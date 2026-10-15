@@ -1,18 +1,17 @@
-// HUD em DOM: placar, gotas, proximo slime, barra de evolucao, power-ups (com o selo do video),
-// avisos, fim (com as gotas da partida), anuncio simulado (localhost) e o painel do ?debug.
+// HUD em DOM: placar, gotas, proximo slime, meta da vez e barra de evolucao, power-ups (com o
+// selo do video e a dica), avisos, slime novo, fim (gotas da partida, quase la e a loja), anuncio
+// simulado (localhost) e o painel do ?debug.
 // O conteudo do menu (modos, loja, missoes) e do src/ui/menu.js. So escreve no DOM quando muda.
 
 import { hexDaMistura } from '../cor/km.js';
+import { PALETA } from '../jogo/skins.js';
+import { svgIcone } from './icones.js';
 
-const ICONES = {
-  trocar: '<svg viewBox="0 0 24 24"><g class="t"><path d="M5 9h11l-3-3M19 15H8l3 3"/></g><path d="M5 9h11l-3-3M19 15H8l3 3"/></svg>',
-  chacoalhar: '<svg viewBox="0 0 24 24"><g class="t"><circle cx="12" cy="13" r="6"/></g><circle cx="12" cy="13" r="6"/><path d="M9.5 12h.01M14.5 12h.01M11 16h2M3 6c1-1 2-1 3 0M18 6c1-1 2-1 3 0M3 20c1-1 2-1 3 0M18 20c1-1 2-1 3 0"/></svg>',
-  alargar: '<svg viewBox="0 0 24 24"><g class="t"><path d="M9 21 5 5M15 21l4-16M5 5 3 9M5 5l4 2M19 5l2 4M19 5l-4 2"/></g><path d="M9 21 5 5M15 21l4-16M5 5 3 9M5 5l4 2M19 5l2 4M19 5l-4 2"/></svg>',
-  mira: '<svg viewBox="0 0 24 24"><g class="t"><circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></g><circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/><circle cx="12" cy="12" r="1.5"/></svg>',
-  calor: '<svg viewBox="0 0 24 24"><g class="t"><path d="M12 3c3 4 5 6 5 10a5 5 0 0 1-10 0c0-2 1-4 2-5 0 2 1 3 2 3 0-3 0-5 1-8z"/></g><path d="M12 3c3 4 5 6 5 10a5 5 0 0 1-10 0c0-2 1-4 2-5 0 2 1 3 2 3 0-3 0-5 1-8z"/></svg>',
-  gelo: '<svg viewBox="0 0 24 24"><g class="t"><path d="M12 3v18M4 7.5l16 9M4 16.5l16-9"/></g><path d="M12 3v18M4 7.5l16 9M4 16.5l16-9M9 4l3 2 3-2M9 20l3-2 3 2"/></svg>',
-  tesoura: '<svg viewBox="0 0 24 24"><g class="t"><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8 16 19 4M16 16 5 4"/></g><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8 16 19 4M16 16 5 4"/></svg>',
-  tinta: '<svg viewBox="0 0 24 24"><g class="t"><path d="M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z"/></g><path d="M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z"/></svg>',
+/** Premios de marco (o 5o espaco): placa dourada. */
+const PREMIOS = ['calor', 'gelo', 'tesoura', 'tinta'];
+
+/** Icones dos prototipos (Croma, Loja e Molde); os dos reforcos estao em src/ui/icones.js. */
+const ICONES_PROTOTIPOS = {
   mexer: '<svg viewBox="0 0 24 24"><g class="t"><path d="M12 4a8 8 0 1 0 8 8"/><path d="m20 4-.5 6-6-.5"/></g><path d="M12 4a8 8 0 1 0 8 8"/><path d="m20 4-.5 6-6-.5"/></svg>',
   servir: '<svg viewBox="0 0 24 24"><g class="t"><path d="m5 12 5 5 9-10"/></g><path d="m5 12 5 5 9-10"/></svg>',
   ralo: '<svg viewBox="0 0 24 24"><g class="t"><path d="M4 8h16l-3 12H7z"/></g><path d="M4 8h16l-3 12H7zM9 4h6"/></svg>',
@@ -21,7 +20,7 @@ const ICONES = {
 /**
  * Fundo CSS da bolinha da barra de evolucao, com a textura do nivel (a mesma do shader).
  * @param {string} cor
- * @param {number} [t] 1 bolinhas, 2 listras, 3 arco-iris, 4 ondas, 5 galaxia, 6 glitter
+ * @param {number} [t] 1 bolinhas, 2 listras, 3 arco-iris, 4 ondas, 5 galaxia, 6 glitter, 7 lava
  */
 function fundoTextura(cor, t) {
   switch (t) {
@@ -31,6 +30,7 @@ function fundoTextura(cor, t) {
     case 4: return `repeating-linear-gradient(0deg, rgba(255,255,255,.6) 0 .08em, transparent .08em .22em), ${cor}`;
     case 5: return 'radial-gradient(circle at 30% 35%, #fff 0 5%, transparent 7%), radial-gradient(circle at 68% 62%, #fff 0 4%, transparent 6%), radial-gradient(circle at 55% 25%, #ff8ad8 0 3%, transparent 5%), radial-gradient(circle at 50% 70%, #6b3fa8, #1c1f45)';
     case 6: return 'conic-gradient(#ffd6f5, #d6f0ff, #fff7c2, #d9ffe0, #ffd6f5)';
+    case 7: return 'radial-gradient(circle at 30% 60%, #ffcf4a 0 6%, transparent 12%), linear-gradient(120deg, transparent 40%, #ff6a1a 42% 47%, transparent 49%), linear-gradient(40deg, transparent 55%, #ff8a1a 57% 61%, transparent 63%), #3b1612';
     default: return cor;
   }
 }
@@ -40,20 +40,65 @@ function fundoTextura(cor, t) {
  * @param {Record<string, string>} T
  */
 export function criarHud(doc, T) {
+  const icone = (id) => svgIcone(id) || ICONES_PROTOTIPOS[id] || '';
   const $ = (id) => /** @type {HTMLElement} */ (doc.getElementById(id));
+  let encosto = '';
+  /** @type {Array<any>|null} skins da partida (indice = nivel), para a barra e o proximo */
+  let skins = null;
+  /** @type {Map<string, HTMLCanvasElement>} imagem 16x16 de cada skin de pixel (pela chave) */
+  const imagensSkin = new Map();
+
+  /** A imagem 16x16 da skin: os pixels opacos sobre a cor do corpo. */
+  function imagemSkin(ap) {
+    let c = imagensSkin.get(ap.chave);
+    if (c) return c;
+    c = doc.createElement('canvas');
+    c.width = 16;
+    c.height = 16;
+    const ctx = c.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = hexDaMistura(ap.pig);
+      ctx.fillRect(0, 0, 16, 16);
+      for (let p = 0; p < 256; p++) {
+        const i = ap.px[p] & 15;
+        if (!i) continue;
+        ctx.fillStyle = PALETA[i];
+        ctx.fillRect(p % 16, p >> 4, 1, 1);
+      }
+    }
+    if (imagensSkin.size > 40) imagensSkin.clear();
+    imagensSkin.set(ap.chave, c);
+    return c;
+  }
+
+  /** Fundo CSS da bolinha da barra para um nivel com skin (null: o de sempre). @param {number} k */
+  function fundoSkin(k) {
+    const ap = skins && skins[k];
+    if (!ap || !ap.ap) return null;
+    if (ap.px) {
+      const tam = ap.modo === 1 ? 'cover' : '0.6em 0.6em';
+      return `url(${imagemSkin(ap).toDataURL()}) center/${tam} repeat, ${ap.hex};image-rendering:pixelated`;
+    }
+    return `radial-gradient(circle at 35% 30%, rgba(255,255,255,.6) 0 12%, transparent 32%), ${ap.hex}`;
+  }
   const el = {
     pontos: $('pontos'), recorde: $('recorde'), proximo: /** @type {HTMLCanvasElement} */ ($('cProximo')), proximoCaixa: $('proximoCaixa'),
     base: $('base'), meta: $('meta'), menu: $('menu'), fim: $('fim'), fimPontos: $('fimPontos'), fimSub: $('fimSub'),
     fimTitulo: $('fimTitulo'), reviver: $('bReviver'), anuncio: $('anuncio'), anNum: $('anNum'), dep: $('depuracao'),
     gotas: $('gotas'), aviso: $('aviso'), fimGanho: $('fimGanho'), fimGotas: $('fimGotas'), dobrar: $('bDobrar'), continuar: $('bContinuar'),
+    revelacao: $('revelacao'), dica: $('dica'), fimQuase: $('fimQuase'), lojaFim: $('bLojaFim'),
   };
   for (const n of doc.querySelectorAll('[data-t]')) {
     const k = /** @type {HTMLElement} */ (n).dataset.t || '';
     if (T[k]) n.textContent = T[k];
   }
+  for (const n of doc.querySelectorAll('[data-t-aria]')) {
+    const k = /** @type {HTMLElement} */ (n).dataset.tAria || '';
+    if (T[k]) n.setAttribute('aria-label', T[k]);
+  }
   const cb = {
-    pausar: () => {}, continuar: () => {}, recomecar: () => {}, deNovo: () => {}, reviver: () => {}, som: () => {},
-    poder: (/** @type {string} */ _id) => {}, menuFim: () => {}, dobrar: () => {}, gotas: () => {},
+    pausar: () => {}, continuar: () => {}, recomecar: () => {}, deNovo: () => {}, reviver: () => {}, som: () => {}, musica: () => {},
+    poder: (/** @type {string} */ _id) => {}, menuFim: () => {}, dobrar: () => {}, gotas: () => {}, lojaFim: () => {},
   };
   $('bPausa').addEventListener('click', () => cb.pausar());
   $('bContinuar').addEventListener('click', () => cb.continuar());
@@ -61,15 +106,41 @@ export function criarHud(doc, T) {
   $('bDeNovo').addEventListener('click', () => cb.deNovo());
   $('bReviver').addEventListener('click', () => cb.reviver());
   $('bSom').addEventListener('click', () => cb.som());
+  $('bMusica').addEventListener('click', () => cb.musica());
   $('bMenuFim').addEventListener('click', () => cb.menuFim());
   $('bDobrar').addEventListener('click', () => cb.dobrar());
   $('gotasHud').addEventListener('click', () => cb.gotas());
+  el.lojaFim.addEventListener('click', () => cb.lojaFim());
 
   /** @type {Map<string, HTMLButtonElement>} */
   const poderes = new Map();
   /** cache do que esta no DOM */
   const ultimo = { pontos: '', recorde: '', proximo: '', evol: '', poderes: '', colecao: '', gotas: -1 };
   const listaMissoes = $('listaMissoes');
+  /** @type {Array<any>} a ultima barra de evolucao (cor e textura de cada nivel) */
+  let evol = [];
+  /** reforco com a dica (o botao pulsa e a mao toca nele) */
+  let dicaId = '';
+  let revelaId = 0;
+
+  /** Bolinha de um nivel (1..13) como na barra; "?" se ninguem o viu ainda. @param {number} k */
+  function bola(k) {
+    const e = evol[k - 1];
+    if (!e || !e.visto) return '<i class="desconhecido">?</i>';
+    return `<i style="background:${fundoSkin(k) || fundoTextura(e.cor, e.textura)}"></i>`;
+  }
+  /** Texto com {n} e {item} preenchidos. @param {string} chave @param {Record<string, string|number>} v */
+  const texto = (chave, v) => String(T[chave] || '').replace(/\{(\w+)\}/g, (_, k) => (k in v ? String(v[k]) : ''));
+
+  /** A mao da dica com a ponta do dedo no centro do botao (os botoes andam com o pote). */
+  function posicionarDica() {
+    const b = dicaId ? poderes.get(dicaId) : null;
+    const r = b && !b.hidden ? b.getBoundingClientRect() : null;
+    if (!r || r.width <= 0) { el.dica.hidden = true; return; }
+    el.dica.hidden = false;
+    el.dica.style.left = Math.round(r.left + r.width / 2) + 'px';
+    el.dica.style.top = Math.round(r.top + r.height / 2) + 'px';
+  }
   /** fila de avisos (um por vez, 2,2 s cada) */
   const avisos = [];
   let avisoId = 0;
@@ -85,8 +156,8 @@ export function criarHud(doc, T) {
     avisoId = /** @type {any} */ (setTimeout(proximoAviso, 2200));
   }
 
-  /** Desenha o slime do "proximo" no canvasinho. */
-  function desenharProximo(pig, escala = 1) {
+  /** Desenha o slime do "proximo" no canvasinho (com a skin equipada do nivel, se tiver). */
+  function desenharProximo(pig, escala = 1, k = 0) {
     const c = el.proximo;
     const ctx = c.getContext('2d');
     if (!ctx) return;
@@ -99,10 +170,24 @@ export function criarHud(doc, T) {
     ctx.beginPath();
     ctx.arc(cx, cy, r + 5, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = hexDaMistura(pig);
+    const ap = k && skins ? skins[k] : null;
+    ctx.fillStyle = ap && ap.ap ? ap.hex : hexDaMistura(pig);
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
+    if (ap && ap.ap && ap.px) {
+      // a imagem da skin dentro do circulo: a estampa cobre o corpo; o ladrilho repete
+      ctx.save();
+      ctx.clip();
+      ctx.imageSmoothingEnabled = false;
+      const img = imagemSkin(ap);
+      if (ap.modo === 1) ctx.drawImage(img, cx - r * 1.05, cy - r * 1.05, r * 2.1, r * 2.1);
+      else {
+        const t = Math.max(8, r * 0.7);
+        for (let y = cy - r - t; y < cy + r; y += t) for (let x = cx - r - t; x < cx + r; x += t) ctx.drawImage(img, x, y, t, t);
+      }
+      ctx.restore();
+    }
     ctx.strokeStyle = 'rgba(255,255,255,0.85)';
     ctx.lineWidth = r * 0.14;
     ctx.lineCap = 'round';
@@ -121,15 +206,60 @@ export function criarHud(doc, T) {
       for (const k of ['pontos', 'recorde', 'proximo', 'evol', 'poderes', 'colecao']) ultimo[k] = '';
       for (const p of h.poderes || []) {
         const b = doc.createElement('button');
-        b.className = 'btn poder';
-        b.innerHTML = (ICONES[p.id] || '') + '<i class="conta"></i><i class="selo" aria-hidden="true" hidden>🎬</i>';
-        b.setAttribute('aria-label', p.id);
+        b.className = 'btn poder' + (PREMIOS.includes(p.id) ? ' premio' : '');
+        const selo = svgIcone('video');
+        b.innerHTML = icone(p.id) + `<i class="conta"></i><i class="selo" aria-hidden="true" hidden>${selo}</i>`;
+        b.setAttribute('aria-label', T['poder.' + p.id] || p.id);
+        b.title = T['poder.' + p.id] || '';
         b.addEventListener('click', () => cb.poder(p.id));
+        b.hidden = !!p.oculto;
         el.base.appendChild(b);
         poderes.set(p.id, b);
       }
+      // o 5o espaco existe desde o inicio (tracejado com "?"): os botoes nao pulam quando o premio chega
+      if ((h.poderes || []).some((p) => PREMIOS.includes(p.id))) {
+        const v = doc.createElement('button');
+        v.className = 'btn poder vago';
+        v.tabIndex = -1;
+        v.setAttribute('aria-label', T['poder.vago'] || '');
+        v.innerHTML = icone('vago');
+        el.base.appendChild(v);
+        poderes.set('_vago', v);
+      }
       el.proximoCaixa.hidden = h.proximo === undefined;
       doc.querySelector('.placar')?.toggleAttribute('hidden', h.pontos === null);
+    },
+    /**
+     * Skins da partida (indice = nivel; null nos prototipos): a barra de evolucao e o proximo
+     * passam a mostrar a skin equipada. @param {Array<any>|null} t
+     */
+    definirAparencias(t) {
+      skins = t;
+      ultimo.proximo = '';
+      ultimo.evol = '';
+    },
+    /**
+     * Reforcos colados ao pote (paisagem): a coluna encosta no pote da direita (px CSS da borda direita e
+     * do meio); null volta a coluna da direita (prototipos, retrato).
+     * @param {number[]|null} a
+     */
+    encostar(a) {
+      const v = a ? Math.round(a[0]) + ',' + Math.round(a[1]) : '';
+      if (v === encosto) return;
+      encosto = v;
+      const hud = /** @type {HTMLElement} */ (el.base.parentElement);
+      doc.body.classList.toggle('colado', !!a);
+      if (a) {
+        hud.style.setProperty('--encosto-x', Math.round(a[0]) + 'px');
+        hud.style.setProperty('--encosto-y', Math.round(a[1]) + 'px');
+      }
+    },
+    /** Centro do botao de um reforco (px CSS), ou null se nao esta na tela. @param {string} id */
+    centroPoder(id) {
+      const b = poderes.get(id);
+      if (!b || b.hidden) return null;
+      const r = b.getBoundingClientRect();
+      return r.width > 0 ? [r.left + r.width / 2, r.top + r.height / 2] : null;
     },
     /** @param {any} h */
     atualizar(h) {
@@ -141,18 +271,26 @@ export function criarHud(doc, T) {
         if (r !== ultimo.recorde) { ultimo.recorde = r; el.recorde.textContent = typeof h.recorde === 'string' ? r : (T.recorde || 'Best') + ': ' + r; }
       }
       if (h.proximo !== undefined) {
-        const k = JSON.stringify(h.proximo) + (h.proximoEscala || 1);
-        if (k !== ultimo.proximo) { ultimo.proximo = k; desenharProximo(h.proximo, h.proximoEscala || 1); }
+        const nk = h.proximoNivel || 0;
+        const k = JSON.stringify(h.proximo) + (h.proximoEscala || 1) + ':' + nk;
+        if (k !== ultimo.proximo) { ultimo.proximo = k; desenharProximo(h.proximo, h.proximoEscala || 1, nk); }
       }
       if (h.evolucao) {
-        const k = JSON.stringify(h.evolucao);
+        const ob = h.objetivo || null;
+        const k = JSON.stringify(h.evolucao) + JSON.stringify(ob);
         if (k !== ultimo.evol) {
           ultimo.evol = k;
-          el.meta.innerHTML = '<div class="evolucao">' + h.evolucao.map((e) => {
+          evol = h.evolucao;
+          // a meta da vez: a pilula com a bolinha do nivel e o alvo pulsando na barra
+          const pilula = ob
+            ? `<div class="objetivo${ob.cresce ? ' cresce' : ''}">${bola(ob.nivel)}<span>${texto(ob.cresce ? 'objetivoCresce' : 'objetivoProximo', { n: ob.nivel })}${ob.premio ? ` · +${ob.premio} 💧` : ''}</span></div>`
+            : '';
+          el.meta.innerHTML = pilula + '<div class="evolucao">' + h.evolucao.map((e) => {
             const tam = (1.05 + e.k * 0.07).toFixed(2);
+            const alvo = ob && ob.nivel === e.k + 1 ? ' alvo' : '';
             return e.visto
-              ? `<i style="width:${tam}em;height:${tam}em;background:${fundoTextura(e.cor, e.textura)}">${e.icone || ''}</i>`
-              : `<i class="desconhecido" style="width:${tam}em;height:${tam}em">?</i>`;
+              ? `<i class="${alvo.trim()}" style="width:${tam}em;height:${tam}em;background:${fundoSkin(e.k + 1) || fundoTextura(e.cor, e.textura)}">${e.icone || ''}</i>`
+              : `<i class="desconhecido${alvo}" style="width:${tam}em;height:${tam}em">?</i>`;
           }).join('') + '</div>';
         }
       } else if (h.metaHtml !== undefined && h.metaHtml !== ultimo.evol) {
@@ -160,6 +298,7 @@ export function criarHud(doc, T) {
         el.meta.innerHTML = h.metaHtml;
       }
       if (h.colecao) this.colecao(h.colecao);
+      if (dicaId) posicionarDica();
       if (h.poderes) {
         const k = JSON.stringify(h.poderes);
         if (k !== ultimo.poderes) {
@@ -174,8 +313,13 @@ export function criarHud(doc, T) {
             b.classList.toggle('vazio', p.qtd === 0 && !p.video);
             b.classList.toggle('video', !!p.video);
             b.classList.toggle('ativo', !!p.ativo);
+            b.setAttribute('aria-pressed', p.ativo ? 'true' : 'false');
+            const nome = T['poder.' + p.id] || p.id;
+            b.setAttribute('aria-label', p.video && T['poder.video'] ? `${nome}: ${T['poder.video']}` : nome);
             b.hidden = !!p.oculto;
           }
+          const vago = poderes.get('_vago');
+          if (vago) vago.hidden = h.poderes.some((p) => PREMIOS.includes(p.id) && !p.oculto);
         }
       }
     },
@@ -202,6 +346,29 @@ export function criarHud(doc, T) {
       avisos.push(texto);
       if (!avisoId) proximoAviso();
     },
+    /**
+     * Slime novo descoberto: cartao com a bolinha do nivel por 2,6 s (nao bloqueia o toque).
+     * @param {number} k nivel @param {string} sub linha de baixo (nivel e gotas)
+     */
+    revelar(k, sub) {
+      const e = evol[k - 1];
+      // atributo inteiro: o fundo da skin de pixel traz o image-rendering junto
+      el.revelacao.querySelector('.bola')?.setAttribute('style', e ? 'background:' + (fundoSkin(k) || fundoTextura(e.cor, e.textura)) : '');
+      /** @type {HTMLElement} */ (el.revelacao.querySelector('b')).textContent = T.novoSlime || '';
+      /** @type {HTMLElement} */ (el.revelacao.querySelector('small')).textContent = sub;
+      el.revelacao.hidden = false;
+      el.revelacao.classList.remove('entra');
+      void el.revelacao.offsetWidth;
+      el.revelacao.classList.add('entra');
+      clearTimeout(revelaId);
+      revelaId = /** @type {any} */ (setTimeout(() => { el.revelacao.hidden = true; }, 2600));
+    },
+    /** Dica do reforco: o botao pulsa e a mao toca nele ('' tira). @param {string} id */
+    dica(id) {
+      dicaId = id || '';
+      for (const [k, b] of poderes) b.classList.toggle('dica', k === dicaId);
+      if (dicaId) posicionarDica(); else el.dica.hidden = true;
+    },
     /** Grade da colecao (Croma-dex) no menu. @param {any[]} lista */
     colecao(lista) {
       const k = JSON.stringify(lista.map((c) => c.visto));
@@ -224,6 +391,20 @@ export function criarHud(doc, T) {
       el.fimTitulo.textContent = d.titulo ? T[d.titulo] || d.titulo : T.fim;
       el.reviver.hidden = !d.reviver;
       this.ganhoFim(d.gotas || 0, !!d.dobrar);
+      // quase la: o recorde por pouco vale mais que o nivel seguinte (uma linha so)
+      const q = d.quase || {};
+      let quase = '';
+      if (q.recorde) quase = `<span>${texto('faltaRecorde', { n: q.recorde })}</span>`;
+      else if (q.nivel) quase = `${bola(q.nivel - 1)}<span aria-hidden="true">→</span>${bola(q.nivel)}<span>${texto('quaseNivel', { n: q.nivel })}</span>`;
+      el.fimQuase.innerHTML = quase;
+      el.fimQuase.hidden = !quase;
+      // o proximo item da loja: quanto falta, ou que ja da para comprar (abre a loja)
+      const L = q.loja;
+      el.lojaFim.hidden = !L;
+      if (L) {
+        el.lojaFim.textContent = '🛒 ' + (L.falta > 0 ? texto('faltaLoja', { n: L.falta, item: L.nome }) : texto('podeComprar', { item: L.nome }));
+        el.lojaFim.classList.toggle('pode', !(L.falta > 0));
+      }
     },
     /** Gotas ganhas na partida e o botao de dobrar (video). @param {string|number} texto @param {boolean} dobrar */
     ganhoFim(texto, dobrar) {
@@ -278,9 +459,11 @@ export function criarHud(doc, T) {
     aoDeNovo(f) { cb.deNovo = f; },
     aoReviver(f) { cb.reviver = f; },
     aoSom(f) { cb.som = f; },
+    aoMusica(f) { cb.musica = f; },
     aoPoder(f) { cb.poder = f; },
     aoMenuFim(f) { cb.menuFim = f; },
     aoDobrar(f) { cb.dobrar = f; },
     aoGotas(f) { cb.gotas = f; },
+    aoLojaFim(f) { cb.lojaFim = f; },
   };
 }

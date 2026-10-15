@@ -91,31 +91,6 @@ export function desenharPote(ctx, cam, dpr, paredes, o = {}) {
   });
 }
 
-/** Tala de madeira cruzada sobre a parede (como no conceito), centrada em (mx, my). */
-export function desenharTala(ctx, mx, my) {
-  ctx.save();
-  ctx.translate(mx, my);
-  for (const ang of [0.6, -0.6]) {
-    ctx.save();
-    ctx.rotate(ang);
-    ctx.fillStyle = '#c98a3e';
-    ctx.strokeStyle = TINTA;
-    ctx.lineWidth = 0.07;
-    ctx.beginPath();
-    ctx.rect(-0.95, -0.2, 1.9, 0.4);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#7a4a1c';
-    for (const x of [-0.65, 0.65]) {
-      ctx.beginPath();
-      ctx.arc(x, 0, 0.07, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-  ctx.restore();
-}
-
 /**
  * Linha tracejada de perigo.
  * @param {CanvasRenderingContext2D} ctx

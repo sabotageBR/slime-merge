@@ -27,12 +27,24 @@ h = h.replace(/<!doctype html>\s*/i, '')
   .replace(/, url\('\.\.\/src\/ui\/fontes\/[^']+'\) format\('woff2'\)/g, '');
 writeFileSync(join(pasta, 'index.html'), h);
 
-// estudio de visuais: outra pagina (com o proprio doctype), prints em visuais/
-let v = readFileSync(join(RAIZ, 'modelos/visuais.html'), 'utf8');
-v = v.replace(/\.\.\/docs\/visuais\//g, 'visuais/')
-  .replace('src="../index.html?modelo=1"', 'src="jogo-1.html"')
-  .replace(/, url\('\.\.\/src\/ui\/fontes\/[^']+'\) format\('woff2'\)/g, '');
-writeFileSync(join(pasta, 'visuais.html'), v);
+// paginas de escolha (com o proprio doctype): estudio de visuais, escolhas de 2026-10-15 e os
+// estudios de sons e de skins; prints em visuais/, jogo em jogo-1.html, modulos em src/
+for (const pagina of ['visuais', 'escolhas', 'sons', 'skins']) {
+  let v;
+  try { v = readFileSync(join(RAIZ, `modelos/${pagina}.html`), 'utf8'); } catch { continue; }
+  v = v.replace(/\.\.\/docs\/visuais\//g, 'visuais/')
+    .replace(/\.\.\/docs\/skins\//g, 'skins/')
+    .replace(/(src|href)="\.\.\/index\.html\?modelo=1"/g, '$1="jogo-1.html"')
+    .replace(/, url\('\.\.\/src\/ui\/fontes\/[^']+'\) format\('woff2'\)/g, '')
+    // './src/' e nao 'src/': nos imports dos modulos 'src/...' e um especificador nu e falha
+    .replace(/\.\.\/src\//g, './src/');
+  writeFileSync(join(pasta, `${pagina}.html`), v);
+}
+// modulos das paginas que ficam em modelos/: no Artifact moram na raiz, ao lado de src/
+for (const extra of ['skins-candidatas.js']) {
+  try { writeFileSync(join(pasta, extra), readFileSync(join(RAIZ, 'modelos', extra), 'utf8').replace(/'\.\.\/src\//g, "'./src/")); } catch { /* ainda nao existe */ }
+}
+try { cpSync(join(RAIZ, 'docs/skins'), join(pasta, 'skins'), { recursive: true }); } catch { /* sem prints de skins */ }
 mkdirSync(join(pasta, 'visuais'), { recursive: true });
 for (const f of readdirSync(join(RAIZ, 'docs/visuais'))) cpSync(join(RAIZ, 'docs/visuais', f), join(pasta, 'visuais', f));
 

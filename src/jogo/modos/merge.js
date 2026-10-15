@@ -1,43 +1,121 @@
 // Modelo 1: Merge Lab (sem fim, o mais perto do conceito).
-// Mirar e soltar; dois iguais fundem no proximo nivel (12 niveis). O slime e gelatina de
+// Mirar e soltar; dois iguais fundem no proximo nivel (13 niveis). O slime e gelatina de
 // verdade: a pilha assenta e "derrete" para o formato do pote; a cor do nivel novo nasce na
 // costura e avanca pelo corpo (frente de transmutacao). Reforcos da referencia: Trocar,
-// Chacoalhar, Alargar (talas de madeira) e Mira; premios de marco: Calor (escoa), Gelo
+// Chacoalhar, Alargar e Mira; premios de marco: Calor (escoa), Gelo
 // (trava), Tesoura (divide) e Tinta (sobe um nivel). Coringa prisma funde com qualquer nivel.
 
 import { criarSoltar, PREMIOS, TEXTO_COMBO, COR_COMBO } from '../soltar.js';
-import { NIVEIS, MAX_NIVEL, particulasNivel, pontosNivel, nivel } from '../niveis.js';
+import { MAX_NIVEL, particulasNivel, pontosNivel } from '../niveis.js';
+import { aparencias as tabelaAparencias } from '../skins.js';
 import { iniciarFrente, pintar } from '../../cor/difusao.js';
-import { hexDaMistura } from '../../cor/km.js';
 
 const PESOS = [30, 26, 20, 14, 10];
 const PRISMA = { pig: [0.06, 0.04, 0.08, 0], textura: 6 };
-const HEX = NIVEIS.map((n) => hexDaMistura(n.pig));
 
-/** Pinta o slime pelo nivel e liga a textura do nivel (se tiver). */
+/**
+ * Comeco do sem fim (Player Fit Test de 2026-10-15: o 2o minuto perdia 24% de quem jogava). O
+ * pote nasce com `largura` da largura e cresce no nivel `nivelCresce`, a primeira meta (o
+ * jogador casual chega nela entre 30 e 75 s), ou aos `tempoCresce` s, antes do fim do resgate
+ * dos 3 primeiros minutos. Mexer no sorteio das primeiras gotas (so 1 a 3, ou repetir o nivel
+ * exposto) nao mudou as fusoes do primeiro minuto na simulacao e ficou de fora.
+ */
+export const INICIO = Object.freeze({ largura: 0.86, nivelCresce: 6, tempoCresce: 150 });
+
+/**
+ * Pinta o slime com a aparencia do nivel (a skin equipada; a padrao e o visual de sempre) e
+ * liga a textura dela.
+ * @param {any} m @param {any} s
+ * @param {{ pig: number[], textura?: number, ap?: number, modo?: number }} def
+ */
 export function colorir(m, s, def) {
   pintar(m, s, def.pig);
   s.dados.textura = def.textura || 0;
   s.dados.texturaT = 1;
+  s.dados.ap = def.ap || 0;
+  s.dados.apModo = def.modo === 1 ? 1 : 0;
+}
+
+/**
+ * A cor nova avanca pelo corpo a partir de (x, y) (fusao, tinta, cinza que pegou cor, skin
+ * trocada no meio da partida); a textura aparece aos poucos.
+ * @param {any} m @param {any} s
+ * @param {import('../skins.js').Aparencia} def
+ * @param {number} x @param {number} y
+ */
+export function transmutar(m, s, def, x, y) {
+  iniciarFrente(m, s, def.pig, x, y);
+  s.dados.hex = def.hex;
+  s.dados.textura = def.textura || 0;
+  s.dados.texturaT = 0;
+  s.dados.ap = def.ap || 0;
+  s.dados.apModo = def.modo === 1 ? 1 : 0;
+}
+
+/**
+ * Tabela de aparencias da partida (indice = nivel; sem `inicial`, as padrao) e a aparencia do
+ * nivel k.
+ * @param {Array<import('../skins.js').Aparencia|null>} [inicial]
+ */
+export function tabelaDaPartida(inicial) {
+  const AP = (inicial || tabelaAparencias()).slice();
+  return { AP, ap: (/** @type {number} */ k) => /** @type {import('../skins.js').Aparencia} */ (AP[Math.max(1, Math.min(MAX_NIVEL, k))]) };
+}
+
+/**
+ * Troca de skin ao vivo: so os slimes dos niveis que mudaram repintam (a cor nova avanca do
+ * alto do corpo). Nao toca no rng.
+ * @param {any} jogo o motor (criarSoltar)
+ * @param {Array<any>} AP a tabela da partida (tabelaDaPartida)
+ * @param {(s: any) => boolean} [pular] slimes que nao seguem o nivel (prisma, cinza)
+ */
+export function ligarAparencias(jogo, AP, pular = () => false) {
+  jogo.aparencias = AP;
+  jogo.definirAparencias = (/** @type {Array<any>} */ nova) => {
+    const mudou = new Set();
+    for (let k = 1; k <= MAX_NIVEL; k++) {
+      if (!nova[k] || (AP[k] && AP[k].chave === nova[k].chave)) continue;
+      AP[k] = nova[k];
+      mudou.add(k);
+    }
+    if (!mudou.size) return;
+    const m = jogo.S.mundo;
+    for (const s of m.vivos()) if (mudou.has(s.nivel) && !pular(s)) transmutar(m, s, AP[s.nivel], s.cx, s.topo - 0.2);
+  };
 }
 
 /**
  * @param {{ semente?: number, salvo?: any, toque?: boolean, visto?: number, regra?: { id: string, meta: number }|null,
- *   vitrine?: number, cesto?: string }} [o]
- *   regra: desafio do dia (src/jogo/perfil.js REGRAS); visto: maior nivel ja descoberto (perfil)
+ *   vitrine?: number, cesto?: string, aparencias?: Array<any>, inicio?: Partial<typeof INICIO> }} [o]
+ *   regra: desafio do dia (src/jogo/perfil.js REGRAS); visto: maior nivel ja descoberto (perfil);
+ *   aparencias: skin de cada nivel (src/jogo/skins.js `aparencias`; sem ela, as padrao);
+ *   inicio: troca o comeco do sem fim (testes e a simulacao de ritmo)
  */
 export function criarModo(o = {}) {
   const salvo = o.salvo || {};
   let visto = Math.max(o.visto || 1, salvo.visto || 1);
   const regra = o.regra ? o.regra.id : '';
+  // o comeco facil e o pote que cresce sao do sem fim (o desafio tem regra e meta proprias)
+  const ini = { ...INICIO, ...(o.inicio || {}) };
+  const comInicio = !regra && !o.vitrine;
+  // aparencia de cada nivel (as skins equipadas no perfil)
+  const { AP, ap } = tabelaDaPartida(o.aparencias);
 
   function criar(S, J, spec, x, y, preso) {
     const s = S.mundo.criarSlime({ x, y, n: particulasNivel(spec.nivel), material: 'gelatina', nivel: spec.nivel, preso });
     if (!s) return null;
     s.dados.prisma = !!spec.prisma;
-    s.dados.hex = spec.prisma ? '#ffffff' : HEX[spec.nivel - 1];
-    colorir(S.mundo, s, spec.prisma ? PRISMA : nivel(spec.nivel));
+    s.dados.hex = spec.prisma ? '#ffffff' : ap(spec.nivel).hex;
+    colorir(S.mundo, s, spec.prisma ? PRISMA : ap(spec.nivel));
     return s;
+  }
+
+  /** O pote estreito do comeco cresce: som, texto e a marca para a telemetria (main.js). */
+  function crescer(S, J, motivo) {
+    if (!J.pote.crescer()) return;
+    S.eventos.push({ tipo: 'som', nome: 'alargar' });
+    S.eventos.push({ tipo: 'texto', x: J.pote.cx, y: J.pote.linha * 0.62, texto: 'poteCresceu', cor: '#5fd9cf', escala: 1.5 });
+    S.eventos.push({ tipo: 'cresceu', motivo });
   }
 
   const jogo = criarSoltar({
@@ -45,6 +123,7 @@ export function criarModo(o = {}) {
     janela: [-7.2, -1.6, 7.2, 15.0],
     campoJanela: [-7.6, -1.4, 7.6, 15.2],
     premios: true,
+    largura: comInicio ? ini.largura : 1,
     sortear(S) {
       const chancePrisma = regra === 'prisma' ? 0.15 : S.tempo > 90 ? 0.03 : 0;
       if (S.rng() < chancePrisma) return { nivel: 2, prisma: true };
@@ -57,6 +136,9 @@ export function criarModo(o = {}) {
       return { nivel: 1 };
     },
     passo(S, dt) {
+      // o pote estreito cresce sozinho antes do fim do resgate (quem nao chegou ao nivel 6)
+      const J0 = S.jogadores[0];
+      if (J0.pote.estreito && S.tempo >= ini.tempoCresce) crescer(S, J0, 'tempo');
       // desafio "chacoalho": o pote sacode sozinho a cada 25 s
       if (regra !== 'chacoalho') return;
       S.extra.tChac = (S.extra.tChac || 0) + dt;
@@ -64,6 +146,8 @@ export function criarModo(o = {}) {
     },
     criar,
     fusao(S, a, b) {
+      // as duas metades da tesoura nao se juntam de novo (cada uma funde com outro igual)
+      if (a.dados.irmao && a.dados.irmao === b.dados.irmao) return 0;
       if (a.dados.prisma && b.dados.prisma) return Math.max(a.nivel, b.nivel) + 1;
       if (a.dados.prisma) return b.nivel + 1;
       if (b.dados.prisma) return a.nivel + 1;
@@ -76,36 +160,38 @@ export function criarModo(o = {}) {
         m.remover(outro);
         m.remover(base);
         J.pontos += pontosNivel(MAX_NIVEL) * 4 * combo;
-        S.eventos.push({ tipo: 'estouro', x: px, y: py, cor: HEX[MAX_NIVEL - 1] });
+        S.eventos.push({ tipo: 'estouro', x: px, y: py, cor: ap(MAX_NIVEL).hex });
         S.eventos.push({ tipo: 'texto', x: px, y: py + 1.5, texto: 'perfeito', cor: '#ffd23a', escala: 1.8 });
-        return;
+        // nenhum nivel novo nasceu (o soltar.js nao registra "nivel 14")
+        return false;
       }
       const saidas = m.fundir(base, outro, { px, py, nAlvo: particulasNivel(k) });
       base.nivel = k;
       base.dados.prisma = false;
-      base.dados.hex = HEX[k - 1];
+      base.dados.irmao = 0;
       base.dados.expr = 'feliz';
       base.dados.exprT = 0.7;
-      const def = nivel(k);
       // a cor nova avanca pelo corpo; a textura do nivel aparece aos poucos
-      iniciarFrente(m, base, def.pig, px, py);
-      base.dados.textura = def.textura || 0;
-      base.dados.texturaT = 0;
+      transmutar(m, base, ap(k), px, py);
       const ganho = pontosNivel(k) * combo;
       J.pontos += ganho;
       if (k > visto) visto = k;
       if (k > J.maxNivel) {
         J.maxNivel = k;
+        // telemetria: ate que nivel a partida chegou (o funil da Poki por nivel)
+        S.eventos.push({ tipo: 'nivel', n: k, acao: 'complete' });
         // marco: um premio fisico a cada nivel novo a partir do 5
         if (k >= 5 && !J.premio) J.premio = PREMIOS[Math.floor(S.rng() * PREMIOS.length)];
+        if (J.pote.estreito && k >= ini.nivelCresce) crescer(S, J, 'nivel');
       }
       S.eventos.push({
-        tipo: 'fusao', x: px, y: py, cor: HEX[k - 1], combo, brilhos: Math.min(12, saidas.length / 3), nivel: k,
+        tipo: 'fusao', x: px, y: py, cor: ap(k).hex, combo, brilhos: Math.min(12, saidas.length / 3), nivel: k,
         texto: combo >= 2 || k >= 5 ? TEXTO_COMBO[Math.min(3, combo - 1)] : '',
         corTexto: COR_COMBO[Math.min(3, combo - 1)], escala: 1 + Math.min(0.6, (combo - 1) * 0.2),
       });
       if (combo >= 2) S.eventos.push({ tipo: 'texto', x: px + 1.6, y: py + 0.4, texto: 'x' + combo, cor: '#ffffff', escala: 0.9, grupo: 'mult' });
       S.eventos.push({ tipo: 'texto', x: px, y: py - 0.2, texto: '+' + ganho, cor: '#ffffff', escala: 0.55, grupo: 'pts' });
+      return true;
     },
     aplicar(S, J, s, id) {
       const m = S.mundo;
@@ -116,14 +202,17 @@ export function criarModo(o = {}) {
         } else {
           const k = s.nivel - 1;
           const pedacos = m.dividir(s, s.cx, s.cy, 1, 0);
+          const irmao = (S.extra.cortes = (S.extra.cortes || 0) + 1);
           for (const p of pedacos) {
+            p.dados.irmao = irmao;
             m.redimensionar(p, particulasNivel(k), p.cx, p.cy);
             p.nivel = k;
             p.dados.pote = J.idx;
-            p.dados.hex = HEX[k - 1];
+            p.dados.hex = ap(k).hex;
             p.dados.solto = -10;
-            p.dados.textura = nivel(k).textura || 0;
-            p.dados.texturaT = 1;
+            p.dados.prisma = false;
+            // os pedacos sao do nivel de baixo: a cor tambem (o redimensionar copia o pigmento)
+            colorir(m, p, ap(k));
           }
           S.eventos.push({ tipo: 'som', nome: 'recusa' });
         }
@@ -135,11 +224,8 @@ export function criarModo(o = {}) {
           // a gota de tinta entra pelo alto do slime e a cor nova avanca pelo corpo
           m.redimensionar(s, particulasNivel(k), s.cx, s.topo);
           s.nivel = k;
-          s.dados.hex = HEX[k - 1];
-          iniciarFrente(m, s, nivel(k).pig, s.cx, s.topo - 0.3);
-          s.dados.textura = nivel(k).textura || 0;
-          s.dados.texturaT = 0;
-          S.eventos.push({ tipo: 'fusao', x: s.cx, y: s.topo, cor: HEX[k - 1], combo: 1, brilhos: 6 });
+          transmutar(m, s, ap(k), s.cx, s.topo - 0.3);
+          S.eventos.push({ tipo: 'fusao', x: s.cx, y: s.topo, cor: ap(k).hex, combo: 1, brilhos: 6 });
         }
         return true;
       }
@@ -147,17 +233,26 @@ export function criarModo(o = {}) {
     },
     // vitrine (depuracao): nada transborda, a cena fica parada para o print
     transbordou: o.vitrine ? () => true : undefined,
-    pigDe: (S, spec) => (spec.prisma ? PRISMA : nivel(spec.nivel)).pig,
+    pigDe: (S, spec) => (spec.prisma ? PRISMA : ap(spec.nivel)).pig,
     escalaDe: (spec) => 0.62 + spec.nivel * 0.08,
-    hud() {
-      return { evolucao: NIVEIS.map((n, k) => ({ k, visto: k + 1 <= visto, cor: HEX[k], textura: n.textura || 0 })) };
+    hud(S) {
+      const J = S.jogadores[0];
+      // a meta da vez: o nivel do crescimento enquanto o pote e estreito; depois, o proximo nivel
+      // da partida (o "?" e o premio de descoberta quando ninguem o viu ainda)
+      const alvo = J.pote.estreito ? Math.max(ini.nivelCresce, J.maxNivel + 1) : J.maxNivel + 1;
+      return {
+        // a bolinha da barra mostra a skin equipada (o HUD desenha a imagem pelas aparencias)
+        evolucao: Array.from({ length: MAX_NIVEL }, (_, k) => ({ k, visto: k + 1 <= visto, cor: ap(k + 1).hex, textura: ap(k + 1).ap ? 0 : ap(k + 1).textura || 0 })),
+        objetivo: alvo <= MAX_NIVEL ? { nivel: alvo, cresce: J.pote.estreito, novo: alvo > visto } : null,
+      };
     },
     salvar(S) {
       const J = S.jogadores[0];
       return {
         pontos: J.pontos, tempo: S.tempo, fila: J.fila, poderes: J.poderes, premio: J.premio, maxNivel: J.maxNivel,
-        alargado: J.pote.alargado,
-        slimes: S.mundo.vivos().filter((s) => !s.preso).map((s) => [s.nivel, +s.cx.toFixed(2), +s.cy.toFixed(2), s.dados.prisma ? 1 : 0]),
+        alargado: J.pote.alargado, estreito: J.pote.estreito,
+        // o alvo de um missil em voo ja esta perdido
+        slimes: S.mundo.vivos().filter((s) => !s.preso && !s.dados.marcado).map((s) => [s.nivel, +s.cx.toFixed(2), +s.cy.toFixed(2), s.dados.prisma ? 1 : 0]),
       };
     },
     salvarMeta: () => ({ visto }),
@@ -169,6 +264,8 @@ export function criarModo(o = {}) {
       if (p.poderes) J.poderes = p.poderes;
       J.premio = p.premio || '';
       J.maxNivel = p.maxNivel || 1;
+      // partida de antes do pote estreito (sem a marca) ou que ja cresceu: largura de sempre
+      if (!p.estreito) J.pote.crescer(0);
       if (p.alargado) J.pote.alargar();
       for (const [k, x, y, prisma] of (p.slimes || []).slice().sort((a, b) => a[2] - b[2])) {
         const s = criar(S, J, { nivel: k, prisma }, x, y, false);
@@ -176,6 +273,7 @@ export function criarModo(o = {}) {
       }
     },
   }, o);
+  ligarAparencias(jogo, AP, (s) => !!s.dados.prisma);
   if (regra === 'semPoderes') {
     for (const J of jogo.S.jogadores) { J.poderes = { trocar: 0, chacoalhar: 0, alargar: 0, mira: 0 }; J.semVideo = true; }
   }
@@ -183,15 +281,18 @@ export function criarModo(o = {}) {
     // depuracao: os niveis altos (texturas) e o coringa ja no pote
     const S = jogo.S;
     const J = S.jogadores[0];
-    const lista = o.vitrine === 4
-      ? [[6, -2.2, 1.7], [5, 1.9, 1.5], [4, -2.6, 5.2], [3, 0.2, 4.8], [2, 2.8, 4.6], [1, -1.2, 7.6], [7, 1.6, 8.2]]
-      : o.vitrine === 3 ? [[11, 0, 3.4]] : o.vitrine === 2 ? [[12, 0, 3.8]] : [[10, -1.6, 2.8], [9, 2.2, 2.6], [8, -1.6, 8], [7, 2.2, 7.6]];
+    const lista = o.vitrine === 5 ? [[13, 0, 4.0]]
+      : o.vitrine === 4
+        ? [[6, -2.2, 1.7], [5, 1.9, 1.5], [4, -2.6, 5.2], [3, 0.2, 4.8], [2, 2.8, 4.6], [1, -1.2, 7.6], [7, 1.6, 8.2]]
+        : o.vitrine === 3 ? [[11, 0, 3.4]] : o.vitrine === 2 ? [[12, 0, 3.8]] : [[10, -1.6, 2.8], [9, 2.2, 2.6], [8, -1.6, 8], [7, 2.2, 7.6]];
     for (const [k, x, y] of lista) {
       const s = criar(S, J, { nivel: k }, x, y, false);
       if (s) { s.dados.pote = 0; s.dados.solto = -10; }
     }
     const p = o.vitrine > 1 ? null : criar(S, J, { nivel: 3, prisma: true }, 0.3, 11.5, false);
     if (p) { p.dados.pote = 0; p.dados.solto = -10; }
+    // a barra mostra a escada inteira no print
+    visto = MAX_NIVEL;
   }
   return jogo;
 }

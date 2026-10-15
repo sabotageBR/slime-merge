@@ -9,13 +9,20 @@ import { poki } from './core/poki.js';
 import { lerDepuracao } from './core/depuracao.js';
 import { criarArmazem } from './core/armazenamento.js';
 import { criarAudio } from './core/audio.js';
+import { criarSons } from './som/sons.js';
+import { criarMusica } from './som/musica.js';
 import { criarLaco, PASSO } from './core/laco.js';
 import { criarEntrada } from './core/entrada.js';
 import { criarCena } from './render/cena.js';
 import { criarHud } from './ui/hud.js';
 import { criarMenu } from './ui/menu.js';
-import { criarPerfil, gotasDaPartida } from './jogo/perfil.js';
-import { escolherIdioma, textos, formatar, numero } from './i18n/textos.js';
+import { criarPerfil, gotasDaPartida, PREMIO_DESCOBERTA } from './jogo/perfil.js';
+import { MAX_NIVEL } from './jogo/niveis.js';
+import { criarQualidade, faixaFps } from './render/qualidade.js';
+import { maoEm, TOQUE_MAO } from './render/guias.js';
+import { aparencias, SKINS } from './jogo/skins.js';
+import { criarEditor } from './ui/editor.js';
+import { escolherIdioma, textos, textosEditor, formatar, numero } from './i18n/textos.js';
 
 const MODULOS = {
   semfim: () => import('./jogo/modos/merge.js'),
@@ -54,7 +61,20 @@ const J = {
   dobravel: 0, // parte do ganho que o video dobra (sem os premios de desafio e missoes)
   meta: 0, // desafio do dia: pontos da meta
   premiado: false, // desafio do dia: premio de hoje ja pago
+  editor: false, // editor de pixel da Minha aberto (por cima do menu, jogo pausado)
+  ocioso: 0, // s sem nenhum gesto (mouse, toque, tecla): a demonstracao espera por ele
+  demos: 0, // gotas soltas pela demonstracao (quem nao toca no comeco)
+  usouPoder: false, // algum reforco usado nesta sessao (a dica do reforco so vem sem isso)
+  dica: /** @type {{ id: string, t: number }|null} */ (null),
+  fpsQ: 0, // quadros e tempo real do minuto de jogo (telemetria do fps)
+  fpsT: 0,
 };
+/** Minutos de jogo em que o fps medio vai para a telemetria (poucos, para nao inflar). */
+const MINUTOS_FPS = [1, 3, 5, 10];
+/** Dicas que o aparelho ja viu (uma vez cada). */
+const dicasVistas = armazem.ler('dicas', {}) || {};
+// qualidade do render: desce sozinha quando o aparelho nao segura o fps (?qualidade= fixa)
+const qualidade = criarQualidade({ inicial: Math.max(0, dep.qualidade) });
 
 // ------------------------------------------------------------------ perfil (uma moeda: gotas)
 /** Data local AAAA-MM-DD: a sequencia e as missoes viram a meia-noite do jogador. */
@@ -62,6 +82,14 @@ function dataLocal(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 const perfil = criarPerfil(armazem.ler('perfil', {}) || {}, dataLocal(new Date()));
+if (perfil.migrou) {
+  // o "nivel 13" do estouro de dois 12 tambem foi copiado para os saves dos modos
+  for (const chave of ['modo1', 'desafio', 'modo5']) {
+    const s = armazem.ler(chave, null);
+    if (s && s.visto > 12) armazem.gravar(chave, { ...s, visto: 12 });
+  }
+  armazem.gravar('perfil', perfil.dados());
+}
 perfil.marcarVisto((armazem.ler('modo1', {}) || {}).visto || 1);
 let perfilSujo = false;
 function gravarPerfil() {
@@ -74,12 +102,35 @@ function gravarPerfil() {
 const pedido = String(dep.modelo || /** @type {any} */ (globalThis).__slimeModelo || '');
 const inicial = DO_MODELO[pedido] || (pedido in MODULOS ? pedido : 'semfim');
 const prototipo = !['semfim', 'desafio', 'duelo', 'duelo2'].includes(inicial);
+// previa da pagina de escolhas do hub (slime.escolha): a vitrine dos niveis altos no pote. Na
+// Poki nao ha pedido: nada muda.
+const escolhaHub = pedido ? armazem.ler('escolha', {}) || {} : {};
 if (prototipo) document.body.classList.add('prototipo');
 
 // visual: parametro local > pagina do hub > Estudio de visuais (so no hub) > o que o jogador
 // equipou na loja (padrao: bequer, jardim, classico, escolhidos pelo usuario em 2026-10-14)
 const visualGlobal = /** @type {any} */ (globalThis).__slimeVisual || {};
 const visualEstudio = pedido ? armazem.ler('visual', {}) || {} : {};
+// sons: a escolha do Estudio de sons (modelos/sons.html grava slime.sons) so vale quando a
+// pagina abre por ?modelo= ou pelo hub, como o slime.visual; na Poki vale o PADRAO do catalogo
+const musica = criarMusica({ audio });
+const sons = criarSons({ audio, musica, escolha: { ...(pedido ? armazem.ler('sons', {}) || {} : {}), ...dep.sons } });
+sons.iniciarMusica(); // espera o primeiro gesto e entra com fade
+
+/** Contagem das gotas (fim e dobrar): um som por gota, ate 12, acelerando. */
+function contarGotas(n, atrasoMs = 600) {
+  let t = atrasoMs;
+  for (let i = 0; i < Math.min(12, Math.max(0, n | 0)); i++) {
+    const k = i;
+    setTimeout(() => sons.tocar('gotas', { i: k }), t);
+    t += Math.max(60, 150 - i * 10);
+  }
+}
+// botoes (menu, loja, fim): o som de interface; os reforcos tem som proprio
+document.addEventListener('pointerdown', (ev) => {
+  const b = /** @type {any} */ (ev.target).closest && /** @type {any} */ (ev.target).closest('button');
+  if (b && !b.classList.contains('poder')) sons.tocar('interface');
+}, true);
 function visualAtual() {
   const eq = perfil.equipado;
   return {
@@ -89,14 +140,17 @@ function visualAtual() {
   };
 }
 const visual = visualAtual();
-const cena = criarCena({ fundo: /** @type {any} */ ($('cFundo')), slime: /** @type {any} */ ($('cSlime')), topo: /** @type {any} */ ($('cTopo')), area: $('area') }, { forcar2d: dep.render === '2d', raio: dep.raio, limiar: dep.limiar, zoom: dep.zoom, cenario: visual.cenario, objeto: visual.objeto, cesto: visual.cesto });
+const cena = criarCena({ fundo: /** @type {any} */ ($('cFundo')), slime: /** @type {any} */ ($('cSlime')), topo: /** @type {any} */ ($('cTopo')), tela: /** @type {any} */ ($('cTela')), area: $('area') }, { forcar2d: dep.render === '2d', raio: dep.raio, limiar: dep.limiar, zoom: dep.zoom, cenario: visual.cenario, objeto: visual.objeto, cesto: visual.cesto, expr: dep.expr });
 const hud = criarHud(document, T);
+// o missil da mira sai do proprio botao
+cena.origemMissil = () => hud.centroPoder('mira');
 const menu = criarMenu(document, T, idioma, {
   modo: (chave) => escolherModo(chave),
   comprar(grupo, id) {
     if (!perfil.comprar(grupo, id)) return;
+    poki.measure('loja', grupo + '-' + id, 'buy');
     gravarPerfil();
-    audio.yes?.();
+    sons.tocar('compra');
     aplicarVisual(grupo);
     atualizarMenu();
   },
@@ -106,7 +160,78 @@ const menu = criarMenu(document, T, idioma, {
     aplicarVisual(grupo);
     atualizarMenu();
   },
+  comprarSkin(k, id) {
+    if (!perfil.comprarSkin(k, id)) return;
+    poki.measure('skin', k + '-' + id, 'buy');
+    gravarPerfil();
+    sons.tocar('compra');
+    aplicarSkins();
+    atualizarMenu();
+    // a Minha comprada abre direto no editor (ela nasce vazia)
+    if (id === 'minha') abrirEditor(k);
+  },
+  equiparSkin(k, id) {
+    if (!perfil.equiparSkin(k, id)) return;
+    gravarPerfil();
+    aplicarSkins();
+    atualizarMenu();
+  },
+  editarMinha: (k) => abrirEditor(k),
 });
+
+// ------------------------------------------------------------------ skins por nivel
+/** A skin equipada de cada nivel (indice = nivel), como os modos e o render usam. */
+function tabelaSkins() {
+  if (dep.skins === 'todas') {
+    // depuracao (?skins=todas): a 1a pronta de cada nivel, para medir o shader no celular
+    const eq = {};
+    for (const x of SKINS) if (x.id !== 'padrao' && !eq[x.nivel]) eq[x.nivel] = x.id;
+    return aparencias(eq, {});
+  }
+  return aparencias(perfil.skins.equipado, perfil.skins.minhas);
+}
+
+/** Skin comprada, equipada ou editada: o modo repinta os slimes daquele nivel; render e HUD seguem. */
+function aplicarSkins() {
+  if (!J.modo || !J.modo.definirAparencias) return;
+  J.modo.definirAparencias(tabelaSkins());
+  cena.definirAparencias(J.modo.aparencias);
+  hud.definirAparencias(J.modo.aparencias);
+}
+
+/** @type {ReturnType<typeof criarEditor>|null} */
+let editor = null;
+/** Editor de pixel da Minha do nivel k, em tela cheia por cima do menu (o jogo segue pausado). */
+function abrirEditor(k) {
+  if (editor || !perfil.possuiSkin(k, 'minha')) return;
+  const raiz = $('telaEditor');
+  raiz.hidden = false;
+  J.editor = true;
+  editor = criarEditor(raiz, {
+    nivel: k,
+    inicial: perfil.skins.minhas[k] || null,
+    objeto: visualAtual().objeto,
+    modal: true,
+    T: textosEditor(idioma),
+    // as prontas de pixel do mesmo nivel que o jogador ja tem viram ponto de partida
+    prontas: SKINS.filter((x) => x.tipo === 'pixel' && x.nivel === k && perfil.possuiSkin(k, x.id))
+      .map((x) => ({ id: x.id, nome: T['skin.' + x.id] || x.id, px: x.px || [], modo: x.modo })),
+    aoSalvar(m) {
+      if (!perfil.salvarMinha(k, m)) return;
+      gravarPerfil();
+      aplicarSkins();
+      atualizarMenu();
+    },
+    aoCancelar: fecharEditor,
+  });
+}
+function fecharEditor() {
+  if (editor) editor.destruir();
+  editor = null;
+  $('telaEditor').hidden = true;
+  J.editor = false;
+  atualizarMenu();
+}
 
 function orientar() {
   const paisagem = window.innerWidth > window.innerHeight * 1.15;
@@ -131,6 +256,7 @@ criarEntrada(window, {
   primeiroGesto: () => audio.iniciar(),
   multi: () => J.chave === 'duelo2',
   ponteiro(fase, px, py, e) {
+    J.ocioso = 0;
     if (J.estado !== 'jogando' || !J.modo) return;
     // o toque abre o gameplay mesmo antes da primeira camera (rAF parado, aba nascendo)
     if (fase === 'baixo') tocar();
@@ -145,7 +271,10 @@ criarEntrada(window, {
     J.modo.apontar(p[0], p[1], fase, quem);
   },
   tecla(codigo, baixo) {
-    if (baixo && (codigo === 'Escape' || codigo === 'KeyP')) { alternarPausa(); return; }
+    // o editor de skin cuida das proprias teclas (Esc fecha ele, nao o menu)
+    if (J.editor) return;
+    J.ocioso = 0;
+    if (baixo && (codigo === 'Escape' || codigo === 'KeyP')) { alternarPausa('tecla'); return; }
     if (J.estado !== 'jogando' || !J.modo) return;
     if (baixo) tocar();
     J.modo.tecla(codigo, baixo);
@@ -170,23 +299,30 @@ function atualizarMenu() {
     sequencia: perfil.sequencia,
     hoje: perfil.hoje,
     modoAtual: J.chave,
+    visto: perfil.visto,
+    skins: perfil.skins,
+    possuiSkin: (k, id) => perfil.possuiSkin(k, id),
+    precoSkin: (k, id) => perfil.precoSkin(k, id),
   });
 }
 
-/** @param {string} [aba] */
-function abrirMenu(aba) {
+/** @param {string} [aba] @param {string} [origem] de onde veio (telemetria): pausa, tecla, gotas, fim, fimLoja */
+function abrirMenu(aba, origem = 'pausa') {
+  poki.measure('menu', origem, 'open');
   atualizarMenu();
+  musica.abaixar(0.5);
   menu.aba(aba || 'jogar');
   hud.menu(true, { fim: J.estado === 'menuFim' });
 }
 
-function alternarPausa() {
+/** @param {string} [origem] botao da pausa, tecla ou gotas (telemetria do menu) */
+function alternarPausa(origem = 'pausa') {
   if (J.estado === 'jogando') {
     J.estado = 'pausa';
     poki.gameplayStop();
     laco.pausar(true);
     salvar();
-    abrirMenu();
+    abrirMenu(undefined, origem);
   } else if (J.estado === 'pausa') {
     continuar();
   } else if (J.estado === 'menuFim') {
@@ -198,7 +334,10 @@ function alternarPausa() {
 }
 
 function continuar() {
+  if (J.editor) return;
   hud.menu(false);
+  menu.liberar();
+  musica.abaixar(1);
   J.estado = 'jogando';
   laco.pausar(false);
   if (J.tocou) poki.gameplayStart();
@@ -215,6 +354,7 @@ async function entrarModo(chave) {
   if (J.estado === 'trocando' || J.estado === 'anuncio') return;
   salvar();
   hud.menu(false);
+  menu.liberar();
   hud.fim(false);
   J.estado = 'trocando';
   laco.pausar(true);
@@ -258,7 +398,7 @@ function configModo(chave, nova = false) {
   const vis = visualAtual();
   // niveis ja vistos: a mao que ensina so aparece para quem nunca fundiu
   const comVisto = (s) => ({ ...s, visto: Math.max(s.visto || 1, perfil.visto), ...(nova ? { partida: null } : {}) });
-  const base = { semente: dep.semente || ((Date.now() / 1000) | 0), toque, lang: idioma, vitrine: dep.vitrine, cesto: vis.cesto, visto: perfil.visto };
+  const base = { semente: dep.semente || ((Date.now() / 1000) | 0), toque, lang: idioma, vitrine: dep.vitrine || (window.parent !== window ? escolhaHub.vitrine || 0 : 0), cesto: vis.cesto, visto: perfil.visto, aparencias: tabelaSkins() };
   if (chave === 'desafio') {
     const d = perfil.desafio();
     const s = armazem.ler('desafio', {}) || {};
@@ -284,6 +424,9 @@ async function carregarModo(chave, nova = false) {
   J.premiado = cfg.regra ? cfg.regra.premiado : false;
   donoDoDedo.clear();
   cena.definirVisual({ cesto: cfg.cesto });
+  // skins da partida (os prototipos nao tem: o visual de sempre)
+  cena.definirAparencias(J.modo.aparencias || []);
+  hud.definirAparencias(J.modo.aparencias || null);
   hud.preparar(J.modo);
   poki.measure('modo', chave, 'start');
 }
@@ -295,22 +438,33 @@ function tratarEventos() {
     const e = evs.shift();
     switch (e.tipo) {
       case 'gota':
-        audio.ruido(0.08, 700, 1.2, 0.18);
+        sons.tocar('soltar', { nivel: e.nivel });
         break;
       case 'pouso':
-        audio.ruido(0.06, 260 + 60 * (e.forca || 1), 1, Math.min(0.35, 0.08 + 0.05 * (e.forca || 1)));
+        sons.tocar('pouso', { forca: e.forca || 1 });
         if (e.cor) cena.vfx.respingo(e.x, e.y, e.cor, 4, 3);
         break;
-      case 'fusao':
-        audio.fusao(e.combo || 1);
-        audio.ruido(0.12, 500, 1.5, 0.25, 0, 'lowpass', 200);
+      case 'fusao': {
+        const k = e.combo || 1;
+        sons.tocar('fusao', { k, nivel: e.nivel });
+        if (k >= 2) sons.tocar('combo', { k });
+        if (k >= 3) sons.falar('iupi', e.nivel);
+        else if ((e.nivel || 0) >= 8) sons.falar('uau', e.nivel);
         if (e.cor) cena.vfx.respingo(e.x, e.y, e.cor, 8, 5);
         for (let k = 0; k < (e.brilhos || 0); k++) cena.vfx.brilho(e.x + (k % 5 - 2) * 0.3, e.y + ((k * 7) % 5 - 2) * 0.3);
         if (e.texto) cena.vfx.texto(e.x, e.y + 1, T[e.texto] || e.texto, e.corTexto || '#ffffff', e.escala || 1, 'combo');
         break;
+      }
       case 'estouro':
-        audio.explodir();
+        sons.tocar('estouro');
         if (e.cor) cena.vfx.respingo(e.x, e.y, e.cor, 18, 8);
+        break;
+      case 'missil':
+        // impacto do missil da mira: explosao no pote e gosma voando na tela
+        sons.tocar('estouro');
+        sons.tocar('splat');
+        cena.vfx.explosao(e.x, e.y, e.cor, e.raio || 1);
+        cena.respingarTela(e.x, e.y, e.cor, e.raio || 1);
         break;
       case 'texto':
         cena.vfx.texto(e.x, e.y, T[e.texto] || e.texto, e.cor || '#ffffff', e.escala || 1, e.grupo || '');
@@ -319,7 +473,12 @@ function tratarEventos() {
         poki.measure('level', String(e.n), e.acao);
         break;
       case 'registro':
+        if (e.chave === 'poder') usouPoder(e.id);
         registrar(e.chave, e.valor);
+        break;
+      case 'cresceu':
+        // o pote estreito do comeco cresceu (no nivel 6 ou pelo tempo)
+        poki.measure('pote', 'cresceu', e.motivo);
         break;
       case 'pedirVideo':
         pedirVideo(e.id);
@@ -335,7 +494,8 @@ function tratarEventos() {
         }
         break;
       case 'som':
-        if (typeof audio[e.nome] === 'function') audio[e.nome]();
+        // nomes de hoje (LEGADO) e as categorias (choro, missil, trocar, alvo, alargar, ataque...)
+        sons.tocar(e.nome, e);
         break;
       default:
         break;
@@ -347,13 +507,85 @@ function tratarEventos() {
 function registrar(chave, valor) {
   const feitas = perfil.registrar(chave, valor);
   perfilSujo = true;
-  let ganhou = false;
-  for (const m of feitas) { hud.aviso(`${T.missaoFeita} +${m.premio} 💧`); ganhou = true; }
+  let missao = false;
+  let nivelNovo = 0;
+  for (const m of feitas) {
+    hud.aviso(`${T.missaoFeita} +${m.premio} 💧`);
+    poki.measure('missao', m.tipo, 'complete');
+    missao = true;
+  }
   if (chave === 'nivel') {
     const g = perfil.descobrir(valor);
-    if (g) { hud.aviso(`${T.novoNivel} +${g} 💧`); ganhou = true; }
+    // slime que ninguem tinha visto: o cartao com a bolinha (antes era so um aviso de texto)
+    if (g) { hud.revelar(valor, `${formatar(T.nivelN, { n: valor })} · +${g} 💧`); nivelNovo = valor; }
   }
-  if (ganhou) { audio.yes?.(); gravarPerfil(); }
+  if (nivelNovo) { sons.tocar('nivelNovo'); sons.falar('oba', nivelNovo); }
+  else if (missao) { sons.tocar('missao'); sons.falar('missao'); }
+  if (nivelNovo || missao) gravarPerfil();
+}
+
+/** Reforco usado: telemetria, fim da dica (se era ela) e a dica nao volta nesta sessao. */
+function usouPoder(id) {
+  poki.measure('poder', id || '-', 'use');
+  J.usouPoder = true;
+  if (J.dica) { poki.measure('dica', 'poder', J.dica.id === id ? 'use' : 'outro'); fecharDica(); }
+}
+
+/**
+ * Dica do reforco (Player Fit Test de 2026-10-15): com 60 s de jogo sem usar nenhum, um botao
+ * que ainda tem carga (o missil, se tiver) pulsa com a mao por 8 s. Uma vez por aparelho.
+ */
+function abrirDica() {
+  dicasVistas.poder = true;
+  armazem.gravar('dicas', dicasVistas);
+  const lista = (J.modo.hud().poderes || []).filter((p) => !p.oculto && p.qtd > 0 && !p.video);
+  const alvo = lista.find((p) => p.id === 'mira') || lista[0];
+  if (!alvo) return;
+  J.dica = { id: alvo.id, t: 0 };
+  hud.dica(alvo.id);
+  poki.measure('dica', 'poder', 'show');
+}
+function fecharDica() {
+  if (!J.dica) return;
+  J.dica = null;
+  hud.dica('');
+}
+
+/**
+ * Demonstracao para quem nao toca (25% do desktop no Player Fit Test): parado ha 4 s, a peca
+ * segue a mao do onboarding e cai sozinha no toque dela, duas vezes. Nao conta como jogada (a
+ * mao continua ate a primeira gota de verdade) e nao abre o gameplay da Poki.
+ */
+function demonstrar() {
+  if (J.ocioso < 4 || !J.modo.S) return;
+  const vis = J.modo.visual();
+  if (!vis.mao) return;
+  const P = J.modo.S.jogadores[0].pote;
+  const m = maoEm(vis.mao, J.t);
+  P.apontar(m.x);
+  // o toque da mao acabou de acontecer neste passo
+  if (m.ciclo >= TOQUE_MAO && m.ciclo - PASSO < TOQUE_MAO && P.soltar()) {
+    if (!J.demos) poki.measure('dica', 'demo', 'show');
+    J.demos++;
+    J.ocioso = 0;
+  }
+}
+
+/** Quase la, para a tela de fim: o nivel seguinte, o recorde por pouco e o proximo item da loja. */
+function quaseLa(e) {
+  const q = { nivel: 0, recorde: '', loja: /** @type {{ nome: string, falta: number }|null} */ (null) };
+  const J0 = J.modo && J.modo.S ? J.modo.S.jogadores[0] : null;
+  if (J0 && (J.chave === 'semfim' || J.chave === 'desafio')) {
+    if (J0.maxNivel >= 4 && J0.maxNivel < MAX_NIVEL) q.nivel = J0.maxNivel + 1;
+    // o recorde de antes (sem recorde novo, o hud ainda mostra o antigo)
+    const rec = J.modo.hud().recorde || 0;
+    if (J.chave === 'semfim' && !e.novo && rec > e.pontos && e.pontos >= rec * 0.7) q.recorde = fmtNumero(rec - e.pontos);
+  }
+  if (J.chave !== 'duelo2') {
+    const it = perfil.proximo();
+    if (it) q.loja = { nome: T[it.grupo + '.' + it.id] || it.id, falta: Math.max(0, it.preco - perfil.gotas) };
+  }
+  return q;
 }
 
 /** Reforco acabado: o video (rewarded) devolve um. */
@@ -361,6 +593,7 @@ async function pedirVideo(id) {
   if (J.estado !== 'jogando' || document.body.classList.contains('sem-anuncio')) return;
   if (!poki.sdkPronto && !dep.local) return;
   const ok = await anuncio('rewarded');
+  poki.measure('video', 'poder-' + id, ok ? 'ok' : 'fail');
   if (ok && J.modo && J.modo.darPoder) J.modo.darPoder(id);
   if (J.tocou && J.estado === 'jogando') poki.gameplayStart();
 }
@@ -386,13 +619,19 @@ function pagarFim(e) {
 function terminar(e) {
   J.estado = 'fim';
   poki.gameplayStop();
-  audio.fim();
+  sons.tocar('fim');
+  musica.abaixar(0.6);
   const g = pagarFim(e);
   J.ganho = g.total;
+  // recorde ou vitoria: palmas; derrota: um "aww"; depois as gotas contadas
+  const festa = e.novo || e.venceu;
+  setTimeout(() => { if (festa) { sons.tocar('palmas'); sons.falar(e.venceu ? 'venceu' : 'uhuu'); } else sons.falar('aww'); }, 400);
+  contarGotas(J.ganho, 1300);
   J.dobravel = g.dobravel;
+  fecharDica();
   salvar();
   gravarPerfil();
-  hud.fim(true, { pontos: e.pontos, novo: e.novo, sub: e.sub || '', titulo: e.titulo, reviver: !!e.reviver, gotas: J.ganho, dobrar: J.dobravel > 0 });
+  hud.fim(true, { pontos: e.pontos, novo: e.novo, sub: e.sub || '', titulo: e.titulo, reviver: !!e.reviver, gotas: J.ganho, dobrar: J.dobravel > 0, quase: quaseLa(e) });
 }
 
 function salvar() {
@@ -406,6 +645,7 @@ function salvar() {
 async function jogarDeNovo() {
   hud.fim(false);
   hud.menu(false);
+  musica.abaixar(1);
   J.estado = 'trocando';
   // pausa natural: o intervalo comercial vem antes de voltar ao gameplay
   if (!dep.semAnuncio) await anuncio('commercial');
@@ -419,7 +659,9 @@ async function jogarDeNovo() {
 
 async function reviver() {
   const ok = await anuncio('rewarded');
+  poki.measure('video', 'reviver', ok ? 'ok' : 'fail');
   hud.fim(false);
+  musica.abaixar(1);
   J.estado = 'jogando';
   if (ok && J.modo.reviver) J.modo.reviver();
   else { J.modo.reiniciar(); J.pagos = 0; }
@@ -430,12 +672,13 @@ async function reviver() {
 async function dobrar() {
   if (!J.dobravel || J.estado !== 'fim') return;
   const ok = await anuncio('rewarded');
+  poki.measure('video', 'dobrar', ok ? 'ok' : 'fail');
   if (!ok || !J.dobravel) return;
   const g = perfil.ganhar(J.dobravel);
   J.dobravel = 0;
   J.ganho += g;
   gravarPerfil();
-  audio.yes?.();
+  contarGotas(g, 0);
   hud.ganhoFim(J.ganho, false);
 }
 
@@ -466,43 +709,95 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', salvar);
 
 // ------------------------------------------------------------------ laco
+let ladoBorda = 1;
+/** Jogada do ?auto: o bot do modo, ou (com ?bot=borda) sempre em cima da borda. */
+function autoJogar() {
+  const P = dep.bot === 'borda' && J.modo.S ? J.modo.S.jogadores[0].pote : null;
+  if (!P) { J.modo.bot(); return; }
+  P.apontar(ladoBorda * 99);
+  if (P.soltar()) ladoBorda = -ladoBorda;
+}
+
 let tAuto = 0;
 let tGravar = 0;
-const laco = criarLaco({
-  passo(dt) {
-    if (J.estado !== 'jogando' || !J.modo) return;
-    J.t += dt;
-    if (dep.auto && J.modo.bot) {
-      tAuto += dt * 1000;
-      if (tAuto >= dep.auto) { tAuto = 0; J.modo.bot(); }
+const laco = criarLaco({ passo: passoJogo, desenhar: desenharJogo });
+
+/** Um passo fixo do jogo (o laco chama; os prints quadro a quadro tambem, por __slime.avancar). */
+function passoJogo(dt) {
+  if (J.estado !== 'jogando' || !J.modo) return;
+  J.t += dt;
+  if (dep.auto && J.modo.bot) {
+    tAuto += dt * 1000;
+    if (tAuto >= dep.auto) { tAuto = 0; autoJogar(); }
+  }
+  J.ocioso += dt;
+  // (o ?auto dos prints joga sem tocar: a demonstracao nao se mete)
+  if (!J.tocou && J.demos < 2 && J.chave === 'semfim' && !dep.auto) demonstrar();
+  J.modo.passo(dt);
+  cena.passo(dt);
+  tratarEventos();
+  if (J.tocou) {
+    J.tempoJogo += dt;
+    const min = Math.floor(J.tempoJogo / 60);
+    if (min > J.minutos) {
+      J.minutos = min;
+      poki.measure('tempo', String(min), 'min');
+      // fps medio do minuto que acabou (o abandono do celular depois de 5 min)
+      if (MINUTOS_FPS.includes(min) && J.fpsT > 0) poki.measure('fps', faixaFps(J.fpsQ / J.fpsT), 'm' + min);
+      J.fpsQ = 0;
+      J.fpsT = 0;
     }
-    J.modo.passo(dt);
-    cena.vfx.passo(dt);
-    tratarEventos();
-    if (J.tocou) {
-      J.tempoJogo += dt;
-      const min = Math.floor(J.tempoJogo / 60);
-      if (min > J.minutos) { J.minutos = min; poki.measure('tempo', String(min), 'min'); }
-    }
-    // o progresso das missoes vai para o armazenamento de tempos em tempos (nao a cada fusao)
-    tGravar += dt;
-    if (tGravar > 5 && perfilSujo) { tGravar = 0; gravarPerfil(); }
-  },
-  desenhar() {
-    if (!J.modo) return;
-    cena.desenhar(J.modo, J.t);
-    const h = J.modo.hud();
-    // no desafio, o lugar do recorde mostra a meta do dia (com o ✓ quando o premio ja saiu)
-    if (J.chave === 'desafio') h.recorde = formatar(T.meta, { n: fmtNumero(J.meta) }) + (J.premiado || (h.pontos || 0) >= J.meta ? ' ✓' : '');
-    hud.atualizar(h);
-    hud.gotas(perfil.gotas, fmtNumero);
-    if (!J.carregou) {
-      J.carregou = true;
-      poki.gameLoadingFinished();
-    }
-    if (dep.debug) hud.depurar(laco.medidas, J.modo.mundo, cena, J.modo);
-  },
-});
+    if (!J.usouPoder && !J.dica && !dicasVistas.poder && J.chave === 'semfim' && J.tempoJogo >= 60) abrirDica();
+    if (J.dica && (J.dica.t += dt) > 8) fecharDica();
+  }
+  // o progresso das missoes vai para o armazenamento de tempos em tempos (nao a cada fusao)
+  tGravar += dt;
+  if (tGravar > 5 && perfilSujo) { tGravar = 0; gravarPerfil(); }
+}
+
+/**
+ * Reforcos colados ao pote (layout B, escolha do usuario em 2026-10-15): na paisagem a coluna
+ * encosta na parede direita do pote mais a direita (o do sem fim; no Duelo, o da CPU, pedido do
+ * usuario em 2026-10-15); no retrato e nos prototipos, o lugar de sempre.
+ */
+function encostarReforcos() {
+  if (document.body.dataset.orient !== 'paisagem' || !J.modo.S) { hud.encostar(null); return; }
+  const ps = J.modo.mundo.paredes;
+  let xMax = -Infinity;
+  for (const K of J.modo.S.jogadores) for (const k of K.pote.idxParedes) xMax = Math.max(xMax, ps[k].ax, ps[k].bx);
+  const a = cena.paraTela(xMax + 1.1, J.modo.S.jogadores[0].pote.linha * 0.5);
+  if (a) hud.encostar(a);
+}
+
+/** @param {number} [dt] s reais desde o quadro anterior (o laco passa; os prints nao) */
+function desenharJogo(dt = 0) {
+  if (!J.modo) return;
+  medirQuadro(dt);
+  cena.desenhar(J.modo, J.t);
+  const h = J.modo.hud();
+  // a meta da vez mostra as gotas da descoberta quando o nivel ainda e novo para o jogador
+  if (h.objetivo && h.objetivo.novo) h.objetivo = { ...h.objetivo, premio: PREMIO_DESCOBERTA };
+  // no desafio, o lugar do recorde mostra a meta do dia (com o ✓ quando o premio ja saiu)
+  if (J.chave === 'desafio') h.recorde = formatar(T.meta, { n: fmtNumero(J.meta) }) + (J.premiado || (h.pontos || 0) >= J.meta ? ' ✓' : '');
+  hud.atualizar(h);
+  hud.gotas(perfil.gotas, fmtNumero);
+  encostarReforcos();
+  if (!J.carregou) {
+    J.carregou = true;
+    poki.gameLoadingFinished();
+  }
+  if (dep.debug) hud.depurar(laco.medidas, J.modo.mundo, cena, J.modo);
+}
+
+/** Fps do jogo rodando: a qualidade adaptativa e a media do minuto para a telemetria. */
+function medirQuadro(dt) {
+  if (J.estado !== 'jogando') { qualidade.reiniciar(); return; }
+  if (dep.qualidade < 0 && qualidade.quadro(dt)) {
+    cena.definirQualidade(qualidade.nivel);
+    poki.measure('qualidade', cena.qualidade, 'm' + J.minutos);
+  }
+  if (J.tocou && dt > 0 && dt < 0.25) { J.fpsQ++; J.fpsT += dt; }
+}
 
 hud.aoPausar(() => alternarPausa());
 hud.aoContinuar(() => { if (J.estado === 'pausa') continuar(); });
@@ -514,29 +809,47 @@ hud.aoRecomecar(() => {
   }
   if (J.estado === 'fim' || J.estado === 'menuFim') jogarDeNovo();
 });
-hud.aoDeNovo(() => jogarDeNovo());
-hud.aoReviver(() => reviver());
-hud.aoDobrar(() => dobrar());
+hud.aoDeNovo(() => { poki.measure('fim', 'denovo', 'click'); jogarDeNovo(); });
+hud.aoReviver(() => { poki.measure('fim', 'reviver', 'click'); reviver(); });
+hud.aoDobrar(() => { poki.measure('fim', 'dobrar', 'click'); dobrar(); });
 hud.aoMenuFim(() => {
   if (J.estado !== 'fim') return;
   hud.fim(false);
   J.estado = 'menuFim';
-  abrirMenu();
+  abrirMenu(undefined, 'fim');
+});
+// o proximo item da loja na tela de fim abre a loja
+hud.aoLojaFim(() => {
+  if (J.estado !== 'fim') return;
+  hud.fim(false);
+  J.estado = 'menuFim';
+  abrirMenu('loja', 'fimLoja');
 });
 hud.aoGotas(() => {
-  if (J.estado === 'jogando') alternarPausa();
-  else if (J.estado === 'fim') { hud.fim(false); J.estado = 'menuFim'; abrirMenu(); }
+  if (J.estado === 'jogando') alternarPausa('gotas');
+  else if (J.estado === 'fim') { hud.fim(false); J.estado = 'menuFim'; abrirMenu(undefined, 'gotas'); }
   if (J.estado === 'pausa' || J.estado === 'menuFim') menu.aba('loja');
 });
+// dois botoes: efeitos e falas (#bSom, o mudo de antes) e a musica (#bMusica)
 hud.aoSom(() => { audio.definirMudo(!audio.mudo); armazem.gravar('mudo', audio.mudo); document.body.classList.toggle('mudo', audio.mudo); });
+hud.aoMusica(() => { audio.definirMusica(!audio.musicaLigada); armazem.gravar('musica', audio.musicaLigada); document.body.classList.toggle('semMusica', !audio.musicaLigada); });
 hud.aoPoder((id) => { if (J.estado === 'jogando' && J.modo.poder) { tocar(); J.modo.poder(id); } });
 audio.definirMudo(!!armazem.ler('mudo', false));
 document.body.classList.toggle('mudo', audio.mudo);
+// quem tinha mutado antes de existir o botao da musica comeca sem musica
+const musicaSalva = armazem.ler('musica', null);
+audio.definirMusica(musicaSalva === null ? !armazem.ler('mudo', false) : !!musicaSalva);
+document.body.classList.toggle('semMusica', !audio.musicaLigada);
+// sem musica (o padrao escolhido em 2026-10-15) o botao da musica nao tem o que fazer
+$('bMusica').hidden = sons.escolha.musica === 'nenhuma';
 
 async function iniciar() {
   // o jogo nao espera o SDK (com bloqueador o init so desiste em 4 s): o wrapper guarda os
   // eventos e entrega na ordem quando o SDK responder
   const pronto = poki.init();
+  // as teclas da dica (setas e espaco) precisam do foco no iframe da Poki sem clique antes
+  try { window.focus(); } catch { /* sem permissao de foco: o primeiro clique foca */ }
+  if (dep.qualidade >= 0) cena.definirQualidade(dep.qualidade);
   await carregarModo(inicial);
   pronto.then(() => { if (!poki.sdkPronto && !dep.local) document.body.classList.add('sem-anuncio'); });
   // sequencia diaria: o premio do dia entra ao abrir, com um aviso que nao interrompe o jogo
@@ -547,9 +860,16 @@ async function iniciar() {
   }
   // prints deterministicos: N quadros de fisica antes do primeiro desenho
   for (let k = 0; k < dep.passos; k++) {
-    if (dep.auto && J.modo.bot && k % Math.max(1, Math.round(dep.auto / 16.67)) === 0) J.modo.bot();
+    if (dep.auto && J.modo.bot && k % Math.max(1, Math.round(dep.auto / 16.67)) === 0) autoJogar();
     J.modo.passo(PASSO);
     J.modo.eventos.length = 0;
+  }
+  if (dep.poder && J.modo.poder) J.modo.poder(dep.poder);
+  if (dep.demoReforcos && J.modo.S) {
+    // prints dos botoes: um de cada estado (normal, acabado com video, 2, ativo, premio)
+    const J0 = J.modo.S.jogadores[0];
+    J0.poderes = { trocar: 1, chacoalhar: 0, alargar: 2, mira: 1 };
+    J0.premio = 'gelo';
   }
   J.estado = 'jogando';
   if (dep.filme) { filmar(dep.filme, dep.cada); return; }
@@ -557,7 +877,13 @@ async function iniciar() {
   // reserva: se o rAF nao andar (aba em segundo plano, iframe escondido), o loading sai assim mesmo
   setTimeout(() => { if (!J.carregou) { J.carregou = true; poki.gameLoadingFinished(); } }, 1500);
   if (dep.ganchos) {
-    /** @type {any} */ (window).__slime = { J, cena, laco, poki, audio, hud, perfil, entrarModo, abrirMenu };
+    /** @type {any} */ (window).__slime = {
+      J, cena, laco, poki, audio, sons, musica, hud, perfil, entrarModo, abrirMenu,
+      /** n passos fixos pelo mesmo caminho do laco e um desenho (prints quadro a quadro com o laco pausado) */
+      avancar(n = 1) { for (let k = 0; k < n; k++) passoJogo(PASSO); desenharJogo(); },
+      /** desliga o ?auto depois do preparo (prints de um gesto so) */
+      pararAuto() { dep.auto = 0; },
+    };
   }
 }
 
@@ -589,15 +915,15 @@ function filmar(n, cada) {
     for (let k = 0; k < cada; k++) {
       if (dep.auto && J.modo.bot) {
         tAuto += PASSO * 1000;
-        if (tAuto >= dep.auto) { tAuto = 0; J.modo.bot(); }
+        if (tAuto >= dep.auto) { tAuto = 0; autoJogar(); }
       }
       J.t += PASSO;
       J.modo.passo(PASSO);
-      cena.vfx.passo(PASSO);
+      cena.passo(PASSO);
       tratarEventos();
     }
     cena.desenhar(J.modo, J.t);
-    for (const id of ['cFundo', 'cSlime', 'cTopo']) {
+    for (const id of ['cFundo', 'cSlime', 'cTopo', 'cTela']) {
       const c = /** @type {HTMLCanvasElement} */ ($(id));
       const k = c.width / window.innerWidth;
       ctx.drawImage(c, rx * k, ry * k, rw * k, rh * k, 0, 0, tela.width, tela.height);

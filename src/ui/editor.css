@@ -1,0 +1,109 @@
+/* Editor de pixel da skin "Minha" (src/ui/editor.js). Tudo dentro de .edSkin para nao brigar
+   com o HUD. Direcao de arte do jogo: papel, tinta grossa, botoes com sombra de tinta,
+   turquesa no selecionado. Retrato: coluna; paisagem: a grade a esquerda. */
+@font-face { font-family: 'Fredoka'; src: url('fontes/fredoka-latin-700-normal.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Fredoka'; src: url('fontes/fredoka-latin-600-normal.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+
+.edSkin {
+  --edTinta: #17161c; --edPapel: #f3f2ee; --edTurq: #5fd9cf; --edTurq2: #3fbfb5; --edLaranja: #ff8a2a; --edSuave: #4a4855;
+  --edLado: 320px;
+  position: relative; box-sizing: border-box; width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden;
+  background-color: var(--edPapel); color: var(--edTinta);
+  background-image: linear-gradient(rgba(40, 60, 90, 0.07) 1.5px, transparent 1.5px), linear-gradient(90deg, rgba(40, 60, 90, 0.07) 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+  font-family: 'Fredoka', system-ui, -apple-system, 'Segoe UI', sans-serif; font-weight: 600; font-size: 15px; line-height: 1.25;
+  user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.edSkin *, .edSkin *::before, .edSkin *::after { box-sizing: border-box; }
+.edSkin [hidden] { display: none !important; }
+
+/* ---- topo */
+.edTopo { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 3px solid var(--edTinta); background: #fff; }
+.edTopo h2 { margin: 0; flex: 1; min-width: 0; font-weight: 700; font-size: 1.3em; display: flex; flex-direction: column; line-height: 1.05; }
+.edTopo h2 small { font-weight: 600; font-size: 0.62em; color: var(--edSuave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.edSalvo { font-weight: 700; color: var(--edTurq2); }
+
+/* ---- botoes */
+.edBtn {
+  font: inherit; font-weight: 700; color: var(--edTinta); background: #fff; cursor: pointer; touch-action: manipulation;
+  border: 3px solid var(--edTinta); border-radius: 12px; box-shadow: 0 3px 0 var(--edTinta); min-height: 44px; padding: 6px 12px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.edBtn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--edTinta); }
+.edBtn:disabled { opacity: 0.4; cursor: default; transform: none; box-shadow: 0 3px 0 var(--edTinta); }
+.edBtn:focus-visible, .edCor:focus-visible, .edGrade:focus-visible { outline: 3px dashed #2a62d6; outline-offset: 3px; }
+.edBtn[aria-pressed="true"] { background: var(--edTurq); }
+.edForte { background: var(--edLaranja); color: #fff; -webkit-text-stroke: 0.07em var(--edTinta); paint-order: stroke fill; padding: 6px 18px; }
+.edSujo .edForte[data-acao="salvar"] { animation: edPulso 1.6s ease-in-out infinite; }
+@keyframes edPulso { 50% { transform: translateY(-2px); box-shadow: 0 5px 0 var(--edTinta); } }
+.edRedondo { width: 44px; padding: 0; border-radius: 50%; flex: none; }
+.edBtn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---- corpo: blocos posicionados por area */
+.edCorpo {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px; display: grid; gap: 12px; align-content: start;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "previa" "grade" "ferr" "paleta" "bases" "comecar";
+}
+.edSkin[data-orient="paisagem"] .edCorpo {
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "grade previa" "grade ferr" "grade paleta" "grade bases" "grade comecar" "grade .";
+}
+.edGradeArea { grid-area: grade; display: grid; place-items: center; }
+.edSkin[data-orient="paisagem"] .edGradeArea { position: sticky; top: 0; align-self: start; }
+.edPreviaArea { grid-area: previa; }
+.edFerramentas { grid-area: ferr; }
+.edPaleta { grid-area: paleta; }
+.edBases { grid-area: bases; }
+.edComecar { grid-area: comecar; }
+
+.edGrade {
+  display: block; width: var(--edLado); height: var(--edLado); touch-action: none; cursor: crosshair;
+  border: 3px solid var(--edTinta); border-radius: 14px; box-shadow: 0 4px 0 var(--edTinta); background: var(--edPapel);
+}
+
+/* previa e opcoes do modo */
+.edPreviaArea { display: flex; gap: 12px; align-items: center; background: #fff; border: 3px solid var(--edTinta); border-radius: 16px; padding: 8px 10px; box-shadow: 0 3px 0 var(--edTinta); }
+.edPalco { flex: none; width: 112px; height: 112px; border-radius: 12px; background: radial-gradient(circle at 50% 40%, #ffffff 0%, #e9f6ff 70%); }
+.edSkin[data-orient="paisagem"] .edPalco { width: 128px; height: 128px; }
+.edOpcoes { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.edGrupo { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.edChip { min-height: 40px; padding: 4px 12px; border-radius: 999px; }
+.edMini { min-width: 38px; padding: 4px 6px; }
+.edTamanho { gap: 6px; }
+.edRotulo { font-size: 0.8em; letter-spacing: 0.06em; text-transform: uppercase; color: var(--edSuave); }
+.edDica { margin: 0; font-size: 0.82em; font-weight: 600; color: var(--edSuave); }
+.edSkin[data-modo="1"] .edTamanho { opacity: 0.5; }
+
+/* ferramentas */
+.edFerramentas { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.edFerr { width: 46px; height: 46px; padding: 0; }
+.edSep { width: 3px; align-self: stretch; background: var(--edTinta); opacity: 0.2; border-radius: 2px; margin: 4px 2px; }
+
+/* paleta e cores do corpo */
+.edPaleta { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; }
+.edCor {
+  --c: #fff; position: relative; aspect-ratio: 1; min-width: 32px; min-height: 32px; border-radius: 10px; cursor: pointer; padding: 0;
+  background: var(--c); border: 3px solid var(--edTinta); box-shadow: 0 2px 0 var(--edTinta); touch-action: manipulation;
+}
+.edTransp { background-image: linear-gradient(45deg, rgba(255,255,255,0.75) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.75) 75%), linear-gradient(45deg, rgba(255,255,255,0.75) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.75) 75%);
+  background-size: 12px 12px; background-position: 0 0, 6px 6px; }
+.edCor[aria-checked="true"] { outline: 4px solid var(--edTurq); outline-offset: 2px; box-shadow: 0 2px 0 var(--edTinta), 0 0 0 7px var(--edTurq2); z-index: 1; }
+.edBases { display: flex; flex-direction: column; gap: 6px; }
+.edLinhaCores { display: grid; grid-template-columns: repeat(auto-fill, minmax(36px, 1fr)); gap: 8px; }
+.edBase { border-radius: 50%; }
+.edNivel::after { content: '★'; position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-size: 15px; -webkit-text-stroke: 1px var(--edTinta); }
+
+/* comecar de */
+.edComecar { display: flex; flex-direction: column; gap: 6px; }
+.edModelos { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; scrollbar-width: thin; }
+.edModelo { flex: none; flex-direction: column; gap: 4px; padding: 6px 8px; min-width: 70px; font-size: 0.85em; }
+.edModelo canvas { width: 40px; height: 40px; image-rendering: pixelated; border: 2px solid var(--edTinta); border-radius: 6px; }
+
+/* aviso de descartar (dentro da tela) */
+.edAviso { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(23, 22, 28, 0.45); z-index: 5; padding: 16px; }
+.edCaixa { background: #fff; border: 3px solid var(--edTinta); border-radius: 18px; box-shadow: 0 5px 0 var(--edTinta); padding: 18px; max-width: 340px; display: flex; flex-direction: column; gap: 14px; text-align: center; }
+.edCaixa p { margin: 0; font-weight: 700; font-size: 1.15em; }
+.edCaixa .edGrupo { justify-content: center; }
+
+@media (prefers-reduced-motion: reduce) { .edBtn:active { transform: none; } .edSujo .edForte[data-acao="salvar"] { animation: none; } }

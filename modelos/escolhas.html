@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Slime Merge · escolhas de 15/10</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800&display=swap">
+<style>
+/* O mesmo caderno do hub e do Estudio de visuais (papel quadriculado, fichas com contorno de
+   tinta). Fichas de escolha a esquerda; a previa jogavel fica ao lado no desktop e embaixo no
+   celular. Um visual so (claro), de proposito, como o resto do hub. */
+:root {
+  --papel: #f3f2ee;
+  --grade: rgba(40, 60, 90, 0.085);
+  --tinta: #17161c;
+  --tinta-suave: #4a4855;
+  --ficha: #ffffff;
+  --turquesa: #5fd9cf;
+  --turquesa-2: #3fbfb5;
+  --laranja: #ff8a2a;
+  --azul: #2a62d6;
+  --roxo: #7b4dff;
+  --display: 'Fredoka', 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --texto: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: light;
+}
+@font-face { font-family: 'Fredoka'; src: url('fredoka-latin-700-normal.woff2') format('woff2'), url('../src/ui/fontes/fredoka-latin-700-normal.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Fredoka'; src: url('fredoka-latin-600-normal.woff2') format('woff2'), url('../src/ui/fontes/fredoka-latin-600-normal.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+* { box-sizing: border-box; }
+body {
+  margin: 0; color: var(--tinta); font-family: var(--texto); font-size: 16px; line-height: 1.5;
+  background-color: var(--papel);
+  background-image: linear-gradient(var(--grade) 1.5px, transparent 1.5px), linear-gradient(90deg, var(--grade) 1.5px, transparent 1.5px);
+  background-size: 28px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 48px;
+}
+.folha { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 380px); gap: 28px; align-items: start; }
+.esquerda { display: flex; flex-direction: column; gap: 34px; min-width: 0; }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; line-height: 1.1; }
+h1 { font-size: clamp(1.9rem, 5vw, 2.9rem); color: #fff; -webkit-text-stroke: 0.16em var(--tinta); paint-order: stroke fill; }
+h1 em { font-style: normal; color: var(--turquesa); }
+h2 { font-size: 1.55rem; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+h2 small { font-family: var(--texto); font-size: 0.95rem; font-weight: 700; color: var(--tinta-suave); }
+h3 { font-size: 1.1rem; }
+p { margin: 0; }
+.lead { max-width: 66ch; color: var(--tinta-suave); }
+.lead b, .nota b { color: var(--tinta); }
+.nota { max-width: 70ch; color: var(--tinta-suave); font-size: 0.95rem; }
+.rotulo { font-family: var(--display); font-weight: 600; font-size: 0.82rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tinta-suave); }
+.topo { display: flex; flex-direction: column; gap: 10px; grid-column: 1 / -1; }
+.voltar { font-family: var(--display); font-weight: 600; color: var(--azul); text-decoration: none; }
+section { display: flex; flex-direction: column; gap: 14px; }
+.pendente { font-family: var(--display); font-weight: 600; font-size: 0.78rem; background: var(--laranja); color: #fff; border: 2px solid var(--tinta); border-radius: 999px; padding: 1px 9px; }
+.feito { font-family: var(--display); font-weight: 600; font-size: 0.78rem; background: var(--turquesa); color: var(--tinta); border: 2px solid var(--tinta); border-radius: 999px; padding: 1px 9px; }
+.grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.grade.quatro { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+.opcao {
+  position: relative; display: flex; flex-direction: column; padding: 0; text-align: left; font: inherit; color: inherit;
+  background: var(--ficha); border: 3px solid var(--tinta); border-radius: 16px; box-shadow: 0 4px 0 var(--tinta); overflow: hidden;
+}
+.opcao img { width: 100%; max-width: 100%; display: block; aspect-ratio: 1031 / 580; object-fit: cover; border-bottom: 3px solid var(--tinta); background: var(--papel); }
+.quatro .opcao img { aspect-ratio: 1 / 1; }
+.opcao .txt { padding: 9px 11px 11px; display: flex; flex-direction: column; gap: 3px; }
+.opcao b { font-family: var(--display); font-weight: 700; font-size: 1.05rem; }
+.opcao span { font-size: 0.88rem; color: var(--tinta-suave); line-height: 1.35; }
+.opcao .num { position: absolute; top: 8px; left: 8px; font-family: var(--display); font-weight: 700; min-width: 1.9rem; height: 1.9rem; border-radius: 999px; padding: 0 6px;
+  display: grid; place-items: center; background: #fff; border: 2.5px solid var(--tinta); font-size: 1rem; }
+.opcao[data-escolhida] { outline: 5px solid var(--turquesa); outline-offset: 2px; box-shadow: 0 4px 0 var(--tinta), 0 0 0 9px var(--turquesa-2); }
+.opcao[data-escolhida] .num { background: var(--turquesa); color: #fff; -webkit-text-stroke: 0.1em var(--tinta); paint-order: stroke fill; }
+.opcao:not([data-escolhida]) { opacity: 0.5; filter: saturate(0.55); }
+.opcao:focus-visible, .btn:focus-visible, .estudio:focus-visible { outline: 3px dashed var(--azul); outline-offset: 3px; }
+.mostra { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.mostra figure { margin: 0; background: var(--ficha); border: 3px solid var(--tinta); border-radius: 16px; box-shadow: 0 4px 0 var(--tinta); overflow: hidden; display: flex; flex-direction: column; }
+.mostra img { width: 100%; max-width: 100%; display: block; border-bottom: 3px solid var(--tinta); background: var(--papel); }
+.mostra figcaption { padding: 9px 11px 11px; font-size: 0.9rem; color: var(--tinta-suave); }
+.mostra figcaption b { color: var(--tinta); font-family: var(--display); }
+.larga { grid-column: 1 / -1; }
+.estudios { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.estudio { display: flex; flex-direction: column; gap: 6px; padding: 16px 18px; text-decoration: none; color: var(--tinta);
+  background: repeating-linear-gradient(135deg, var(--turquesa) 0 14px, var(--turquesa-2) 14px 28px); border: 3px solid var(--tinta); border-radius: 18px; box-shadow: 0 4px 0 var(--tinta); }
+.estudio b { font-family: var(--display); font-size: 1.35rem; color: #fff; -webkit-text-stroke: 0.12em var(--tinta); paint-order: stroke fill; }
+.estudio span { background: rgba(255, 255, 255, 0.92); border: 2px solid var(--tinta); border-radius: 10px; padding: 6px 9px; font-size: 0.92rem; }
+
+.previa { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); display: flex; flex-direction: column; gap: 12px;
+  background: var(--ficha); border: 3px solid var(--tinta); border-radius: 22px; box-shadow: 0 5px 0 var(--tinta); padding: 16px; }
+.previa iframe { width: 100%; max-width: 100%; aspect-ratio: 390 / 700; border: 3px solid var(--tinta); border-radius: 16px; background: var(--papel); display: block; }
+.escolha { font-family: var(--display); font-weight: 600; font-size: 1rem; line-height: 1.4; }
+.escolha output { display: block; font-family: var(--texto); font-weight: 800; color: var(--azul); }
+.linha { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { font-family: var(--display); font-weight: 700; font-size: 1rem; border: 3px solid var(--tinta); border-radius: 14px; padding: 8px 14px; min-height: 44px; cursor: pointer;
+  background: #fff; color: var(--tinta); box-shadow: 0 3px 0 var(--tinta); }
+.btn.forte { background: var(--laranja); color: #fff; -webkit-text-stroke: 0.08em var(--tinta); paint-order: stroke fill; }
+.btn[aria-pressed="true"] { background: var(--turquesa); }
+.btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--tinta); }
+.dica { font-size: 0.85rem; color: var(--tinta-suave); }
+kbd { font-family: var(--display); font-size: 0.85em; border: 2px solid var(--tinta); border-radius: 6px; padding: 0 5px; background: #fff; }
+textarea { width: 100%; font: 0.85rem/1.4 ui-monospace, monospace; border: 2px solid var(--tinta); border-radius: 10px; padding: 8px; resize: vertical; }
+@media (max-width: 900px) {
+  .folha { grid-template-columns: minmax(0, 1fr); }
+  .previa { position: static; }
+  .esquerda { order: 3; }
+  .previa iframe { max-width: 360px; margin: 0 auto; }
+}
+@media (prefers-reduced-motion: reduce) { .btn:active { transform: none; } }
+</style>
+</head>
+<body>
+<main class="folha">
+  <header class="topo">
+    <a class="voltar" href="index.html">← os 5 modelos</a>
+    <span class="rotulo">Escolhido · 2026-10-15</span>
+    <h1>Escolhas de <em>hoje</em></h1>
+    <p class="lead">Tudo isto já está no jogo: <b>soltar em cima da borda</b>, o <b>míssil da mira</b> com choro e gosma na tela, as <b>talas do Alargar</b> fora, os <b>13 níveis</b> e as suas escolhas: <b>botões colados no pote (B)</b>, <b>nível 13 de lava</b>, os <b>sons</b> do Estúdio e as <b>skins</b> (2 por nível na aba Skins da Loja, mais a Minha no editor de pixel).</p>
+  </header>
+
+  <div class="esquerda">
+    <section id="reforcos" aria-labelledby="t-reforcos">
+      <h2 id="t-reforcos">1. Botões de reforço <small>ícones novos</small> <span class="feito">escolhido: B</span></h2>
+      <p class="nota"><b>Escolhido: B.</b> Na tela deitada e no computador a coluna encosta na parede do pote; no celular em pé fica a fileira embaixo da barra. Os ícones agora são formas cheias com <b>um contorno só</b>, iguais de 48 a 96 px, e o contador fica numa pílula. Só a placa fica torta; ícone e número ficam retos. O 5º espaço (prêmio) aparece tracejado desde o início, e a placa do prêmio é dourada. No celular em pé as três opções eram iguais; a diferença estava na tela deitada e no computador.</p>
+      <div class="grade" data-grupo="reforcos">
+        <div class="opcao" data-id="A">
+          <span class="num">A</span>
+          <img src="../docs/visuais/reforcos-A.jpg" alt="Layout A: os cinco botões numa fileira embaixo da tela, como no jogo de referência" loading="lazy">
+          <span class="txt"><b>Régua</b><span>Fileira embaixo em qualquer tela, como na referência. No computador o pote fica menor.</span></span>
+        </div>
+        <div class="opcao" data-id="B" data-escolhida>
+          <span class="num">B</span>
+          <img src="../docs/visuais/reforcos-B.jpg" alt="Layout B: coluna de botões encostada na parede direita do béquer" loading="lazy">
+          <span class="txt"><b>Colada no pote</b><span>Coluna encostada na parede do pote. O pote cresce, e o dedo vai do slime ao botão em menos espaço.</span></span>
+        </div>
+        <div class="opcao" data-id="C">
+          <span class="num">C</span>
+          <img src="../docs/visuais/reforcos-C.jpg" alt="Layout C: grade de dois por dois no canto de baixo, com o prêmio maior em cima" loading="lazy">
+          <span class="txt"><b>Grade compacta</b><span>2×2 no canto de baixo, perto do polegar, com o prêmio maior em cima.</span></span>
+        </div>
+      </div>
+      <div class="mostra">
+        <figure class="larga"><img src="../docs/visuais/icones.png" alt="Folha de ícones: os oito reforços em três tamanhos e os estados (normal, acabado, vídeo, ativo, prêmio, espaço vago)" loading="lazy"><figcaption><b>Ícones novos.</b> Tamanhos e estados (acabado, com vídeo, ativo, prêmio, espaço vago).</figcaption></figure>
+        <figure><img src="../docs/visuais/reforcos-comparar-640x360.png" alt="Os três layouts e o de hoje num celular deitado" loading="lazy"><figcaption><b>Celular deitado (640×360)</b>: hoje, A, B e C.</figcaption></figure>
+        <figure><img src="../docs/visuais/reforcos-comparar-360x640.png" alt="Os três layouts e o de hoje num celular em pé" loading="lazy"><figcaption><b>Celular em pé (360×640)</b>: hoje, A, B e C.</figcaption></figure>
+      </div>
+    </section>
+
+    <section id="nivel13" aria-labelledby="t-n13">
+      <h2 id="t-n13">2. Visual do nível 13 <small>o topo da escada</small> <span class="feito">escolhido: lava</span></h2>
+      <p class="nota"><b>Escolhido: lava</b>, a crosta escura com rachaduras em brasa. Todos os níveis foram reescalados: o 13 tem o tamanho que o 12 tinha, e os do meio ficaram de 1% a 12% menores. A textura é animada e cobre a cor de base, como o arco-íris, para a frente de cor da fusão não virar lama. Use “Ver o nível 13 no pote” na prévia.</p>
+      <div class="grade quatro" data-grupo="nivel13">
+        <div class="opcao" data-id="ouro"><span class="num">1</span><img src="../docs/visuais/nivel13-ouro.jpg" alt="Nível 13 de ouro líquido, com faixas de reflexo e brilhos" loading="lazy"><span class="txt"><b>Ouro</b><span>Ouro líquido com reflexos que escorrem e brilhos.</span></span></div>
+        <div class="opcao" data-id="lava" data-escolhida><span class="num">2</span><img src="../docs/visuais/nivel13-lava.jpg" alt="Nível 13 de lava: crosta escura com rachaduras em brasa" loading="lazy"><span class="txt"><b>Lava</b><span>Crosta escura com rachaduras em brasa que pulsam.</span></span></div>
+        <div class="opcao" data-id="aurora"><span class="num">3</span><img src="../docs/visuais/nivel13-aurora.jpg" alt="Nível 13 aurora: pérola furta-cor em tons pastel" loading="lazy"><span class="txt"><b>Aurora</b><span>Pérola furta-cor, com faixas pastel que mudam.</span></span></div>
+        <div class="opcao" data-id="cristal"><span class="num">4</span><img src="../docs/visuais/nivel13-cristal.jpg" alt="Nível 13 de cristal: facetas de gelo com arestas claras" loading="lazy"><span class="txt"><b>Cristal</b><span>Facetas de gelo com arestas claras que cintilam.</span></span></div>
+      </div>
+      <div class="mostra"><figure><img src="../docs/visuais/nivel13-comparar.gif" alt="Animação das quatro texturas do nível 13 lado a lado" loading="lazy"><figcaption><b>As quatro candidatas em movimento.</b></figcaption></figure></div>
+    </section>
+
+    <section id="sons" aria-labelledby="t-sons">
+      <h2 id="t-sons">3. Sons e skins <span class="feito">escolhidos</span></h2>
+      <div class="estudios">
+        <a class="estudio" href="sons.html"><b>Estúdio de sons</b><span>Ouça e escolha um som por momento do jogo: fusão, combo, moeda, conquista, palmas, água, meleca, o míssil, as falas e a música de fundo.</span></a>
+        <a class="estudio" href="skins.html"><b>Estúdio de skins</b><span>Quatro candidatas por nível (marque duas) e o editor de pixel para testar: ladrilho repetido ou estampa no corpo inteiro.</span></a>
+      </div>
+    </section>
+
+    <section id="missil" aria-labelledby="t-missil">
+      <h2 id="t-missil">4. Míssil da mira <span class="feito">já no jogo</span></h2>
+      <p class="nota">Toque na mira: cada slime do pote ganha uma <b>retícula de mira</b>. Escolha um: ele chora, a retícula trava, o míssil sai do botão, faz a curva atrás do alvo e explode. A gosma voa na tela, gruda e escorre. São 0,75 s até a explosão e 1,3 s de gosma. Enquanto o míssil voa, o alvo não funde, e o fim da partida espera a explosão. Os outros reforços de alvo usam a mesma retícula na cor deles, com o ícone no canto. Para testar na prévia: <kbd>4</kbd> ou o botão da mira, e depois um slime.</p>
+      <div class="mostra">
+        <figure class="larga"><img src="../docs/visuais/missil-1031x580.jpg" alt="Oito quadros: retículas, alvo chorando, lançamento, voo, mergulho, explosão, gosma na tela e gosma escorrendo" loading="lazy"><figcaption><b>Quadro a quadro.</b> Retículas, choro, lançamento, voo, mergulho, explosão, gosma e escorrendo.</figcaption></figure>
+        <figure><img src="../docs/visuais/missil-1031x580.gif" alt="Animação do míssil explodindo um slime e a gosma escorrendo na tela" loading="lazy"><figcaption><b>Em tempo real.</b></figcaption></figure>
+      </div>
+    </section>
+
+    <section id="borda" aria-labelledby="t-borda">
+      <h2 id="t-borda">5. Soltar em cima da borda <span class="feito">já no jogo</span></h2>
+      <p class="nota">O centro do slime vai até o topo do vidro. Ele pousa na borda, balança e escorrega para dentro por uma guia invisível em cada parede (testado nos 8 cestos, normal e alargado, e no Duelo). O toque rápido agora solta da posição do dedo; antes, o slime caía de onde estava.</p>
+      <div class="mostra">
+        <figure><img src="../docs/visuais/borda-becher.gif" alt="Slimes soltos em cima da borda do béquer escorregando para dentro" loading="lazy"><figcaption><b>Béquer</b>, soltando sempre em cima da borda.</figcaption></figure>
+        <figure><img src="../docs/visuais/borda-aquario.gif" alt="Slimes soltos em cima da borda do aquário escorregando para dentro" loading="lazy"><figcaption><b>Aquário</b>, com a boca estreita.</figcaption></figure>
+      </div>
+    </section>
+  </div>
+
+  <aside class="previa" aria-label="Prévia jogável">
+    <span class="rotulo">Prévia jogável</span>
+    <iframe id="jogo" title="Slime Merge com as escolhas" data-src="../index.html?modelo=1"></iframe>
+    <div class="linha">
+      <button class="btn forte" id="vitrine" aria-pressed="false">Ver o nível 13 no pote</button>
+    </div>
+    <p class="dica">A prévia já tem os botões colados no pote (deite a tela ou alargue a janela), a lava, os sons e as skins (pausa › Loja › Skins).</p>
+  </aside>
+</main>
+<script>
+  // o jogo dentro do iframe le slime.escolha.vitrine ao abrir: 5 poe os niveis altos (e o 13) no pote
+  const jogo = document.getElementById('jogo');
+  const botao = document.getElementById('vitrine');
+  function abrir(vitrine) {
+    try { localStorage.setItem('slime.escolha', JSON.stringify({ vitrine: vitrine ? 5 : 0 })); } catch { /* sem armazenamento */ }
+    botao.setAttribute('aria-pressed', String(vitrine));
+    botao.textContent = vitrine ? 'Voltar à partida normal' : 'Ver o nível 13 no pote';
+    // no Artifact o jogo e jogo-1.html, sem '?'
+    const base = jogo.dataset.src;
+    const q = (vitrine ? '&vitrine=5' : '') + '&v=' + Date.now();
+    jogo.src = base + (base.includes('?') ? q : '?' + q.slice(1));
+  }
+  botao.addEventListener('click', () => abrir(botao.getAttribute('aria-pressed') !== 'true'));
+  abrir(false);
+</script>
+</body>
+</html>

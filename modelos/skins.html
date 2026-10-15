@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Estúdio de skins</title>
+<meta name="description" content="Slime Merge: 4 skins candidatas por nível no motor real do jogo, a paleta do editor e o editor de pixel para testar.">
+<link rel="stylesheet" href="../src/ui/editor.css">
+<style>
+/* Mesmo caderno do estudio de visuais: fichas coladas no papel quadriculado. Aqui cada ficha e
+   uma skin candidata desenhada pelo motor do jogo (palco); marcar = borda turquesa. */
+@font-face { font-family: 'Fredoka'; src: url('../src/ui/fontes/fredoka-latin-700-normal.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Fredoka'; src: url('../src/ui/fontes/fredoka-latin-600-normal.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+:root {
+  --papel: #f3f2ee; --grade: rgba(40, 60, 90, 0.085); --tinta: #17161c; --tinta-suave: #4a4855; --ficha: #ffffff;
+  --turquesa: #5fd9cf; --turquesa-2: #3fbfb5; --laranja: #ff8a2a; --azul: #2a62d6;
+  --display: 'Fredoka', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --texto: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; color: var(--tinta); font-family: var(--texto); font-size: 16px; line-height: 1.5;
+  background-color: var(--papel);
+  background-image: linear-gradient(var(--grade) 1.5px, transparent 1.5px), linear-gradient(90deg, var(--grade) 1.5px, transparent 1.5px);
+  background-size: 28px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 48px;
+}
+.folha { max-width: 1280px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 330px); gap: 28px; align-items: start; }
+.esquerda { display: flex; flex-direction: column; gap: 30px; min-width: 0; }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; line-height: 1.1; }
+h1 { font-size: clamp(1.9rem, 5vw, 2.9rem); color: #fff; -webkit-text-stroke: 0.16em var(--tinta); paint-order: stroke fill; }
+h1 em { font-style: normal; color: var(--turquesa); }
+h2 { font-size: 1.5rem; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+h2 small { font-family: var(--texto); font-size: 0.92rem; font-weight: 700; color: var(--tinta-suave); }
+.lead { margin: 0; max-width: 70ch; color: var(--tinta-suave); }
+.lead b { color: var(--tinta); }
+.rotulo { font-family: var(--display); font-weight: 600; font-size: 0.82rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tinta-suave); }
+.topo { display: flex; flex-direction: column; gap: 10px; grid-column: 1 / -1; }
+.voltar { font-family: var(--display); font-weight: 600; color: var(--azul); text-decoration: none; }
+section { display: flex; flex-direction: column; gap: 14px; }
+.cartao { background: var(--ficha); border: 3px solid var(--tinta); border-radius: 18px; box-shadow: 0 4px 0 var(--tinta); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+/* paleta e bases */
+.paleta { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.amostra { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; line-height: 1.2; min-width: 0; }
+.amostra i { flex: none; width: 34px; height: 34px; border-radius: 10px; border: 3px solid var(--tinta); background: var(--c); box-shadow: 0 2px 0 var(--tinta); }
+.amostra.redonda i { border-radius: 50%; }
+.amostra.transp i { background-image: linear-gradient(45deg, rgba(255,255,255,.8) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.8) 75%), linear-gradient(45deg, rgba(255,255,255,.8) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.8) 75%); background-size: 12px 12px; background-position: 0 0, 6px 6px; background-color: #3295df; }
+.amostra span { min-width: 0; }
+.amostra small { display: block; color: var(--tinta-suave); font-family: ui-monospace, monospace; font-size: 0.75rem; }
+.precos { margin: 0; padding-left: 1.2em; color: var(--tinta-suave); }
+.precos b { color: var(--tinta); }
+
+/* perguntas */
+.perguntas { display: grid; gap: 14px; }
+.pergunta { display: flex; flex-direction: column; gap: 6px; }
+.pergunta > b { font-family: var(--display); font-weight: 600; }
+.pergunta .linha { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* niveis e fichas */
+.nivel { gap: 12px; }
+.nivel h2 .bola { width: 1.4rem; height: 1.4rem; border-radius: 50%; border: 3px solid var(--tinta); background: var(--c); display: inline-block; transform: translateY(3px); }
+.fichas { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.ficha {
+  position: relative; display: flex; flex-direction: column; padding: 0; text-align: left; cursor: pointer; font: inherit; color: inherit; min-width: 0;
+  background: var(--ficha); border: 3px solid var(--tinta); border-radius: 16px; box-shadow: 0 4px 0 var(--tinta); overflow: hidden;
+}
+.ficha canvas { width: 100%; aspect-ratio: 1; display: block; border-bottom: 3px solid var(--tinta); background: radial-gradient(circle at 50% 40%, #ffffff 0%, #e9f6ff 75%); }
+.ficha.padrao { cursor: default; background: #f7f6f2; }
+.ficha.padrao canvas { background: radial-gradient(circle at 50% 40%, #ffffff 0%, #eeeae0 75%); }
+.ficha .txt { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ficha b { font-family: var(--display); font-weight: 700; font-size: 1.02rem; line-height: 1.15; }
+.ficha .tipo { font-size: 0.78rem; font-weight: 700; color: var(--tinta-suave); text-transform: uppercase; letter-spacing: 0.04em; }
+.ficha .nota { font-size: 0.82rem; color: var(--tinta-suave); line-height: 1.3; }
+.ficha .preco { position: absolute; top: 8px; right: 8px; font-family: var(--display); font-weight: 700; font-size: 0.8rem; background: #fff; border: 2.5px solid var(--tinta); border-radius: 999px; padding: 1px 8px; }
+.ficha .marca { position: absolute; top: 8px; left: 8px; width: 1.9rem; height: 1.9rem; border-radius: 50%; display: grid; place-items: center; background: #fff; border: 2.5px solid var(--tinta); font-family: var(--display); font-weight: 700; }
+.ficha[aria-pressed="true"] { outline: 5px solid var(--turquesa); outline-offset: 2px; box-shadow: 0 4px 0 var(--tinta), 0 0 0 9px var(--turquesa-2); }
+.ficha[aria-pressed="true"] .marca { background: var(--turquesa); color: #fff; -webkit-text-stroke: 0.1em var(--tinta); paint-order: stroke fill; }
+.ficha:focus-visible { outline: 3px dashed var(--azul); outline-offset: 3px; }
+
+/* previa lateral */
+.previa { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); display: flex; flex-direction: column; gap: 12px;
+  background: var(--ficha); border: 3px solid var(--tinta); border-radius: 22px; box-shadow: 0 5px 0 var(--tinta); padding: 16px; }
+.previa canvas { width: 100%; max-width: 100%; aspect-ratio: 1; border: 3px solid var(--tinta); border-radius: 16px; background: radial-gradient(circle at 50% 40%, #ffffff 0%, #dff2ff 75%); display: block; }
+.previa .nome { font-family: var(--display); font-weight: 700; font-size: 1.1rem; }
+.escolha { font-family: var(--display); font-weight: 600; font-size: 1rem; line-height: 1.4; }
+.escolha output { display: block; font-family: var(--texto); font-weight: 800; color: var(--azul); }
+.linha { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { font-family: var(--display); font-weight: 700; font-size: 1rem; border: 3px solid var(--tinta); border-radius: 14px; padding: 8px 14px; min-height: 44px; cursor: pointer;
+  background: #fff; color: var(--tinta); box-shadow: 0 3px 0 var(--tinta); }
+.btn.forte { background: var(--laranja); color: #fff; -webkit-text-stroke: 0.08em var(--tinta); paint-order: stroke fill; }
+.btn[aria-pressed="true"] { background: var(--turquesa); }
+.btn.mini { min-height: 36px; padding: 4px 10px; font-size: 0.9rem; border-radius: 999px; }
+.btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--tinta); }
+.dica { font-size: 0.85rem; color: var(--tinta-suave); margin: 0; }
+textarea.saida { width: 100%; min-height: 120px; font-family: ui-monospace, monospace; font-size: 0.8rem; border: 3px solid var(--tinta); border-radius: 12px; padding: 8px; background: #fff; resize: vertical; }
+
+/* editor embutido */
+.caixaEditor { height: min(680px, 88vh); border: 3px solid var(--tinta); border-radius: 18px; overflow: hidden; box-shadow: 0 4px 0 var(--tinta); background: var(--papel); }
+.editorTopo { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.editorTopo select { font: inherit; font-family: var(--display); font-weight: 600; border: 3px solid var(--tinta); border-radius: 12px; padding: 6px 10px; min-height: 44px; background: #fff; }
+pre.codigo { margin: 0; font-size: 0.8rem; background: #fff; border: 3px solid var(--tinta); border-radius: 12px; padding: 10px; overflow-x: auto; }
+
+/* modos de print */
+body.soEditor { padding: 0; background: var(--papel); }
+body.soEditor .folha { display: none; }
+body.soEditor #telaEditor { position: fixed; inset: 0; }
+body.soFolha { padding: 0; background: #fff; }
+body.soFolha .folha { display: none; }
+
+@media (max-width: 1100px) { .fichas { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px) {
+  .folha { grid-template-columns: minmax(0, 1fr); }
+  .previa { position: static; order: -1; }
+  .previa canvas { max-width: 260px; margin: 0 auto; }
+}
+@media (max-width: 560px) { .fichas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { .btn:active { transform: none; } }
+</style>
+</head>
+<body>
+<main class="folha">
+  <header class="topo">
+    <a class="voltar" href="index.html">← os modelos</a>
+    <span class="rotulo">Escolhido · 2026-10-15</span>
+    <h1>Estúdio de <em>skins</em></h1>
+    <p class="lead">Cada nível ganha <b>skins para comprar com gotas</b> numa aba nova da Loja, mais a <b>Minha</b>, que o jogador desenha no editor de pixel. Aqui estão as <b>4 candidatas por nível</b>; as <b>2 marcadas</b> em cada um são as escolhidas e já estão na <b>Loja do jogo (aba Skins)</b>. Os preços ficaram como propostos, os níveis não descobertos ficam bloqueados e a gosma cinza do Duelo mantém a regra da cor. Tudo é desenhado pelo motor do jogo: a skin troca o pigmento do slime (a cor nova da fusão, os respingos e as orelhas acompanham), e a estampa amassa junto com o rosto. Passe o mouse ou o dedo numa ficha para vê-la se mexer.</p>
+  </header>
+  <div class="esquerda">
+
+    <section aria-labelledby="t-regras">
+      <h2 id="t-regras">Paleta e cores do corpo <small>para aprovar</small></h2>
+      <div class="cartao">
+        <span class="rotulo">Paleta do editor · 16 cores</span>
+        <div class="paleta" id="paleta"></div>
+        <span class="rotulo">Cor do corpo da Minha · pigmento do jogo</span>
+        <div class="paleta" id="bases"></div>
+        <p class="dica">O corpo é pigmento de verdade (Kubelka-Munk), por isso não há branco nem tons pastel: com menos de 25% de pigmento, a gosma cinza do Duelo não pegaria a cor. A “cor do nível” mantém a textura do nível por baixo dos pixels transparentes.</p>
+        <span class="rotulo">Preços propostos</span>
+        <ul class="precos">
+          <li><b>Paramétrica</b> (padrão desenhado no shader, com a cor da skin): 80 + 10 × nível gotas (90 a 210).</li>
+          <li><b>Pixel</b> (desenho 16×16, ladrilho ou estampa): 120 + 15 × nível (135 a 315).</li>
+          <li><b>Minha</b>: 150 por nível, comprada uma vez e editável à vontade.</li>
+        </ul>
+      </div>
+      <div class="cartao perguntas" id="perguntas"></div>
+    </section>
+
+    <div id="niveis" class="esquerda"></div>
+
+    <section id="secEditor" aria-labelledby="t-editor">
+      <h2 id="t-editor">Editor de pixel <small>o de verdade, para testar</small></h2>
+      <p class="lead">Dois modos: <b>ladrilho</b> (16×16 repetido pelo corpo; o balde dá a volta pelas bordas) e <b>estampa</b> (uma imagem cobre o corpo inteiro; o círculo tracejado é o corpo, o turquesa a área segura e as silhuetas, os olhos). Atalhos: B pincel, E borracha, G balde, I conta-gotas, M espelho, Z desfazer, 0 a 9 cores, Enter salva, Esc fecha.</p>
+      <div class="editorTopo">
+        <label class="rotulo" for="nivelEditor">Nível</label>
+        <select id="nivelEditor"></select>
+        <button class="btn" id="copiarCodigo" type="button">Copiar código</button>
+        <span class="dica" id="avisoCodigo" aria-live="polite"></span>
+      </div>
+      <div class="caixaEditor" id="caixaEditor"></div>
+      <pre class="codigo" id="codigo" aria-label="Código da imagem (16 linhas hex)"></pre>
+    </section>
+  </div>
+
+  <aside class="previa" aria-label="Prévia animada">
+    <span class="rotulo">Prévia animada</span>
+    <canvas id="grande" aria-label="Slime com a skin escolhida"></canvas>
+    <span class="nome" id="nomeGrande"></span>
+    <span class="rotulo">Personagem</span>
+    <div class="linha" id="objetos" role="group" aria-label="Personagem"></div>
+    <div class="escolha"><span id="contagem"></span><output id="resumo"></output></div>
+    <div class="linha">
+      <button class="btn forte" id="copiar" type="button">Copiar a escolha</button>
+      <button class="btn" id="limpar" type="button">Voltar ao padrão</button>
+    </div>
+    <p class="dica" id="avisoCopia" aria-live="polite"></p>
+    <textarea class="saida" id="saida" readonly aria-label="Texto da escolha para colar na conversa"></textarea>
+  </aside>
+</main>
+<div id="telaEditor"></div>
+<canvas id="folhaCv" hidden></canvas>
+
+<script type="module">
+import { PALETA, NOMES_PALETA, BASES, NOMES_BASES, aparencia, PRECO_MINHA, pxDeLinhas, codificar, SKINS } from '../src/jogo/skins.js';
+import { NIVEIS } from '../src/jogo/niveis.js';
+import { hexDaMistura } from '../src/cor/km.js';
+import { OBJETOS } from '../src/render/rostos.js';
+import { criarPalco } from '../src/render/palco.js';
+import { criarEditor, TEXTOS_EDITOR } from '../src/ui/editor.js';
+import { CANDIDATAS } from './skins-candidatas.js';
+
+const q = new URLSearchParams(location.search);
+const CHAVE = 'slime.skinsEstudio';
+const NOMES = { gotinha: 'Gotinha', broto: 'Broto', lilas: 'Lilás', pimenta: 'Pimenta', tangerina: 'Tangerina', limao: 'Limão', nuvem: 'Nuvem',
+  arcoiris: 'Arco-íris', mar: 'Mar', uva: 'Uva', chiclete: 'Chiclete', noite: 'Noite', ouro: 'Ouro', lava: 'Lava', aurora: 'Aurora', cristal: 'Cristal' };
+const nomeNivel = (k) => NOMES[NIVEIS[k - 1].nome] || NIVEIS[k - 1].nome;
+// as 2 por nivel que o usuario escolheu em 2026-10-15 (o catalogo SKINS do jogo)
+const ESCOLHIDAS = {};
+for (const x of SKINS) if (x.id !== 'padrao') (ESCOLHIDAS[x.nivel] = ESCOLHIDAS[x.nivel] || []).push(x.id);
+const tipoDe = (c) => (c.tipo === 'pixel' ? `Pixel · ${c.modo === 1 ? 'estampa' : 'ladrilho'}` : 'Paramétrica');
+const $ = (id) => document.getElementById(id);
+
+// ------------------------------------------------------------ estado (localStorage direto: pagina de avaliacao)
+function ler() {
+  try { return JSON.parse(localStorage.getItem(CHAVE) || '{}') || {}; } catch { return {}; }
+}
+let salvo = ler();
+// sem marcas salvas neste navegador, a pagina mostra as escolhidas
+if (!salvo.marcadas || !Object.keys(salvo.marcadas).length) salvo.marcadas = JSON.parse(JSON.stringify(ESCOLHIDAS));
+salvo.respostas = salvo.respostas || {};
+let objeto = salvo.objeto || 'classico';
+function gravar() {
+  try { localStorage.setItem(CHAVE, JSON.stringify({ ...salvo, objeto })); } catch { /* sem armazenamento */ }
+}
+
+// ------------------------------------------------------------ paleta e bases
+$('paleta').innerHTML = PALETA.map((h, i) => `<div class="amostra${i ? '' : ' transp'}"><i style="--c:${h || '#3295df'}"></i><span>${TEXTOS_EDITOR.cores[NOMES_PALETA[i]]}<small>${i ? h : 'transparente'}</small></span></div>`).join('');
+$('bases').innerHTML = BASES.map((b, i) => `<div class="amostra redonda"><i style="--c:${hexDaMistura(b || NIVEIS[0].pig)}"></i><span>${TEXTOS_EDITOR.bases[NOMES_BASES[i]]}<small>${b ? hexDaMistura(b) : 'a do nível'}</small></span></div>`).join('');
+
+// ------------------------------------------------------------ perguntas
+const PERGUNTAS = [
+  { id: 'precos', titulo: 'Preços', op: ['Como proposto', 'Mais baratos (−30%)', 'Mais caros (+30%)'] },
+  { id: 'bloqueio', titulo: 'Níveis ainda não descobertos', op: ['Bloquear as skins (recomendado)', 'Liberar tudo'] },
+  { id: 'aba', titulo: 'Nome da aba nova da Loja', op: ['Skins', 'Slimes (o grupo de personagens vira “Rostos”)', 'Visual'] },
+  { id: 'gosma', titulo: 'Gosma cinza do Duelo', op: ['Manter a regra da cor (as skins prontas já respeitam)', 'Não depender da cor da skin (conta o contato)'] },
+];
+function desenharPerguntas() {
+  $('perguntas').innerHTML = '<span class="rotulo">Pontos para confirmar</span>' + PERGUNTAS.map((p) => `<div class="pergunta"><b>${p.titulo}</b><div class="linha" role="group" aria-label="${p.titulo}">`
+    + p.op.map((t, i) => `<button type="button" class="btn mini" data-perg="${p.id}" data-op="${i}" aria-pressed="${salvo.respostas[p.id] === i}">${t}</button>`).join('') + '</div></div>').join('');
+}
+$('perguntas').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-perg]');
+  if (!b) return;
+  const id = b.dataset.perg;
+  const op = Number(b.dataset.op);
+  if (salvo.respostas[id] === op) delete salvo.respostas[id];
+  else salvo.respostas[id] = op;
+  gravar();
+  desenharPerguntas();
+  resumir();
+});
+desenharPerguntas();
+
+// ------------------------------------------------------------ niveis e fichas
+const porNivel = Array.from({ length: 14 }, () => []);
+for (const c of CANDIDATAS) porNivel[c.nivel].push(c);
+const fichas = []; // { cv, k, skin, ap }
+let html = '';
+for (let k = 1; k <= 13; k++) {
+  const pad = aparencia(k, 'padrao');
+  html += `<section class="nivel" id="nivel-${k}" aria-labelledby="t-n${k}"><h2 id="t-n${k}"><i class="bola" style="--c:${pad.hex}" aria-hidden="true"></i>Nível ${k} · ${nomeNivel(k)} <small id="cont-${k}"></small></h2><div class="fichas">`;
+  html += `<div class="ficha padrao" data-k="${k}" data-id="padrao" tabindex="0"><canvas></canvas><span class="txt"><span class="tipo">Padrão · grátis</span><b>O de hoje</b><span class="nota">${k >= 7 ? 'Textura do nível no shader.' : 'Cor lisa do nível.'}</span></span></div>`;
+  for (const c of porNivel[k]) {
+    html += `<button type="button" class="ficha" data-k="${k}" data-id="${c.id}" aria-pressed="false"><canvas></canvas><i class="marca" aria-hidden="true"></i><i class="preco">💧 ${c.preco}</i>`
+      + `<span class="txt"><span class="tipo">${tipoDe(c)}</span><b>${c.nome}</b><span class="nota">${c.nota}</span></span></button>`;
+  }
+  html += '</div></section>';
+}
+$('niveis').innerHTML = html;
+for (const el of document.querySelectorAll('.ficha')) {
+  const k = Number(el.dataset.k);
+  const id = el.dataset.id;
+  const skin = id === 'padrao' ? 'padrao' : CANDIDATAS.find((c) => c.nivel === k && c.id === id);
+  fichas.push({ el, cv: el.querySelector('canvas'), k, id, skin, ap: aparencia(k, skin), foto: null });
+}
+
+function marcar(k, id) {
+  const lista = (salvo.marcadas[k] || []).slice();
+  const i = lista.indexOf(id);
+  if (i >= 0) lista.splice(i, 1);
+  else { lista.push(id); while (lista.length > 2) lista.shift(); }
+  salvo.marcadas[k] = lista;
+  gravar();
+  atualizarMarcas();
+}
+function atualizarMarcas() {
+  for (const f of fichas) {
+    if (f.id === 'padrao') continue;
+    const lista = salvo.marcadas[f.k] || [];
+    const n = lista.indexOf(f.id);
+    f.el.setAttribute('aria-pressed', String(n >= 0));
+    f.el.querySelector('.marca').textContent = n >= 0 ? String(n + 1) : '';
+  }
+  for (let k = 1; k <= 13; k++) $('cont-' + k).textContent = `${(salvo.marcadas[k] || []).length} de 2`;
+  resumir();
+}
+$('niveis').addEventListener('click', (e) => {
+  const f = e.target.closest('.ficha');
+  if (!f || f.dataset.id === 'padrao') return;
+  marcar(Number(f.dataset.k), f.dataset.id);
+  mostrarGrande(fichas.find((x) => x.el === f));
+});
+
+// ------------------------------------------------------------ resumo e copia
+function resumir() {
+  let n = 0;
+  const linhas = ['Skins escolhidas no Estúdio de skins (modelos/skins.html):'];
+  const faltam = [];
+  for (let k = 1; k <= 13; k++) {
+    const lista = salvo.marcadas[k] || [];
+    n += lista.length;
+    if (lista.length < 2) faltam.push(k);
+    const nomes = lista.map((id) => { const c = CANDIDATAS.find((x) => x.nivel === k && x.id === id); return c ? `${c.nome} (${c.id})` : id; });
+    linhas.push(`- Nível ${k} ${nomeNivel(k)}: ${nomes.length ? nomes.join(', ') : '—'}`);
+  }
+  if (faltam.length) linhas.push(`Faltam marcar: nível ${faltam.join(', ')}.`);
+  for (const p of PERGUNTAS) {
+    const r = salvo.respostas[p.id];
+    linhas.push(`${p.titulo}: ${r === undefined ? '(sem resposta)' : p.op[r]}`);
+  }
+  linhas.push(`Personagem da prévia: ${objeto}.`);
+  $('contagem').textContent = `${n} de 26 marcadas`;
+  $('resumo').textContent = faltam.length ? `faltam ${faltam.length} níveis` : 'todos os níveis com 2';
+  $('saida').value = linhas.join('\n');
+}
+async function copiar(texto, aviso) {
+  try { await navigator.clipboard.writeText(texto); $(aviso).textContent = 'Copiado. Cole na conversa.'; } catch {
+    $(aviso).textContent = 'Selecione o texto e copie (o navegador bloqueou a cópia).';
+  }
+}
+$('copiar').addEventListener('click', () => { $('saida').select(); copiar($('saida').value, 'avisoCopia'); });
+$('limpar').addEventListener('click', () => { salvo.marcadas = {}; salvo.respostas = {}; gravar(); desenharPerguntas(); atualizarMarcas(); $('avisoCopia').textContent = 'Marcas apagadas.'; });
+
+// ------------------------------------------------------------ personagem
+$('objetos').innerHTML = OBJETOS.map((ob) => `<button type="button" class="btn mini" data-obj="${ob.id}" aria-pressed="${ob.id === objeto}">${ob.nome}</button>`).join('');
+$('objetos').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-obj]');
+  if (!b) return;
+  objeto = b.dataset.obj;
+  gravar();
+  for (const x of document.querySelectorAll('[data-obj]')) x.setAttribute('aria-pressed', String(x.dataset.obj === objeto));
+  resumir();
+  fotografarTudo();
+  if (atual) mostrarGrande(atual);
+  if (editor) abrirEditor();
+});
+
+// ------------------------------------------------------------ fotos (um palco so, fora da tela)
+const LADO_FOTO = 150;
+const DPR = Math.min(2, window.devicePixelRatio || 1);
+const fotografo = criarPalco(document.createElement('canvas'), { tamanho: LADO_FOTO, cutucar: false, dpr: DPR });
+let filaFotos = [];
+let fotoRodando = false;
+function fotografar(f) {
+  fotografo.montar(f.k, f.ap, objeto);
+  for (let i = 0; i < 45; i++) fotografo.passo(1 / 60);
+  f.foto = fotografo.foto(Math.round(LADO_FOTO * DPR));
+  f.cv.width = f.foto.width;
+  f.cv.height = f.foto.height;
+  f.cv.getContext('2d').drawImage(f.foto, 0, 0);
+}
+function fotografarTudo() {
+  filaFotos = fichas.slice();
+  if (fotoRodando) return;
+  fotoRodando = true;
+  const lote = () => {
+    const t0 = performance.now();
+    while (filaFotos.length && performance.now() - t0 < 24) fotografar(filaFotos.shift());
+    if (filaFotos.length) setTimeout(lote, 0);
+    else { fotoRodando = false; prontoFotos = true; if (q.has('folha')) montarFolha(); else document.title = document.title.replace(' …', ''); }
+  };
+  lote();
+}
+let prontoFotos = false;
+
+// ------------------------------------------------------------ animacao: a ficha sob o ponteiro e a previa grande
+const animado = criarPalco(document.createElement('canvas'), { tamanho: LADO_FOTO, dpr: DPR });
+let sob = null;
+const grande = criarPalco($('grande'), { tamanho: 290 });
+let atual = null;
+function mostrarGrande(f) {
+  if (!f) return;
+  atual = f;
+  grande.montar(f.k, f.ap, objeto);
+  $('nomeGrande').textContent = `Nível ${f.k} · ${f.id === 'padrao' ? 'padrão' : f.skin.nome}`;
+}
+function sobre(f) {
+  if (sob === f) return;
+  if (sob && sob.foto) sob.cv.getContext('2d').drawImage(sob.foto, 0, 0);
+  sob = f;
+  if (!f) return;
+  animado.trocarSaida(f.cv);
+  animado.montar(f.k, f.ap, objeto);
+  mostrarGrande(f);
+}
+$('niveis').addEventListener('pointerover', (e) => { const el = e.target.closest('.ficha'); sobre(el ? fichas.find((x) => x.el === el) : null); });
+$('niveis').addEventListener('pointerleave', () => sobre(null));
+$('niveis').addEventListener('focusin', (e) => { const el = e.target.closest('.ficha'); if (el) sobre(fichas.find((x) => x.el === el)); });
+let antes = 0;
+function quadro(t) {
+  const dt = antes ? Math.min(0.05, (t - antes) / 1000) : 0;
+  antes = t;
+  if (!document.hidden) {
+    grande.passo(dt);
+    grande.desenhar();
+    if (sob) { animado.passo(dt); animado.desenhar(); }
+  }
+  requestAnimationFrame(quadro);
+}
+
+// ------------------------------------------------------------ editor
+let editor = null;
+const sel = $('nivelEditor');
+sel.innerHTML = Array.from({ length: 13 }, (_, i) => `<option value="${i + 1}">${i + 1} · ${nomeNivel(i + 1)}</option>`).join('');
+sel.value = String(salvo.nivelEditor || 3);
+function prontasDe(k) {
+  const doNivel = CANDIDATAS.filter((c) => c.tipo === 'pixel' && c.nivel === k);
+  const outras = CANDIDATAS.filter((c) => c.tipo === 'pixel' && c.nivel !== k);
+  return [...doNivel, ...outras].map((c) => ({ id: c.id, nome: c.nome, px: c.px, modo: c.modo }));
+}
+function abrirEditor(raiz = $('caixaEditor'), inicial = null, modal = false) {
+  if (editor) editor.destruir();
+  const k = Number(q.get('nivel') || sel.value) || 3;
+  const ini = inicial || (salvo.minhas && salvo.minhas[k]) || null;
+  editor = criarEditor(raiz, {
+    nivel: k, nomeNivel: nomeNivel(k), inicial: ini, prontas: prontasDe(k), objeto, modal,
+    aoSalvar(m) {
+      salvo.minhas = salvo.minhas || {};
+      salvo.minhas[k] = m;
+      gravar();
+      mostrarCodigo();
+    },
+    aoCancelar() { abrirEditor(raiz, null, modal); },
+  });
+  window.__editor = editor;
+  mostrarCodigo();
+}
+function mostrarCodigo() {
+  if (!editor) return;
+  const v = editor.valor();
+  $('codigo').textContent = `// modo ${v.m === 1 ? '1 (estampa)' : '0 (ladrilho)'} · cor do corpo ${v.b} · tamanho ${'PMG'[v.e]}\npx: [\n${editor.linhas().map((l) => `  '${l}',`).join('\n')}\n]\n// codigo da Minha (171 caracteres): ${v.px}`;
+}
+sel.addEventListener('change', () => { salvo.nivelEditor = Number(sel.value); gravar(); abrirEditor(); });
+$('copiarCodigo').addEventListener('click', () => { mostrarCodigo(); copiar($('codigo').textContent, 'avisoCodigo'); });
+$('caixaEditor').addEventListener('pointerup', () => setTimeout(mostrarCodigo, 0));
+$('caixaEditor').addEventListener('click', () => setTimeout(mostrarCodigo, 0));
+
+// ------------------------------------------------------------ folha unica para o print (?folha)
+async function montarFolha() {
+  await document.fonts.ready;
+  const cv = $('folhaCv');
+  const C = 158;
+  const gap = 12;
+  const rot = 168;
+  const larguraBloco = rot + 4 * (C + gap) + gap;
+  const altLinha = C + 66;
+  const topo = 118;
+  const blocos = [[1, 7], [8, 13]];
+  cv.width = larguraBloco * 2 + 40;
+  cv.height = topo + 7 * altLinha + 30;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#f3f2ee';
+  g.fillRect(0, 0, cv.width, cv.height);
+  g.strokeStyle = 'rgba(40, 60, 90, 0.085)';
+  g.lineWidth = 1.5;
+  for (let x = 0; x < cv.width; x += 28) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, cv.height); g.stroke(); }
+  for (let y = 0; y < cv.height; y += 28) { g.beginPath(); g.moveTo(0, y); g.lineTo(cv.width, y); g.stroke(); }
+  g.fillStyle = '#17161c';
+  g.font = '700 46px Fredoka, sans-serif';
+  g.fillText('Estúdio de skins · as 2 escolhidas por nível (em destaque)', 24, 60);
+  g.font = '600 20px Fredoka, sans-serif';
+  g.fillStyle = '#4a4855';
+  g.fillText(`Motor real do jogo (palco). À esquerda de cada linha, a padrão de hoje. Preço em gotas: paramétrica 80+10k, pixel 120+15k, Minha ${PRECO_MINHA}.`, 24, 94);
+  blocos.forEach(([a, b], bi) => {
+    const ox = 20 + bi * (larguraBloco + 0);
+    for (let k = a; k <= b; k++) {
+      const oy = topo + (k - a) * altLinha;
+      const lista = fichas.filter((f) => f.k === k);
+      const pad = lista.find((f) => f.id === 'padrao');
+      // rotulo e a padrao
+      g.fillStyle = '#17161c';
+      g.font = '700 24px Fredoka, sans-serif';
+      g.fillText(`Nível ${k}`, ox, oy + 22);
+      g.font = '600 18px Fredoka, sans-serif';
+      g.fillStyle = '#4a4855';
+      g.fillText(nomeNivel(k), ox, oy + 44);
+      g.drawImage(pad.foto, ox, oy + 54, rot - 24, rot - 24);
+      g.fillText('padrão', ox + 40, oy + 54 + rot - 12);
+      lista.filter((f) => f.id !== 'padrao').forEach((f, i) => {
+        const x = ox + rot + i * (C + gap);
+        const y = oy;
+        // as escolhidas ganham a moldura turquesa; as outras ficam esmaecidas
+        const escolhida = (ESCOLHIDAS[k] || []).includes(f.id);
+        g.fillStyle = '#ffffff';
+        g.strokeStyle = escolhida ? '#3fbfb5' : '#17161c';
+        g.lineWidth = escolhida ? 8 : 3;
+        g.beginPath();
+        g.rect(x, y, C, C + 58);
+        g.fill();
+        g.stroke();
+        g.globalAlpha = escolhida ? 1 : 0.45;
+        g.drawImage(f.foto, x + 2, y + 2, C - 4, C - 4);
+        g.fillStyle = '#17161c';
+        g.font = '700 19px Fredoka, sans-serif';
+        g.fillText(f.skin.nome, x + 8, y + C + 20, C - 14);
+        g.font = '600 14px Fredoka, sans-serif';
+        g.fillStyle = '#4a4855';
+        g.fillText(`${tipoDe(f.skin)} · ${f.skin.preco}`, x + 8, y + C + 42, C - 14);
+        g.globalAlpha = 1;
+      });
+    }
+  });
+  cv.hidden = false;
+  document.body.classList.add('soFolha');
+  window.__folha = () => cv.toDataURL('image/jpeg', 0.9);
+  document.title = 'PRONTO';
+}
+
+// ------------------------------------------------------------ partida
+atualizarMarcas();
+if (q.has('editor')) {
+  // tela propria do editor (prints): ?editor&nivel=4&exemplo=joaninha
+  document.body.classList.add('soEditor');
+  const ex = CANDIDATAS.find((c) => c.id === q.get('exemplo'));
+  let ini = null;
+  if (ex && ex.px) ini = { m: ex.modo === 1 ? 1 : 0, b: 0, e: 1, px: codificar(pxDeLinhas(ex.px)) };
+  abrirEditor($('telaEditor'), ini, true);
+  setTimeout(() => { document.title = 'PRONTO'; }, 900);
+} else {
+  document.title += ' …';
+  fotografarTudo();
+  mostrarGrande(fichas.find((f) => f.k === 1 && f.id !== 'padrao'));
+  if (!q.has('folha')) abrirEditor();
+}
+requestAnimationFrame(quadro);
+window.__skins = { fichas, get pronto() { return prontoFotos; } };
+</script>
+</body>
+</html>

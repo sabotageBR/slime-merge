@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>thumb</title>
+<style>html,body{margin:0;overflow:hidden;background:#000}canvas{display:block}</style></head>
+<body><canvas id="c"></canvas><pre id="medidas"></pre>
+<script type="module">
+// Thumb da Poki feita com o proprio jogo: a fisica monta a cena (slimes caindo e assentando
+// no bequer, a fusao com a cor nova nascendo na costura) e o render do jogo desenha (campo e
+// composicao em WebGL2, rostos, cenario e cesto). Skin padrao: bequer, jardim, classico.
+// Regras (developers.poki.com/guide/game-thumbnail, conferidas em 2026-10-15):
+//   - quadrado 1:1 de no minimo 628 px, sangrado: sem borda, margem nem tarja (a Poki
+//     arredonda os cantos);
+//   - sem texto;
+//   - um assunto principal, com pose dinamica, o personagem na skin padrao; fundo limpo;
+//   - parecida com o jogo de verdade; contraste alto e nada perto do #83FFE7 do site;
+//   - legivel nos tiles pequenos (ver ?grade).
+//   ?opcao=fusao&s=1256   a thumb no tamanho s (a janela deve ter s x s)
+//   ?opcao=fusao&grade    folha de conferencia: tiles de 314 a 94 px sobre o #83FFE7
+//   ?opcao=fusao&medir    mede a thumb de 628 px e escreve o JSON em #medidas
+//   ?opcao=fusao&perto    a thumb de 628 px com os pixels perto do #83FFE7 em magenta
+import { criarMundo } from '../src/fisica/mundo.js';
+import { criarPote } from '../src/jogo/pote.js';
+import { NIVEIS, particulasNivel, nivel, diametroNivel } from '../src/jogo/niveis.js';
+import { colorir } from '../src/jogo/modos/merge.js';
+import { iniciarFrente, difundir } from '../src/cor/difusao.js';
+import { hexDaMistura } from '../src/cor/km.js';
+import { enquadrar, aplicar, paraTela } from '../src/render/camera.js';
+import { criarCampo } from '../src/render/campo.js';
+import { criarComposicao } from '../src/render/composicao.js';
+import { desenharRostos, desenharAtras } from '../src/render/rostos.js';
+import { desenharCestos, desenharReflexos } from '../src/render/cestos.js';
+import { criarVfx } from '../src/render/vfx.js';
+import { desenharGuias } from '../src/render/guias.js';
+import { desenharMissil } from '../src/render/missil.js';
+import { LIMIAR, RAIO_CAMPO } from '../src/render/cena.js';
+
+const q = new URLSearchParams(location.search);
+const S = Math.max(64, parseInt(q.get('s') || '1256', 10));
+const OPCAO = q.get('opcao') || 'fusao';
+const POKI = '#83FFE7';
+const TILES = [314, 204, 140, 94];
+const HEX = NIVEIS.map((n) => hexDaMistura(n.pig));
+const DT = 1 / 60;
+const TINTA = '#17161c';
+
+// ------------------------------------------------------------ cenas (fisica de verdade)
+function novoMundo(semente) {
+  const m = criarMundo({ semente });
+  const pote = criarPote({ mundo: m, cx: 0, cesto: 'becher', eventos: [] });
+  return { m, pote, vfx: criarVfx() };
+}
+function slime(m, k, x, y) {
+  const s = m.criarSlime({ x, y, n: particulasNivel(k), material: 'gelatina', nivel: k });
+  s.dados.hex = HEX[k - 1];
+  s.dados.pote = 0;
+  colorir(m, s, nivel(k));
+  return s;
+}
+function rodar(c, seg) {
+  for (let f = 0; f < Math.round(seg / DT); f++) {
+    c.m.avancar(4);
+    c.m.medir(DT);
+    difundir(c.m, DT, {});
+    c.vfx.passo(DT);
+  }
+}
+/** Solta os slimes um a um no bequer, como numa partida (niveis vizinhos diferentes). */
+function empilhar(c, lista) {
+  for (const [k, x] of lista) { slime(c.m, k, x, 12.6); rodar(c, 0.75); }
+  rodar(c, 1.2);
+}
+/** Puxa as particulas de a e b uma para a outra (velocidade v), por `quadros` quadros. */
+function puxar(c, a, b, v, quadros) {
+  for (let f = 0; f < quadros; f++) {
+    const dir = b.cx > a.cx ? 1 : -1;
+    for (let i = 0; i < c.m.n; i++) {
+      if (c.m.sl[i] === a.idx) c.m.vx[i] += v * dir;
+      if (c.m.sl[i] === b.idx) c.m.vx[i] -= v * dir;
+    }
+    rodar(c, DT);
+  }
+}
+/**
+ * O empurrao do encosto (o amasso de quem vai fundir) e as estrelas no ponto de encosto, numa
+ * escala e do tamanho do par (1 no nivel 4). Devolve o ponto de encosto.
+ */
+function encostar(c, a, b, e) {
+  for (let i = 0; i < c.m.n; i++) {
+    if (c.m.sl[i] === a.idx) c.m.vx[i] = 6 * (b.cx > a.cx ? 1 : -1);
+    if (c.m.sl[i] === b.idx) c.m.vx[i] = -6 * (b.cx > a.cx ? 1 : -1);
+  }
+  rodar(c, 0.07);
+  const px = (a.cx * b.raio0 + b.cx * a.raio0) / (a.raio0 + b.raio0);
+  const py = (a.cy + b.cy) / 2;
+  for (let k = 0; k < 9; k++) c.vfx.brilho(px + ((k % 3) - 1) * 0.3 * e, py + (1.0 + (((k * 5) % 3) - 1) * 0.35) * e);
+  rodar(c, 0.12);
+  return [px, py];
+}
+/**
+ * O estilo da fusao com as cores do comeco (azul, verde e lilas: mais calmas que o vermelho) e
+ * o quadro cheio: o par de iguais grande no alto da pilha, ladeado e apoiado em slimes de
+ * tamanho parecido, e o ceu so no alto, com as estrelas do encosto. A pilha e uma grade em favo
+ * (fileiras de 4 e 5 desencontradas) pintada para que so o par seja igual entre os que se tocam
+ * (a thumb diz "iguais se juntam"); as fileiras sao postas no lugar e a fisica so assenta. O par
+ * cai em cima dos dois do meio e os dois escorregam para o mesmo vale: o amasso da fusao.
+ * Com x e y os outros dois niveis calmos (o k reaparece embaixo, longe do par, como numa
+ * partida):  [y, k, k, x]  [k, x, y, k]  [x, y, k, x, y]  [k, x, y, k]  (de cima para baixo)
+ * @param {number} k nivel do par @param {number} x @param {number} y @param {number} semente
+ * @param {{ lado: number, alto: number }} Q quadro: lado em diametros do par, altura do encosto (0..1)
+ */
+function fusaoInicial(k, x, y, semente, Q = { lado: 2.5, alto: 0.54 }) {
+  const c = novoMundo(semente);
+  const W = 1.9;
+  let topo = 0;
+  for (const fila of [[k, x, y, k], [x, y, k, x, y], [k, x, y, k]]) {
+    fila.forEach((n, i) => slime(c.m, n, (i - (fila.length - 1) / 2) * W, topo + 0.1 + diametroNivel(n) / 2));
+    rodar(c, 0.6);
+    topo = 0;
+    for (const s of c.m.vivos()) topo = Math.max(topo, s.topo);
+  }
+  const d = diametroNivel(k);
+  const a = slime(c.m, k, -d / 2, topo + 0.1 + d / 2);
+  const b = slime(c.m, k, d / 2, topo + 0.1 + d / 2);
+  const e = slime(c.m, y, -d - diametroNivel(y) / 2 - 0.05, topo + 0.1 + diametroNivel(y) / 2);
+  const f = slime(c.m, x, d + diametroNivel(x) / 2 + 0.05, topo + 0.1 + diametroNivel(x) / 2);
+  // o par se puxa e os vizinhos de lado apertam (o quadro cheio, sem fresta de ceu)
+  for (let q = 0; q < 90; q++) {
+    for (let i = 0; i < c.m.n; i++) {
+      if (c.m.sl[i] === e.idx) c.m.vx[i] += 0.05;
+      if (c.m.sl[i] === f.idx) c.m.vx[i] -= 0.05;
+    }
+    puxar(c, a, b, 0.2, 1);
+  }
+  const [px, py] = encostar(c, a, b, 1);
+  const lado = d * Q.lado;
+  const y0 = py - lado * Q.alto;
+  // as estrelas ficam do tamanho das da fusao (sem o zoom do quadro), centradas no encosto
+  const escala = d / diametroNivel(4);
+  return { ...c, janela: [px - lado / 2, y0, px + lado / 2, y0 + lado], olhar: [px, py + d * 0.1], foco: [px, py + d * 0.2], heroi: HEX[k - 1], estrelas: [px, py, escala] };
+}
+
+/**
+ * Cada opcao: a fisica monta a cena e devolve o enquadramento (quadrado do mundo), para onde
+ * os olhos olham, o foco do brilho do fundo e a cor do slime principal (contraste).
+ */
+const CENAS = {
+  fusao() {
+    // dois vermelhos iguais caem juntos e se espremem um contra o outro no alto da pilha: o
+    // instante antes da fusao, com as estrelas no ponto de encosto. A pilha so tem niveis
+    // diferentes (iguais encostados fundiriam no jogo).
+    const c = novoMundo(11);
+    // o par cai no fundo do bequer, so com pequenos nas laterais: o par e o maior do quadro
+    empilhar(c, [[3, -3.7], [2, 3.8]]);
+    const a = slime(c.m, 4, -1.25, 13.4);
+    const b = slime(c.m, 4, 1.25, 13.4);
+    // os dois caem se puxando um para o outro (encontram-se em qualquer relevo da pilha) e,
+    // no fim, o empurrao do encosto: o amasso de quem vai fundir
+    puxar(c, a, b, 0.25, 100);
+    const [px, py] = encostar(c, a, b, 1);
+    // o quadro pega o fundo de vidro e a grama florida (sangrado, sem faixa lisa)
+    const h = 5.6;
+    const y0 = py - h * 0.42;
+    return { ...c, janela: [px - h / 2, y0, px + h / 2, y0 + h], olhar: [px, py + 0.2], foco: [px, py + 0.5], heroi: HEX[3] };
+  },
+  pote() {
+    // o bequer cheio (cada slime com o formato dos vizinhos e do vidro) e um laranja caindo
+    // dentro, feliz: o slime toma a forma do recipiente
+    const c = novoMundo(5);
+    empilhar(c, [[9, -1.8], [7, 2.4], [3, -3.8], [6, 1.0], [1, 3.6], [4, -2.4], [2, 0.6]]);
+    let topo = 0;
+    for (const s of c.m.vivos()) topo = Math.max(topo, s.topo);
+    const h = slime(c.m, 5, 0.2, topo + 2.5);
+    h.dados.expr = 'feliz';
+    for (let i = 0; i < c.m.n; i++) if (c.m.sl[i] === h.idx) c.m.vy[i] = -5;
+    rodar(c, 0.05);
+    const lado = 9.0;
+    return { ...c, janela: [-lado / 2, topo - lado * 0.45, lado / 2, topo + lado * 0.55], olhar: [h.cx, h.cy], foco: [h.cx, h.cy], heroi: HEX[4], trilha: h };
+  },
+  arcoiris() {
+    // o slime arco-iris (nivel 8) no alto da pilha, feliz, com estrelas
+    const c = novoMundo(8);
+    empilhar(c, [[7, -2.6], [6, 2.8], [3, 0.2], [5, -1.4], [1, 3.6], [4, 1.6], [2, -3.6]]);
+    const r = slime(c.m, 8, 0.0, 13.6);
+    r.dados.expr = 'feliz';
+    rodar(c, 1.3);
+    for (let k = 0; k < 12; k++) c.vfx.brilho(r.cx + ((k % 6) - 2.5) * 0.75, r.cy + 1.6 + (((k * 5) % 6) - 2.5) * 0.3);
+    rodar(c, 0.2);
+    const lado = 7.2;
+    const y0 = Math.max(r.cy - lado * 0.48, 0.3);
+    return { ...c, janela: [r.cx - lado / 2, y0, r.cx + lado / 2, y0 + lado], olhar: [r.cx, r.cy + 3], foco: [r.cx, r.cy], heroi: '#ff4d4d' };
+  },
+  lava() {
+    // o topo da escada: o nivel 13 de lava (o maior slime do jogo) por cima da pilha, de olhos
+    // bem abertos (o branco salta da crosta escura), com estrelas; os pequenos dao a escala
+    const c = novoMundo(13);
+    empilhar(c, [[2, -3.9], [4, 3.3], [1, -1.4], [3, 1.0], [1, 4.0]]);
+    const r = slime(c.m, 13, 0.0, 14.2);
+    rodar(c, 1.6);
+    for (let k = 0; k < 12; k++) c.vfx.brilho(r.cx + ((k % 6) - 2.5) * 1.1, r.topo + 0.6 + (((k * 5) % 6) - 2.5) * 0.3);
+    rodar(c, 0.2);
+    const lado = 9.2;
+    const y0 = Math.max(r.cy - lado * 0.56, 0.2);
+    return { ...c, janela: [r.cx - lado / 2, y0, r.cx + lado / 2, y0 + lado], olhar: [r.cx + 1.5, r.cy + 3], foco: [r.cx, r.cy + 0.5], heroi: HEX[12] };
+  },
+  missil() {
+    // o reforco da mira: o laranja escolhido chora com a reticula travada, e o missil mergulha
+    // nele com o rastro de fumaca (o instante antes da explosao)
+    const c = novoMundo(21);
+    empilhar(c, [[3, -3.6], [6, 2.6], [2, 0.4], [4, -1.8], [1, 3.9]]);
+    let topo = 0;
+    for (const s of c.m.vivos()) topo = Math.max(topo, s.topo);
+    const a = slime(c.m, 5, -0.6, topo + 2.2);
+    rodar(c, 1.4);
+    a.dados.expr = 'choro';
+    a.dados.marcado = 1;
+    rodar(c, 0.1);
+    const lado = 5.4;
+    const y0 = a.cy - lado * 0.46;
+    const missil = { x: a.cx, y: a.cy, r: a.raio0, cor: HEX[4], t: 0.665, choro: 0.3, impacto: 0.75, origem: [1.08, -0.05] };
+    return { ...c, janela: [a.cx - lado * 0.42, y0, a.cx + lado * 0.58, y0 + lado], olhar: [a.cx + 2.5, a.cy + 2.5], foco: [a.cx, a.cy], heroi: HEX[4], missil };
+  },
+  // as tres de cores calmas (pedido de 2026-10-15): o par azul, o verde e o lilas
+  'fusao-azul': () => fusaoInicial(1, 3, 2, 31),
+  'fusao-verde': () => fusaoInicial(2, 1, 3, 34),
+  'fusao-lilas': () => fusaoInicial(3, 2, 1, 34, { lado: 2.5, alto: 0.5 }),
+  close() {
+    // de perto: um uva grande no alto da pilha olhando para quem ve o tile (o rosto ocupa o
+    // quadro: o mais legivel nos tiles pequenos)
+    const c = novoMundo(4);
+    empilhar(c, [[5, -2.6], [6, 2.4], [2, 0.2], [4, -1.0], [1, 3.8]]);
+    let topo = 0;
+    for (const s of c.m.vivos()) topo = Math.max(topo, s.topo);
+    const r = slime(c.m, 10, 0.4, topo + 3.4);
+    rodar(c, 1.5);
+    for (let k = 0; k < 6; k++) c.vfx.brilho(r.cx + ((k % 3) - 1) * 1.6, r.topo + 0.45 + (((k * 2) % 3) - 1) * 0.25);
+    rodar(c, 0.15);
+    const lado = r.raio0 * 2.35;
+    const y0 = r.cy - lado * 0.47;
+    return { ...c, janela: [r.cx - lado / 2, y0, r.cx + lado / 2, y0 + lado], olhar: [r.cx, r.cy + 0.1], foco: [r.cx, r.cy + 0.4], heroi: HEX[9] };
+  },
+};
+
+/**
+ * Fundo limpo (a Poki pede foco no assunto): o ceu do jardim, com as mesmas cores do jogo,
+ * sem as nuvens, e um brilho com raios suaves atras do assunto; morros e grama se aparecerem.
+ */
+function fundo(ctx, cam, s, chao, foco) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const yc = paraTela(cam, 0, chao)[1];
+  const g = ctx.createLinearGradient(0, 0, 0, Math.max(1, Math.min(s, yc)));
+  g.addColorStop(0, '#7fcdff');
+  g.addColorStop(0.6, '#c9efff');
+  g.addColorStop(1, '#e8f9ff');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+  const [fx, fy] = paraTela(cam, foco[0], foco[1]);
+  ctx.save();
+  ctx.translate(fx, fy);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+  const N = 16;
+  for (let k = 0; k < N; k++) {
+    const a0 = (k / N) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, s * 1.6, a0, a0 + Math.PI / N);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+  const r = ctx.createRadialGradient(fx, fy, 0, fx, fy, s * 0.5);
+  r.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+  r.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = r;
+  ctx.fillRect(0, 0, s, s);
+  // vinheta: o ceu fica mais fundo nos cantos (o assunto salta e o tile se separa do site)
+  const v = ctx.createRadialGradient(fx, fy, s * 0.35, fx, fy, s * 0.95);
+  v.addColorStop(0, 'rgba(30, 110, 200, 0)');
+  v.addColorStop(1, 'rgba(30, 110, 200, 0.45)');
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, s, s);
+  if (yc < s) {
+    const u = cam.s;
+    ctx.fillStyle = '#a6e08e';
+    ctx.beginPath();
+    ctx.moveTo(0, yc);
+    for (let x = 0; x <= s; x += 20) ctx.lineTo(x, yc - u * 1.2 - Math.sin(x * 0.01) * u * 0.8);
+    ctx.lineTo(s, yc);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#6cc04a';
+    ctx.fillRect(0, yc, s, s - yc);
+    ctx.fillStyle = TINTA;
+    ctx.fillRect(0, yc - Math.max(1.5, s / 400), s, Math.max(3, s / 200));
+    // flores do jardim (as do jogo: branca, amarela e rosa de 5 petalas)
+    let sem = 7;
+    const rnd = () => { sem = (sem * 16807) % 2147483647; return sem / 2147483647; };
+    const pe = Math.max(4, s / 150);
+    for (let k = 0; k < 40; k++) {
+      const x = rnd() * s;
+      const y = yc + pe * 3 + rnd() * Math.max(pe * 2, s - yc - pe * 4);
+      ctx.fillStyle = ['#ffffff', '#ffd23a', '#ff8ac0'][k % 3];
+      for (let p = 0; p < 5; p++) {
+        const a = (p / 5) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.arc(x + Math.cos(a) * pe, y + Math.sin(a) * pe, pe * 0.75, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#e8a23a';
+      ctx.beginPath();
+      ctx.arc(x, y, pe * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+// ------------------------------------------------------------ desenho (o render do jogo)
+const glcv = document.createElement('canvas');
+const comp = criarComposicao(glcv);
+let cena = null;
+
+/** @param {HTMLCanvasElement} cv @param {number} s */
+function thumb(cv, s) {
+  if (!cena) cena = CENAS[OPCAO]();
+  const { m, pote, vfx, janela } = cena;
+  cv.width = s;
+  cv.height = s;
+  const ctx = /** @type {CanvasRenderingContext2D} */ (cv.getContext('2d'));
+  const cam = enquadrar(janela, { x: 0, y: 0, w: s, h: s });
+  const t = 0.55;
+  let chao = Infinity;
+  for (const p of m.paredes) if (!p.oculta) chao = Math.min(chao, p.ay - p.r, p.by - p.r);
+  const potes = [{ idx: pote.idxParedes, cesto: pote.cesto }];
+  fundo(ctx, cam, s, chao - 0.08, cena.foco);
+  desenharCestos(ctx, cam, 1, m.paredes, { potes, t, estiloSoltas: 'vidro', numeros: false });
+  desenharAtras(ctx, m, cam, 1, 'classico');
+  // trilha de queda (pose dinamica): riscos de tinta acima do slime que cai
+  if (cena.trilha) {
+    const h = cena.trilha;
+    aplicar(ctx, cam, 1);
+    ctx.strokeStyle = 'rgba(23, 22, 28, 0.55)';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 0.13;
+    for (const [dx, a, b] of [[-0.85, 0.5, 1.7], [0, 0.75, 2.3], [0.85, 0.5, 1.5]]) {
+      ctx.beginPath();
+      ctx.moveTo(h.cx + dx * h.raio0, h.topo + a);
+      ctx.lineTo(h.cx + dx * h.raio0, h.topo + b);
+      ctx.stroke();
+    }
+  }
+  glcv.width = s;
+  glcv.height = s;
+  const margem = 1.5;
+  // a celula do campo acompanha o zoom nos quadros fechados (o contorno nao serrilha)
+  const celula = Math.min(0.055, (janela[2] - janela[0]) / 100);
+  const campo = criarCampo({ janela: [janela[0] - margem, janela[1] - margem, janela[2] + margem, janela[3] + margem], celula, raio: RAIO_CAMPO });
+  campo.acumular(m);
+  comp.desenhar(campo, cam, 1, { tempo: t, brilho: 1, limiar: LIMIAR, traco: cam.s * 0.05 });
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(glcv, 0, 0);
+  desenharRostos(ctx, m, cam, 1, t, { olhar: cena.olhar, estilo: 'classico' });
+  desenharReflexos(ctx, cam, 1, m.paredes, potes);
+  if (cena.estrelas) {
+    const [ex, ey, e] = cena.estrelas;
+    const [sx, sy] = paraTela(cam, ex, ey);
+    vfx.desenhar(ctx, { s: cam.s * e, cx: ex, cy: ey, sx, sy }, 1);
+  } else vfx.desenhar(ctx, cam, 1);
+  if (cena.missil) {
+    // a reticula travada e o missil saindo do canto de baixo (onde fica o botao da mira)
+    const M = cena.missil;
+    desenharGuias(ctx, cam, 1, { missil: M }, t, m);
+    const o = M.origem || [1.02, 0.98];
+    desenharMissil(ctx, 1, [s * o[0], s * o[1]], paraTela(cam, M.x, M.y), M, s * 0.2);
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  afastarDaPoki(ctx, s);
+}
+
+/**
+ * Ultimo passo de cor (como na thumb do 2048 Cards): o que ficou perto do #83FFE7 do site (o
+ * anel ciano-verde do arco-iris) escurece e satura, para a thumb nao sumir no fundo da Poki.
+ */
+function afastarDaPoki(ctx, s) {
+  const img = ctx.getImageData(0, 0, s, s);
+  const d = img.data;
+  const n = parseInt(POKI.slice(1), 16);
+  const P = lab((n >> 16) & 255, (n >> 8) & 255, n & 255);
+  for (let i = 0; i < d.length; i += 4) {
+    const L = lab(d[i], d[i + 1], d[i + 2]);
+    const e = Math.hypot(L[0] - P[0], L[1] - P[1], L[2] - P[2]);
+    if (e >= 30) continue;
+    // abaixo de 25 (a regua) escurece de vez; de 25 a 30 volta aos poucos (sem degrau)
+    const k = e < 25 ? 0.62 : 0.62 + 0.38 * ((e - 25) / 5);
+    d[i] = Math.round(d[i] * k * 0.7);
+    d[i + 1] = Math.round(d[i + 1] * k);
+    d[i + 2] = Math.round(d[i + 2] * k * 0.92);
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+// ------------------------------------------------------------ medidas (mesma regua do 2048 Cards)
+function lab(r, g, b) {
+  const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const R = lin(r), G = lin(g), B = lin(b);
+  const f = (t) => (t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116);
+  const x = f((R * 0.4124 + G * 0.3576 + B * 0.1805) / 0.95047);
+  const y = f(R * 0.2126 + G * 0.7152 + B * 0.0722);
+  const z = f((R * 0.0193 + G * 0.1192 + B * 0.9505) / 1.08883);
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+}
+function lum(r, g, b) {
+  const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+/** Contraste WCAG entre a cor do slime principal e a media do fundo nos cantos. */
+function contrasteHeroi(d, s) {
+  const amostra = (x0, y0) => { let r = 0, g = 0, b = 0, n = 0; for (let y = y0; y < y0 + 20; y++) for (let x = x0; x < x0 + 20; x++) { const i = (y * s + x) * 4; r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; } return [r / n, g / n, b / n]; };
+  const cantos = [amostra(10, 10), amostra(s - 30, 10), amostra(10, s - 30), amostra(s - 30, s - 30)];
+  const fundo = cantos.reduce((a, c) => a + lum(...c), 0) / 4;
+  const n = parseInt(cena.heroi.slice(1), 16);
+  const h = lum((n >> 16) & 255, (n >> 8) & 255, n & 255);
+  return +((Math.max(fundo, h) + 0.05) / (Math.min(fundo, h) + 0.05)).toFixed(2);
+}
+function medir(cv) {
+  const s = cv.width;
+  const d = cv.getContext('2d').getImageData(0, 0, s, s).data;
+  const n = parseInt(POKI.slice(1), 16);
+  const P = lab((n >> 16) & 255, (n >> 8) & 255, n & 255);
+  const dist = (L, M) => Math.hypot(L[0] - M[0], L[1] - M[1], L[2] - M[2]);
+  const cor = (x, y) => { const i = (y * s + x) * 4; return lab(d[i], d[i + 1], d[i + 2]); };
+  let perto = 0, opaca = true, somaB = 0, nB = 0;
+  const anel = Math.round(s * 0.02);
+  for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) {
+    if (d[(y * s + x) * 4 + 3] < 255) opaca = false;
+    const e = dist(cor(x, y), P);
+    if (e < 25) perto++;
+    if (x < anel || y < anel || x >= s - anel || y >= s - anel) { somaB += e; nB++; }
+  }
+  const f = Math.round(s * 0.04);
+  const faixa = (x0, y0, w, h) => {
+    const labs = [];
+    for (let y = y0; y < y0 + h; y += 2) for (let x = x0; x < x0 + w; x += 2) labs.push(cor(x, y));
+    const m = [0, 1, 2].map((c) => labs.reduce((a, L) => a + L[c], 0) / labs.length);
+    return { m, lisa: labs.filter((L) => dist(L, m) < 3).length / labs.length };
+  };
+  const lados = { topo: [[0, 0, s, f], [0, f, s, f]], base: [[0, s - f, s, f], [0, s - 2 * f, s, f]], esq: [[0, 0, f, s], [f, 0, f, s]], dir: [[s - f, 0, f, s], [s - 2 * f, 0, f, s]] };
+  const tarja = [];
+  for (const [lado, [b, i]] of Object.entries(lados)) { const B = faixa(...b), I = faixa(...i); if (B.lisa > 0.9 && dist(B.m, I.m) > 8) tarja.push(lado); }
+  return { lado: s, pertoPoki: +(perto / (s * s)).toFixed(4), bordaPoki: +(somaB / nB).toFixed(1), tarja, contraste: { heroi: contrasteHeroi(d, s) }, opaca };
+}
+
+const cv = /** @type {HTMLCanvasElement} */ (document.getElementById('c'));
+if (q.has('grade')) {
+  const big = document.createElement('canvas');
+  thumb(big, 1256);
+  const m = 28;
+  cv.width = TILES.reduce((a, t) => a + t + m, m);
+  cv.height = TILES[0] + 2 * m;
+  const g = /** @type {CanvasRenderingContext2D} */ (cv.getContext('2d'));
+  g.fillStyle = POKI;
+  g.fillRect(0, 0, cv.width, cv.height);
+  g.imageSmoothingQuality = 'high';
+  let x = m;
+  for (const t of TILES) {
+    const y = m + TILES[0] - t;
+    g.save(); g.beginPath(); g.roundRect(x, y, t, t, Math.max(8, t * 0.08)); g.clip();
+    g.drawImage(big, x, y, t, t); g.restore();
+    x += t + m;
+  }
+} else if (q.has('perto')) {
+  thumb(cv, 628);
+  const g = /** @type {CanvasRenderingContext2D} */ (cv.getContext('2d'));
+  const img = g.getImageData(0, 0, 628, 628);
+  const d = img.data;
+  const n = parseInt(POKI.slice(1), 16);
+  const P = lab((n >> 16) & 255, (n >> 8) & 255, n & 255);
+  for (let i = 0; i < d.length; i += 4) {
+    const L = lab(d[i], d[i + 1], d[i + 2]);
+    if (Math.hypot(L[0] - P[0], L[1] - P[1], L[2] - P[2]) < 25) { d[i] = 255; d[i + 1] = 0; d[i + 2] = 255; }
+  }
+  g.putImageData(img, 0, 0);
+} else if (q.has('medir')) {
+  thumb(cv, 628);
+  document.getElementById('medidas').textContent = JSON.stringify(medir(cv));
+} else {
+  thumb(cv, S);
+}
+document.title = 'PRONTO';
+</script></body></html>

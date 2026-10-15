@@ -82,3 +82,56 @@ test('gotas da partida crescem com os pontos sem explodir', () => {
   assert.ok(gotasDaPartida(10000) > 60 && gotasDaPartida(10000) < 120);
   assert.ok(gotasDaPartida(40000) < 250);
 });
+
+test('migracao: o "nivel 13" do estouro de dois 12 (antes de existir) volta a 12 uma vez', () => {
+  const p = criarPerfil({ visto: 13, gotas: 40 }, '2026-10-15');
+  assert.equal(p.migrou, true);
+  assert.equal(p.visto, 12);
+  assert.equal(p.gotas, 40, 'as gotas ja pagas ficam');
+  assert.equal(p.descobrir(13), 25, 'o 13 de verdade ainda paga');
+  // depois de migrado, um 13 legitimo se mantem
+  const q = criarPerfil(p.dados(), '2026-10-16');
+  assert.equal(q.migrou, false);
+  assert.equal(q.visto, 13);
+  // perfil novo nao migra nada
+  assert.equal(criarPerfil({}, '2026-10-15').migrou, false);
+});
+
+test('skins: compra so nos niveis descobertos, equipa, a Minha nasce vazia e o save mexido e limpo', async () => {
+  const { SKINS, PRECO_MINHA, codificar, modelo } = await import('../src/jogo/skins.js');
+  const p = criarPerfil({ gotas: 1000, visto: 4 }, '2026-10-15');
+  const b = SKINS.find((s) => s.nivel === 1 && s.id !== 'padrao');
+  assert.equal(p.possuiSkin(1, 'padrao'), true);
+  assert.equal(p.possuiSkin(1, b.id), false);
+  assert.equal(p.comprarSkin(1, b.id), true);
+  assert.equal(p.gotas, 1000 - b.preco);
+  assert.equal(p.skins.equipado[1], b.id);
+  assert.equal(p.comprarSkin(1, b.id), false, 'nao compra duas vezes');
+  // nivel ainda nao descoberto fica bloqueado; skin que nao existe tambem
+  const alto = SKINS.find((s) => s.nivel === 9 && s.id !== 'padrao');
+  assert.equal(p.comprarSkin(9, alto.id), false);
+  assert.equal(p.comprarSkin(2, 'naoExiste'), false);
+  assert.equal(p.comprarSkin(2, 'padrao'), false);
+  // sem gotas, nao compra
+  const pobre = criarPerfil({ gotas: 10, visto: 13 }, '2026-10-15');
+  assert.equal(pobre.comprarSkin(13, 'tesouro'), false);
+  // a Minha: compra, nasce vazia, salva o desenho (codigo invalido nao entra)
+  assert.equal(p.precoSkin(2, 'minha'), PRECO_MINHA);
+  assert.equal(p.salvarMinha(2, { px: codificar(modelo('xadrez', 0, 4)) }), false, 'antes de comprar');
+  assert.equal(p.comprarSkin(2, 'minha'), true);
+  assert.equal(p.skins.minhas[2].px, 'A'.repeat(171));
+  assert.equal(p.salvarMinha(2, { m: 1, b: 3, e: 2, px: codificar(modelo('xadrez', 1, 4)) }), true);
+  assert.equal(p.salvarMinha(2, { px: 'lixo' }), false);
+  assert.deepEqual({ ...p.skins.minhas[2], px: '' }, { m: 1, b: 3, e: 2, px: '' });
+  // voltar para a padrao tira do equipado
+  assert.equal(p.equiparSkin(1, 'padrao'), true);
+  assert.equal(p.skins.equipado[1], undefined);
+  assert.equal(p.equiparSkin(1, b.id), true);
+  // o save volta igual; o save mexido e limpo
+  const q = criarPerfil(p.dados(), '2026-10-15');
+  assert.deepEqual(q.skins, p.skins);
+  const r = criarPerfil({ skins: { possui: ['1:' + b.id, 'lixo', '99:minha', '3:naoExiste', 7], equipado: { 1: b.id, 2: 'gotas', 4: 'minha' }, minhas: { 4: { px: 'lixo' } } } }, '2026-10-15');
+  assert.deepEqual(r.dados().skins, { possui: ['1:' + b.id], equipado: { 1: b.id }, minhas: {} });
+  // o perfil de antes das skins abre sem nada equipado
+  assert.deepEqual(criarPerfil({ gotas: 5 }, '2026-10-15').skins, { equipado: {}, minhas: {} });
+});

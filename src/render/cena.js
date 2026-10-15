@@ -1,11 +1,12 @@
-// A cena: tres canvases empilhados (papel + pote | slime em WebGL2 | rostos + efeitos),
-// camera que enquadra a janela do modo dentro da #area do HUD, qualidade adaptativa.
+// A cena: tres canvases empilhados (papel + pote | slime em WebGL2 | rostos + efeitos), mais
+// um por cima do HUD (missil da mira e gosma na tela), camera que enquadra a janela do modo
+// dentro da #area do HUD, qualidade adaptativa.
 // Nada desenha com canvas 0x0 (iframe zerado/escondido congelava o stringcut no iPad).
 
-import { enquadrar, paraMundo, aplicar } from './camera.js';
+import { enquadrar, paraMundo, paraTela, aplicar } from './camera.js';
 import { criarCampo } from './campo.js';
 import { criarComposicao } from './composicao.js';
-import { desenharSlimes2D } from './fallback2d.js';
+import { desenharSlimes2D, definirAparencias2D } from './fallback2d.js';
 import { desenharLinha } from './fundo.js';
 import { desenharRostos, desenharAtras } from './rostos.js';
 import { desenharCenario } from './cenarios.js';
@@ -13,6 +14,8 @@ import { desenharCestos, desenharReflexos } from './cestos.js';
 import { cesto as acharCesto } from '../jogo/cestos.js';
 import { criarVfx } from './vfx.js';
 import { desenharGuias } from './guias.js';
+import { criarGosma } from './gosma.js';
+import { desenharMissil } from './missil.js';
 
 /** Raio do nucleo do campo (u) e limiar da superficie: o slime isolado fica com ~r de borda. */
 export const RAIO_CAMPO = 0.48;
@@ -26,8 +29,10 @@ export const QUALIDADES = [
 ];
 
 /**
- * @param {{ fundo: HTMLCanvasElement, slime: HTMLCanvasElement, topo: HTMLCanvasElement, area: HTMLElement }} el
- * @param {{ forcar2d?: boolean, raio?: number, limiar?: number, zoom?: number[]|null, cenario?: string, objeto?: string, cesto?: string }} [o]
+ * @param {{ fundo: HTMLCanvasElement, slime: HTMLCanvasElement, topo: HTMLCanvasElement, area: HTMLElement, tela?: HTMLCanvasElement|null }} el
+ *   tela: canvas por cima do HUD (missil e gosma); sem ele, os dois vao para o canvas de cima
+ * @param {{ forcar2d?: boolean, raio?: number, limiar?: number, zoom?: number[]|null, cenario?: string, objeto?: string, cesto?: string, expr?: string }} [o]
+ *   expr: forca a expressao de todos os rostos (prints)
  */
 export function criarCena(el, o = {}) {
   const raioCampo = o.raio || RAIO_CAMPO;
@@ -47,6 +52,14 @@ export function criarCena(el, o = {}) {
   let campo = null;
   let campoChave = '';
   const vfx = criarVfx();
+  const gosma = criarGosma();
+  const ctxTela = el.tela ? /** @type {CanvasRenderingContext2D} */ (el.tela.getContext('2d')) : null;
+  /** o canvas da tela tem algo desenhado (limpar uma vez quando acabar) */
+  let telaSuja = false;
+  let dprTela = 1;
+  /** @type {() => number[]|null} centro do botao da mira (px CSS), de onde sai o missil */
+  let origemMissil = () => null;
+  let respingos = 0;
 
   function medir(janela) {
     W = Math.max(0, window.innerWidth | 0);
@@ -58,6 +71,14 @@ export function criarCena(el, o = {}) {
       const h = Math.max(1, Math.round(H * dpr));
       if (c.width !== w) c.width = w;
       if (c.height !== h) c.height = h;
+    }
+    if (el.tela) {
+      // so efeitos rapidos: resolucao menor basta
+      dprTela = Math.min(1.5, dpr);
+      const w = Math.max(1, Math.round(W * dprTela));
+      const h = Math.max(1, Math.round(H * dprTela));
+      if (el.tela.width !== w) { el.tela.width = w; telaSuja = true; }
+      if (el.tela.height !== h) { el.tela.height = h; telaSuja = true; }
     }
     const r = el.area.getBoundingClientRect();
     if (r.width > 0 && r.height > 0) cam = enquadrar(janela, { x: r.left, y: r.top, w: r.width, h: r.height });
@@ -83,7 +104,7 @@ export function criarCena(el, o = {}) {
     const vis = modo.visual ? modo.visual() : {};
     // fundo: cenario (o chao fica logo abaixo do cesto), cesto e o que nasce atras do slime
     let chao = Infinity;
-    for (const p of m.paredes) chao = Math.min(chao, p.ay - p.r, p.by - p.r);
+    for (const p of m.paredes) if (!p.oculta) chao = Math.min(chao, p.ay - p.r, p.by - p.r);
     if (chao === Infinity) chao = 0;
     const pes = (vis.potes || []).some((P) => P.cesto.detalhe === 'pes' || P.cesto.detalhe === 'xicara');
     chao -= pes ? 0.85 : 0.08;
@@ -119,17 +140,61 @@ export function criarCena(el, o = {}) {
     // por cima
     ctxTopo.setTransform(1, 0, 0, 1, 0, 0);
     ctxTopo.clearRect(0, 0, el.topo.width, el.topo.height);
-    desenharRostos(ctxTopo, m, cam, dpr, t, { olhar: vis.olhar || null, estilo: visual.objeto });
+    desenharRostos(ctxTopo, m, cam, dpr, t, { olhar: vis.olhar || null, estilo: visual.objeto, expr: o.expr || '' });
     if (vis.potes) desenharReflexos(ctxTopo, cam, dpr, m.paredes, vis.potes);
     vfx.desenhar(ctxTopo, cam, dpr);
     desenharGuias(ctxTopo, cam, dpr, vis, t, m);
+    desenharTela(vis);
+  }
+
+  /** Missil e gosma: por cima do HUD (canvas proprio, so desenha quando ha o que mostrar). */
+  function desenharTela(vis) {
+    const ctx = ctxTela || ctxTopo;
+    const d = ctxTela ? dprTela : dpr;
+    const ativo = !!vis.missil || !gosma.vazio;
+    if (ctxTela && (ativo || telaSuja)) {
+      ctxTela.setTransform(1, 0, 0, 1, 0, 0);
+      ctxTela.clearRect(0, 0, el.tela.width, el.tela.height);
+      telaSuja = ativo;
+    }
+    if (!ativo || !cam) return;
+    if (vis.missil) {
+      const alvo = paraTela(cam, vis.missil.x, vis.missil.y);
+      const origem = origemMissil() || [W / 2, H - 40];
+      desenharMissil(ctx, d, origem, alvo, vis.missil, Math.max(34, Math.min(70, cam.s * 1.7)));
+    }
+    gosma.desenhar(ctx, d);
   }
 
   return {
     desenhar,
     vfx,
+    /**
+     * Skins da partida (src/jogo/skins.js `aparencias`, indice = nivel): WebGL e a reserva 2D.
+     * So reenvia quando muda.
+     * @param {Array<any>} lista
+     */
+    definirAparencias(lista) {
+      if (comp) comp.definirAparencias(lista);
+      definirAparencias2D(lista);
+    },
+    /** Efeitos com tempo (respingos, textos, gosma na tela). @param {number} dt */
+    passo(dt) {
+      vfx.passo(dt);
+      gosma.passo(dt);
+    },
+    /** Gosma do slime explodido voando na tela (x, y e r do mundo). */
+    respingarTela(x, y, cor, r) {
+      if (!cam) return;
+      const [sx, sy] = paraTela(cam, x, y);
+      gosma.respingar(sx, sy, cor, r * cam.s, ++respingos * 7919, W, H);
+    },
+    /** @param {() => number[]|null} f */
+    set origemMissil(f) { origemMissil = f; },
     /** px CSS -> mundo (ou null antes da primeira camera) */
     paraMundo(px, py) { return cam ? paraMundo(cam, px, py) : null; },
+    /** mundo -> px CSS (ou null antes da primeira camera) */
+    paraTela(x, y) { return cam ? paraTela(cam, x, y) : null; },
     get camera() { return cam; },
     get qualidade() { return QUALIDADES[qual].nome; },
     get usaGl() { return !!comp; },

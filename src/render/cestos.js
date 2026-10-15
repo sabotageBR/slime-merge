@@ -3,7 +3,7 @@
 // desenha, por cima dos slimes, o reflexo da frente (o slime fica "dentro" do vidro).
 
 import { aplicar } from './camera.js';
-import { TINTA, desenharTala } from './fundo.js';
+import { TINTA } from './fundo.js';
 
 /** Pontos do contorno de um pote (capsulas encadeadas). */
 function contorno(paredes, idx) {
@@ -149,7 +149,8 @@ const ESTILOS = {
 };
 
 /** Detalhes que nao sao a faixa: alca, pes, marcas, pires, rosca, cascalho. */
-function detalhes(ctx, C, pts, t) {
+/** @param {boolean} [numeros] os numeros da graduacao do bequer (a thumb da Poki vai sem texto) */
+function detalhes(ctx, C, pts, t, numeros = true) {
   const xs = pts.map((p) => p[0]);
   const ys = pts.map((p) => p[1]);
   const x0 = Math.min(...xs);
@@ -253,7 +254,7 @@ function detalhes(ctx, C, pts, t) {
         ctx.moveTo(x1 - 0.32, -y);
         ctx.lineTo(x1 - (larga ? 1.1 : 0.7), -y);
         ctx.stroke();
-        if (larga) ctx.fillText(String(k * 50), x1 - 1.2, -y + 0.15);
+        if (larga && numeros) ctx.fillText(String(k * 50), x1 - 1.2, -y + 0.15);
       }
       ctx.restore();
       break;
@@ -298,8 +299,9 @@ function detalhes(ctx, C, pts, t) {
  * @param {import('./camera.js').Camera} cam
  * @param {number} dpr
  * @param {any[]} paredes  mundo.paredes
- * @param {{ potes?: any[], t?: number, estiloSoltas?: string }} o  potes: [{ idx, cesto, madeira }];
- *   estiloSoltas: estilo das paredes que nao sao de um cesto (loja, molde, lab), o do cesto escolhido
+ * @param {{ potes?: any[], t?: number, estiloSoltas?: string, numeros?: boolean }} o  potes: [{ idx, cesto }];
+ *   estiloSoltas: estilo das paredes que nao sao de um cesto (loja, molde, lab), o do cesto escolhido;
+ *   numeros: false tira os numeros da graduacao (thumb)
  */
 export function desenharCestos(ctx, cam, dpr, paredes, o = {}) {
   aplicar(ctx, cam, dpr);
@@ -311,8 +313,7 @@ export function desenharCestos(ctx, cam, dpr, paredes, o = {}) {
     const C = P.cesto;
     if (C.detalhe === 'alca' || C.detalhe === 'pes' || C.detalhe === 'aquario') detalhes(ctx, C, pts, o.t || 0);
     (ESTILOS[C.estilo] || ESTILOS.listrado)(ctx, pts);
-    if (C.detalhe && !['alca', 'pes', 'aquario'].includes(C.detalhe)) detalhes(ctx, C, pts, o.t || 0);
-    for (const m of P.madeira || []) desenharTala(ctx, m[0], m[1]);
+    if (C.detalhe && !['alca', 'pes', 'aquario'].includes(C.detalhe)) detalhes(ctx, C, pts, o.t || 0, o.numeros !== false);
   }
   // paredes que nao sao de nenhum cesto (lab, loja, molde): no estilo do cesto escolhido,
   // juntando as capsulas encadeadas numa polilinha so (emendas limpas e miolo do vidro)
@@ -321,7 +322,7 @@ export function desenharCestos(ctx, cam, dpr, paredes, o = {}) {
   const grupos = [];
   let atual = null;
   paredes.forEach((p, k) => {
-    if (usadas.has(k)) { atual = null; return; }
+    if (usadas.has(k) || p.oculta) { atual = null; return; }
     const emenda = atual && Math.abs(atual[atual.length - 1][0] - p.ax) < 1e-6 && Math.abs(atual[atual.length - 1][1] - p.ay) < 1e-6;
     if (emenda) atual.push([p.bx, p.by]);
     else { atual = [[p.ax, p.ay], [p.bx, p.by]]; grupos.push(atual); }

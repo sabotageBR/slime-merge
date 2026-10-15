@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<title>Icones dos reforcos</title>
+<link rel="stylesheet" href="../src/ui/estilo.css">
+<style>
+  body { overflow: auto; background: #f3f2ee; padding: 16px; font-size: 18px; height: auto; touch-action: auto; }
+  h2 { margin: 18px 0 6px; font-size: 18px; }
+  .linha { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; margin: 10px 0 22px; }
+  .linha .poder { flex: none; }
+  .t48 { font-size: 13.3px; } .t64 { font-size: 17.8px; } .t96 { font-size: 26.7px; }
+  canvas { background: #5fd9cf; border-radius: 12px; }
+</style>
+</head>
+<body>
+<h2>Novos: 48 px / 64 px / 96 px</h2>
+<div id="novos"></div>
+<h2>Estados: normal, vazio, video, ativo, premio, vago</h2>
+<div class="linha t64" id="estados"></div>
+<h2>Canvas (Path2D, para a reticula)</h2>
+<div class="linha" id="canvas"></div>
+<script type="module">
+  import { svgIcone, desenharIcone } from '../src/ui/icones.js';
+  const ids = ['trocar', 'chacoalhar', 'alargar', 'mira', 'calor', 'gelo', 'tesoura', 'tinta'];
+  const botao = (id, extra = '', conta = '1') => `<button class="btn poder ${extra}">${svgIcone(id)}<i class="conta">${conta}</i><i class="selo" ${extra.includes('video') ? '' : 'hidden'}>${svgIcone('video')}</i></button>`;
+  document.getElementById('novos').innerHTML = ['t48', 't64', 't96'].map((t) => `<div class="linha ${t}">${ids.map((id) => botao(id)).join('')}</div>`).join('');
+  document.getElementById('estados').innerHTML = botao('trocar') + botao('chacoalhar', 'vazio', '0') + botao('alargar', 'video', '') + botao('mira', 'ativo') + botao('gelo', 'premio') + `<button class="btn poder vago">${svgIcone('vago')}</button>`;
+  const cv = document.getElementById('canvas');
+  for (const id of ids) {
+    const c = document.createElement('canvas');
+    c.width = 72; c.height = 72;
+    desenharIcone(c.getContext('2d'), id, 36, 36, 56);
+    cv.appendChild(c);
+  }
+  document.title = 'PRONTO';
+</script>
+</body>
+</html>

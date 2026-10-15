@@ -5,13 +5,12 @@
 // Perde a rodada quem transbordar; melhor de 3.
 
 import { criarSoltar } from '../soltar.js';
-import { NIVEIS, particulasNivel, pontosNivel, nivel } from '../niveis.js';
-import { iniciarFrente, pintar, pigmentoMedio } from '../../cor/difusao.js';
+import { NIVEIS, particulasNivel, pontosNivel } from '../niveis.js';
+import { pintar, pigmentoMedio } from '../../cor/difusao.js';
 import { hexDaMistura } from '../../cor/km.js';
-import { colorir } from './merge.js';
+import { colorir, transmutar, tabelaDaPartida, ligarAparencias } from './merge.js';
 
 const PESOS = [34, 28, 22, 16];
-const HEX = NIVEIS.map((n) => hexDaMistura(n.pig));
 const CINZA = [0, 0, 0, 0.1];
 const CPU = [
   { espera: 1.25, erro: 2.2 },
@@ -20,8 +19,10 @@ const CPU = [
 ];
 
 /**
- * @param {{ semente?: number, salvo?: any, toque?: boolean, lang?: string, liga?: number, doisJogadores?: boolean, cesto?: string }} [o]
- *   liga: 0..2, a forca da CPU (perfil); doisJogadores: os dois potes sao de gente desde o inicio.
+ * @param {{ semente?: number, salvo?: any, toque?: boolean, lang?: string, liga?: number, doisJogadores?: boolean, cesto?: string,
+ *   aparencias?: Array<any> }} [o]
+ *   liga: 0..2, a forca da CPU (perfil); doisJogadores: os dois potes sao de gente desde o inicio;
+ *   aparencias: skin de cada nivel (as do jogador valem para os dois potes, CPU inclusive).
  *   Sem nenhum dos dois (prototipo do hub), as setas ligam o 2o jogador e a CPU sobe com as vitorias.
  */
 export function criarModo(o = {}) {
@@ -31,6 +32,7 @@ export function criarModo(o = {}) {
   let rodada = 1;
   let doisJogadores = !!o.doisJogadores;
   const producao = o.liga !== undefined || o.doisJogadores !== undefined;
+  const { AP, ap } = tabelaDaPartida(o.aparencias);
   /** @type {any} */
   let jogo = null;
 
@@ -44,8 +46,8 @@ export function criarModo(o = {}) {
       s.dados.expr = 'bravo';
       pintar(S.mundo, s, CINZA);
     } else {
-      s.dados.hex = HEX[spec.nivel - 1];
-      colorir(S.mundo, s, nivel(spec.nivel));
+      s.dados.hex = ap(spec.nivel).hex;
+      colorir(S.mundo, s, ap(spec.nivel));
     }
     return s;
   }
@@ -54,7 +56,8 @@ export function criarModo(o = {}) {
     id: 'duelo',
     potes: [-6.2, 6.2],
     janela: [-12.4, -0.9, 12.4, 15.0],
-    campoJanela: [-12.8, -1.2, 12.8, 15.2],
+    // o slime pousado na borda de fora do pote alargado passa da janela: o campo vai alem
+    campoJanela: [-13.6, -1.2, 13.6, 15.2],
     sortear(S) {
       let x = S.rng() * 100;
       for (let k = 0; k < PESOS.length; k++) {
@@ -73,15 +76,12 @@ export function criarModo(o = {}) {
       const m = S.mundo;
       const saidas = m.fundir(base, outro, { px, py, nAlvo: particulasNivel(k) });
       base.nivel = k;
-      base.dados.hex = HEX[k - 1];
       base.dados.expr = 'feliz';
       base.dados.exprT = 0.6;
-      iniciarFrente(m, base, nivel(k).pig, px, py);
-      base.dados.textura = nivel(k).textura || 0;
-      base.dados.texturaT = 0;
+      transmutar(m, base, ap(k), px, py);
       J.pontos += pontosNivel(k) * combo;
       if (k > J.maxNivel) J.maxNivel = k;
-      S.eventos.push({ tipo: 'fusao', x: px, y: py, cor: HEX[k - 1], combo, brilhos: Math.min(8, saidas.length / 3) });
+      S.eventos.push({ tipo: 'fusao', x: px, y: py, cor: ap(k).hex, combo, brilhos: Math.min(8, saidas.length / 3) });
       // ataque: gosma cinza para o rival
       const qtd = (k >= 3 ? Math.floor((k - 1) / 2) : 0) + (combo >= 3 ? 1 : 0);
       if (qtd > 0) {
@@ -89,6 +89,7 @@ export function criarModo(o = {}) {
         R.lixo = (R.lixo || 0) + qtd;
         R.tLixo = 1.2;
         S.eventos.push({ tipo: 'texto', x: R.pote.cx, y: 13.6, texto: '+' + qtd + ' ☁', cor: '#b9b9c2', escala: 1 });
+        S.eventos.push({ tipo: 'som', nome: 'ataque' });
       }
     },
     // a gosma cinza puxa o pigmento das vizinhas coloridas
@@ -136,8 +137,7 @@ export function criarModo(o = {}) {
           s.dados.expr = 'feliz';
           s.dados.exprT = 0.6;
           s.nivel = 1;
-          iniciarFrente(m, s, nivel(1).pig, s.cx, s.cy);
-          s.dados.hex = HEX[0];
+          transmutar(m, s, ap(1), s.cx, s.cy);
           S.eventos.push({ tipo: 'som', nome: 'graduar' });
         }
       }
@@ -163,7 +163,9 @@ export function criarModo(o = {}) {
       }
       return true;
     },
-    pigDe: (S, spec) => nivel(spec.nivel).pig,
+    // 2 jogadores: sem reforcos (os botoes e as teclas 1-5 seriam so do jogador 1)
+    semReforcos: () => doisJogadores,
+    pigDe: (S, spec) => ap(spec.nivel).pig,
     escalaDe: (spec) => 0.62 + spec.nivel * 0.08,
     hud(S) {
       const lixo = S.jogadores.map((J) => J.lixo || 0);
@@ -175,6 +177,8 @@ export function criarModo(o = {}) {
     },
     salvarMeta: () => ({ vitorias }),
   }, o);
+
+  ligarAparencias(jogo, AP, (s) => !!s.dados.cinza);
 
   // gosma cinza: troca de pigmento entre slimes diferentes so quando um deles e cinza
   const S0 = () => jogo.S;

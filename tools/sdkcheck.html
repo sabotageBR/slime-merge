@@ -53,6 +53,8 @@ await new Promise((r) => (f.onload = r));
 const w = () => f.contentWindow;
 const S = () => w().__slime;
 const nomes = () => log.map((l) => l[1]);
+// so as chamadas de gameplay (a telemetria pode vir logo depois do stop, como o menu aberto pelo Esc)
+const ultimoGameplay = () => nomes().filter((n) => n.startsWith('gameplay')).at(-1);
 const ponteiro = (tipo, x, y) => w().dispatchEvent(new (w().PointerEvent)(tipo, { clientX: x, clientY: y, pointerId: 1, bubbles: true }));
 const clicar = (id) => w().document.getElementById(id).click();
 const perder = () => { const s = S().J.modo.S; s.tempo = 999; s.jogadores[0].pote.perigoT = 9; };
@@ -85,10 +87,10 @@ if (cenario === 'bloqueado' || cenario === 'pendente') {
   // pausa e volta
   w().dispatchEvent(new (w().KeyboardEvent)('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
   await espera(200);
-  conferir(nomes().at(-1) === 'gameplayStop', 'Esc nao mandou gameplayStop');
+  conferir(ultimoGameplay() === 'gameplayStop', 'Esc nao mandou gameplayStop');
   clicar('bContinuar');
   await espera(200);
-  conferir(nomes().at(-1) === 'gameplayStart', 'Continuar nao mandou gameplayStart');
+  conferir(ultimoGameplay() === 'gameplayStart', 'Continuar nao mandou gameplayStart');
   // fim, revive (rewarded) e jogar de novo (commercial)
   perder();
   await espera(800);

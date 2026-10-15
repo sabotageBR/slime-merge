@@ -139,7 +139,8 @@ const pupilas = new WeakMap();
  * @param {import('./camera.js').Camera} cam
  * @param {number} dpr
  * @param {number} t tempo em s
- * @param {{ olhar?: number[]|null, minN?: number, estilo?: string }} [o]
+ * @param {{ olhar?: number[]|null, minN?: number, estilo?: string, expr?: string }} [o]
+ *   expr: forca a expressao de todos (prints)
  */
 export function desenharRostos(ctx, m, cam, dpr, t, o = {}) {
   aplicar(ctx, cam, dpr);
@@ -147,14 +148,94 @@ export function desenharRostos(ctx, m, cam, dpr, t, o = {}) {
   const estilo = o.estilo || 'classico';
   for (const s of m.slimes) {
     if (!s.ativo || s.n < minN || s.dados.semRosto) continue;
-    if (estilo === 'docinho') { docinho(ctx, s, t); continue; }
-    if (estilo === 'boneco') { boneco(ctx, s, t, cam.s); continue; }
-    if (estilo === 'kawaii') { kawaii(ctx, s, t, cam.s); continue; }
-    if (estilo === 'monstrinhos') { monstrinho(ctx, s, t, o.olhar || null, cam.s); continue; }
-    desenharRosto(ctx, s, t, o.olhar || null, cam.s, estilo === 'frutinhas' ? 0.82 : 1);
-    if (estilo === 'chapeus') chapeu(ctx, s, cam.s);
-    if (estilo === 'bichinhos') focinho(ctx, s, cam.s);
-    if (estilo === 'frutinhas') sementes(ctx, s);
+    const salva = s.dados.expr;
+    if (o.expr) s.dados.expr = o.expr;
+    const choro = s.dados.expr === 'choro';
+    if (choro) {
+      // o rosto treme no berreiro (so o desenho)
+      ctx.save();
+      ctx.translate(Math.sin(t * 55 + s.idx) * 0.03 * s.raio0, 0);
+    }
+    rosto(ctx, s, t, o.olhar || null, cam.s, estilo);
+    if (choro) {
+      lagrimas(ctx, s, t, cam.s, estilo);
+      ctx.restore();
+    }
+    s.dados.expr = salva;
+  }
+}
+
+/** O rosto de um slime no estilo escolhido. */
+function rosto(ctx, s, t, olhar, escala, estilo) {
+  if (estilo === 'docinho') { docinho(ctx, s, t); return; }
+  if (estilo === 'boneco') { boneco(ctx, s, t, escala); return; }
+  if (estilo === 'kawaii') { kawaii(ctx, s, t, escala); return; }
+  if (estilo === 'monstrinhos') { monstrinho(ctx, s, t, olhar, escala); return; }
+  desenharRosto(ctx, s, t, olhar, escala, estilo === 'frutinhas' ? 0.82 : 1);
+  if (estilo === 'chapeus') chapeu(ctx, s, escala);
+  if (estilo === 'bichinhos') focinho(ctx, s, escala);
+  if (estilo === 'frutinhas') sementes(ctx, s);
+}
+
+/**
+ * Choro (alvo do missil da mira), comum a todos os estilos: dois rios de lagrimas saindo do
+ * canto de baixo dos olhos e gotas que pingam do queixo.
+ */
+function lagrimas(ctx, s, t, escala, estilo) {
+  const { R, tr } = quadro(s);
+  const f = estilo === 'frutinhas' ? 0.82 : 1;
+  const traco = Math.max(0.035, 1.5 / escala);
+  const ciclope = estilo === 'monstrinhos' && (s.nivel || 1) % 2;
+  const olhos = ciclope ? [[-0.2, 0.2 - 0.36], [0.2, 0.2 - 0.36]] : [[-0.36 * f, 0.16 - 0.27 * f], [0.36 * f, 0.16 - 0.27 * f]];
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  for (const [lx, ly] of olhos) {
+    const lado = lx < 0 ? -1 : 1;
+    // rio: desce do canto de fora do olho ate a altura do queixo, alargando
+    const pts = [];
+    for (let k = 0; k <= 6; k++) {
+      const v = k / 6;
+      const onda = Math.sin(t * 9 + v * 5 + lado) * 0.025;
+      pts.push([(lx + lado * (0.08 + v * 0.12) + onda) * R, (ly - v * 0.62) * R, (0.045 + v * 0.06) * R]);
+    }
+    ctx.beginPath();
+    pts.forEach(([x, y, w], k) => { const [px, py] = tr(x - w, y); if (k) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
+    for (let k = pts.length - 1; k >= 0; k--) { const [x, y, w] = pts[k]; const [px, py] = tr(x + w, y); ctx.lineTo(px, py); }
+    ctx.closePath();
+    ctx.fillStyle = '#7fd3ff';
+    ctx.strokeStyle = TINTA;
+    ctx.lineWidth = traco;
+    ctx.fill();
+    ctx.stroke();
+    // gotas pingando do fim do rio
+    const [x1, y1] = pts[pts.length - 1];
+    for (let g = 0; g < 2; g++) {
+      const fase = (t * 2.2 + g * 0.5 + (lado > 0 ? 0.25 : 0)) % 1;
+      const [gx, gy] = tr(x1 + lado * fase * 0.12 * R, y1 - fase * 0.75 * R);
+      const r = 0.075 * R * (1 - fase * 0.4);
+      ctx.globalAlpha = 1 - fase;
+      ctx.beginPath();
+      ctx.arc(gx, gy, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+/** Sobrancelhas tristes (a ponta de dentro sobe): choro dos estilos que tem olho aberto. */
+function sobrancelhasTristes(ctx, tr, olhos, re, traco) {
+  ctx.strokeStyle = TINTA;
+  ctx.lineWidth = traco * 1.3;
+  ctx.lineCap = 'round';
+  for (const [lx, ly] of olhos) {
+    const lado = lx < 0 ? -1 : 1;
+    const [ax, ay] = tr(lx + lado * re * 0.9, ly + re * 1.05);
+    const [bx, by] = tr(lx - lado * re * 0.55, ly + re * 1.5);
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx, by);
+    ctx.stroke();
   }
 }
 
@@ -173,7 +254,7 @@ function kawaii(ctx, s, t, escala) {
     ctx.strokeStyle = TINTA;
     ctx.lineWidth = traco * 1.3;
     ctx.beginPath();
-    if (pisca || s.dados.expr === 'feliz') {
+    if (pisca || s.dados.expr === 'feliz' || s.dados.expr === 'choro') {
       ctx.arc(ex, ey - ry * 0.2, rx * 0.9, Math.PI * 0.15, Math.PI * 0.85);
       ctx.stroke();
     } else {
@@ -194,7 +275,9 @@ function kawaii(ctx, s, t, escala) {
     ctx.ellipse(bx, by, 0.15 * R, 0.09 * R, 0, 0, Math.PI * 2);
     ctx.fill();
   }
-  if (s.n >= 10) {
+  if (s.n >= 10 && s.dados.expr === 'choro') {
+    bocaBerreiro(ctx, tr, R, t, traco, 0.7);
+  } else if (s.n >= 10) {
     const [mx, my] = tr(0, -0.12 * R);
     ctx.strokeStyle = TINTA;
     ctx.lineWidth = traco;
@@ -203,6 +286,26 @@ function kawaii(ctx, s, t, escala) {
     ctx.arc(mx + 0.06 * R, my, 0.06 * R, Math.PI, Math.PI * 2, true);
     ctx.stroke();
   }
+}
+
+/** Boca aberta do berreiro (tremendo), com a lingua. */
+function bocaBerreiro(ctx, tr, R, t, traco, tam = 1) {
+  const [bx, by] = tr(0, -0.24 * R);
+  const rx = 0.15 * R * tam;
+  const ry = 0.11 * R * tam * (1 + 0.18 * Math.sin(t * 24));
+  ctx.fillStyle = TINTA;
+  ctx.beginPath();
+  ctx.ellipse(bx, by, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ff7a9a';
+  ctx.beginPath();
+  ctx.ellipse(bx, by - ry * 0.45, rx * 0.62, ry * 0.42, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = TINTA;
+  ctx.lineWidth = traco;
+  ctx.beginPath();
+  ctx.ellipse(bx, by, rx, ry, 0, 0, Math.PI * 2);
+  ctx.stroke();
 }
 
 /** Monstrinho: ciclope nos niveis impares, dois olhos nos pares; sorriso com presas. */
@@ -240,6 +343,11 @@ function monstrinho(ctx, s, t, alvo, escala) {
     ctx.beginPath();
     ctx.ellipse(ex + dx * rx * 0.4, ey + dy * ry * 0.4, pr * 0.35, pr * 0.8, 0, 0, Math.PI * 2);
     ctx.fill();
+  }
+  if (s.dados.expr === 'choro') {
+    sobrancelhasTristes(ctx, (x, y) => tr(x * R, y * R), olhos.map(([lx, ly]) => [lx, ly]), olhos[0][2] * 0.9, traco);
+    if (s.n >= 10) bocaBerreiro(ctx, tr, R, t, traco, 1.1);
+    return;
   }
   if (s.n >= 10) {
     const [m0x, m0y] = tr(-0.32 * R, -0.2 * R);
@@ -301,6 +409,11 @@ function boneco(ctx, s, t, escala) {
     ctx.arc(ex + p[0] * rx * 0.75, ey + p[1] * ry * 0.75, rx * 0.4, 0, Math.PI * 2);
     ctx.fill();
   });
+  if (s.dados.expr === 'choro') {
+    sobrancelhasTristes(ctx, (x, y) => tr(x * R, y * R), [[-0.34, 0.16], [0.34, 0.16]], 0.27, traco);
+    if (s.n >= 10) bocaBerreiro(ctx, tr, R, t, traco, 0.8);
+    return;
+  }
   if (s.n >= 10) {
     const [bx, by] = tr(0, -0.22 * R);
     ctx.strokeStyle = TINTA;
@@ -377,7 +490,7 @@ function sementes(ctx, s) {
 function chapeu(ctx, s, escala) {
   const { R, a11, tr } = quadro(s);
   const traco = Math.max(0.04, 1.8 / escala);
-  const k = s.dados.prisma ? 13 : s.nivel || 1;
+  const k = s.dados.prisma ? 'prisma' : s.nivel || 1;
   const [tx, ty] = tr(0, 0.86 * R);
   const w = 0.5 * R * a11;
   ctx.lineWidth = traco;
@@ -429,7 +542,19 @@ function chapeu(ctx, s, escala) {
     case 10: poli([[-0.85, -0.05], [0.85, -0.05], [0.1, 1.5], [0.35, 1.15], [-0.05, 1.3]], '#4b3fd6'); bola(0.15, 0.55, 0.07, '#ffd23a'); bola(-0.2, 0.3, 0.05, '#ffd23a'); break;
     case 11: poli([[-0.6, 0], [-0.45, 0.35], [-0.2, 0.15], [0, 0.5], [0.2, 0.15], [0.45, 0.35], [0.6, 0]], '#d9e6ff'); bola(0, 0.36, 0.08, '#6fd3ff'); break;
     case 12: poli([[-0.7, -0.05], [0.7, -0.05], [0.75, 0.6], [0.38, 0.3], [0, 0.72], [-0.38, 0.3], [-0.75, 0.6]], '#ffcf2e'); bola(0, 0.18, 0.09, '#ef3e4f'); bola(-0.42, 0.12, 0.06, '#3b8cf0'); bola(0.42, 0.12, 0.06, '#3b8cf0'); break;
-    case 13: poli([[-0.5, -0.05], [0.5, -0.05], [0, 1.1]], '#7fe36b'); bola(0, 1.12, 0.12, '#ff6fa8'); break;
+    case 13: {
+      // aureola dourada flutuando acima da cabeca
+      const [hx, hy] = [tx, ty + 0.62 * w];
+      for (const [larg, cor] of [[0.26 * w + traco * 2, TINTA], [0.26 * w, '#ffd23a']]) {
+        ctx.lineWidth = larg;
+        ctx.strokeStyle = cor;
+        ctx.beginPath();
+        ctx.ellipse(hx, hy, 0.62 * w, 0.2 * w, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      break;
+    }
+    case 'prisma': poli([[-0.5, -0.05], [0.5, -0.05], [0, 1.1]], '#7fe36b'); bola(0, 1.12, 0.12, '#ff6fa8'); break;
     default: break;
   }
 }
@@ -480,6 +605,22 @@ function desenharRosto(ctx, s, t, alvo, escala, fator = 1) {
     const [ex, ey] = tr(lado * 0.36 * R, 0.16 * R);
     const rx = re * a11 * (expr === 'medo' ? 1.15 : 1);
     const ry = re * a22 * (expr === 'medo' ? 1.2 : 1.08) * piscada;
+    if (expr === 'choro') {
+      // olhos espremidos de berreiro (arco para cima) e sobrancelha triste
+      ctx.strokeStyle = TINTA;
+      ctx.lineWidth = traco * 1.5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(ex - rx * 0.85, ey - ry * 0.2);
+      ctx.quadraticCurveTo(ex, ey + ry * 0.75, ex + rx * 0.85, ey - ry * 0.2);
+      ctx.stroke();
+      ctx.lineWidth = traco * 1.3;
+      ctx.beginPath();
+      ctx.moveTo(...tr(lado * 0.36 * R + lado * re * 0.9, 0.16 * R + re * 1.05));
+      ctx.lineTo(...tr(lado * 0.36 * R - lado * re * 0.55, 0.16 * R + re * 1.5));
+      ctx.stroke();
+      continue;
+    }
     if (expr === 'feliz' || expr === 'amassado') {
       // ^ ^ (feliz) ou > < (amassado)
       ctx.strokeStyle = TINTA;
@@ -553,7 +694,9 @@ function desenharRosto(ctx, s, t, alvo, escala, fator = 1) {
     }
   }
   // boca
-  if (s.n >= 10) {
+  if (s.n >= 10 && expr === 'choro') {
+    bocaBerreiro(ctx, tr, R, t, traco);
+  } else if (s.n >= 10) {
     const [bx, by] = tr(0, -0.17 * R);
     ctx.strokeStyle = TINTA;
     ctx.lineWidth = traco;

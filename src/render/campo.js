@@ -5,10 +5,13 @@
 //
 //   t0 = (rho total, ciano, magenta, amarelo)   (pigmento do slime dominante, ja normalizado)
 //   t1 = (preto, dominancia, u, v)              dominancia = (1o - 2o) / (1o + 2o)
-//   t2 = (textura, intensidade, -, -)           textura do slime dominante (lida sem filtro)
+//   t2 = (textura, intensidade, aparencia, raio0) do slime dominante (lida sem filtro)
 //
 // (u, v) e a coordenada do pixel no disco de repouso do slime dominante (A^-1 (x - c)): a
-// textura gira e amassa junto com o corpo, como o rosto.
+// textura gira e amassa junto com o corpo, como o rosto. Aparencia (skin, src/jogo/skins.js):
+// 0 = a textura legada do nivel (o caminho de sempre); k = entrada k do uniforme uAp da
+// composicao. Na estampa (dados.apModo = 1) a inversa usa os limites do rosto (0,75-1,3 e
+// +-0,25, src/render/rostos.js): imagem e rosto andam juntos.
 //
 // A cor nunca vaza para o slime vizinho, e a costura (dominancia ~ 0) e uma linha continua
 // onde dois slimes se encostam. Dentro de um slime o pigmento varia por particula
@@ -38,6 +41,8 @@ export function criarCampo({ janela, celula, raio }) {
   const h2 = raio * raio;
   const alcance = Math.ceil(raio / celula);
   let sujo = [0, 0, nx - 1, ny - 1];
+  /** algum slime do ultimo acumular tem aparencia (skin): a composicao usa o programa delas */
+  let comAp = false;
   const inv = 1 / celula;
 
   /**
@@ -59,6 +64,7 @@ export function criarCampo({ janela, celula, raio }) {
     let gx1 = -1;
     let gy1 = -1;
     const { x, y, pig, membros, iniSl } = m;
+    let alguma = false;
     for (const s of m.slimes) {
       if (!s.ativo || (filtro && !filtro(s))) continue;
       const a0 = iniSl[s.idx];
@@ -76,10 +82,16 @@ export function criarCampo({ janela, celula, raio }) {
       if (bx0 > bx1 || by0 > by1) continue;
       // inversa da deformacao (limitada, como no rosto) para a coordenada da textura
       const lim = (v, a, b) => (v < a ? a : v > b ? b : v);
-      const a11 = lim(s.a11, 0.6, 1.6);
-      const a22 = lim(s.a22, 0.6, 1.6);
-      const a12 = lim(s.a12, -0.6, 0.6);
-      const a21 = lim(s.a21, -0.6, 0.6);
+      const ap = s.dados.ap || 0;
+      if (ap > 0) alguma = true;
+      const estampa = ap > 0 && s.dados.apModo === 1;
+      const d0 = estampa ? 0.75 : 0.6;
+      const d1 = estampa ? 1.3 : 1.6;
+      const dc = estampa ? 0.25 : 0.6;
+      const a11 = lim(s.a11, d0, d1);
+      const a22 = lim(s.a22, d0, d1);
+      const a12 = lim(s.a12, -dc, dc);
+      const a21 = lim(s.a21, -dc, dc);
       const det = a11 * a22 - a12 * a21;
       const okA = det > 0.2;
       const i11 = okA ? a22 / det : 1;
@@ -154,6 +166,8 @@ export function criarCampo({ janela, celula, raio }) {
             t1[k4 + 3] = i21 * rx + i22 * ry;
             t2[k4] = tex;
             t2[k4 + 1] = texT;
+            t2[k4 + 2] = ap;
+            t2[k4 + 3] = s.raio0;
           } else if (d > segundo[k]) {
             segundo[k] = d;
           }
@@ -176,7 +190,8 @@ export function criarCampo({ janela, celula, raio }) {
       }
     }
     sujo = gx1 >= 0 ? [gx0, gy0, gx1, gy1] : [0, 0, 0, 0];
+    comAp = alguma;
   }
 
-  return { nx, ny, t0, t1, t2, janela, celula, raio, acumular, get caixa() { return sujo; } };
+  return { nx, ny, t0, t1, t2, janela, celula, raio, acumular, get caixa() { return sujo; }, get comAparencia() { return comAp; } };
 }

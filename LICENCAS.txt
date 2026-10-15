@@ -1,5 +1,36 @@
-2048 Cards - licencas de terceiros incluidas no jogo
+Slime Merge - licencas de terceiros incluidas no jogo
 =====================================================
+
+=== Sons (src/som/arquivos/) ===
+Os demais sons do jogo sao sintetizados no navegador (src/core/audio.js e src/som/).
+Os arquivos abaixo vem dos pacotes da Kenney (www.kenney.nl), licenca Creative Commons
+Zero (CC0 1.0 Universal): dominio publico, sem exigencia de credito. Credito por cortesia:
+"Kenney Vleugels (www.kenney.nl)". Convertidos por tools/sons.mjs (corte, loudnorm, MP3).
+
+Kenney - UI Audio (CC0 1.0)
+  clique.mp3 <- Audio/click1.ogg
+
+Kenney - Casino Audio (CC0 1.0)
+  ficha.mp3 <- Audio/chip-lay-1.ogg
+  fichas.mp3 <- Audio/chips-stack-3.ogg
+
+Kenney - Voiceover Pack (CC0 1.0), voz masculina de Jeffrey M. Smith
+  vozCuidado.mp3 <- Male/war_look_out.ogg
+  vozCuidadoSlime.mp3 <- Male/war_look_out.ogg (tom x1.35)
+  vozFim.mp3 <- Male/game_over.ogg
+  vozFimSlime.mp3 <- Male/game_over.ogg (tom x1.35)
+  vozMissao.mp3 <- Male/mission_completed.ogg
+  vozMissaoSlime.mp3 <- Male/mission_completed.ogg (tom x1.35)
+  vozNivel.mp3 <- Male/level_up.ogg
+  vozNivelSlime.mp3 <- Male/level_up.ogg (tom x1.35)
+  vozPowerUp.mp3 <- Male/power_up.ogg
+  vozPowerUpSlime.mp3 <- Male/power_up.ogg (tom x1.35)
+  vozRecorde.mp3 <- Male/new_highscore.ogg
+  vozRecordeSlime.mp3 <- Male/new_highscore.ogg (tom x1.35)
+  vozVenceu.mp3 <- Male/you_win.ogg
+  vozVenceuSlime.mp3 <- Male/you_win.ogg (tom x1.35)
+
+=== fim dos sons ===
 
 Fredoka (SIL Open Font License 1.1) - arquivos src/ui/fontes/fredoka-*
 ----------------------------------------------------------------------

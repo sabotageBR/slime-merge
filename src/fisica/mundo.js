@@ -545,13 +545,19 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
 
   /** @param {Slime} s @param {number} [vy0] */
   function soltar(s, vy0 = 0) {
-    s.preso = false;
     if (sujo) reconstruir();
+    // cai de onde a mira esta agora (o toque rapido mira e solta no mesmo quadro; a peca
+    // presa so chegaria ao alvo no proximo passo)
     for (let a = iniSl[s.idx]; a < iniSl[s.idx + 1]; a++) {
       const i = membros[a];
+      x[i] = s.alvoX + s.cos * qx[i] - s.sin * qy[i];
+      y[i] = s.alvoY + s.sin * qx[i] + s.cos * qy[i];
+      px[i] = x[i];
+      py[i] = y[i];
       vx[i] = 0;
       vy[i] = vy0;
     }
+    s.preso = false;
   }
 
   /** @param {Slime} s @param {number} ax @param {number} ay */
@@ -560,11 +566,14 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
     s.alvoY = ay;
   }
 
-  /** @param {{ ax: number, ay: number, bx: number, by: number, r: number }[]} caps */
+  /**
+   * @param {{ ax: number, ay: number, bx: number, by: number, r: number, oculta?: boolean }[]} caps
+   *   oculta: so colide, o render nao desenha (guia da borda); nao conta para o chao
+   */
   function definirParedes(caps) {
-    paredes = caps.map((c) => ({ ax: c.ax, ay: c.ay, bx: c.bx, by: c.by, r: c.r, vax: 0, vay: 0, vbx: 0, vby: 0, t: 0 }));
+    paredes = caps.map((c) => ({ ax: c.ax, ay: c.ay, bx: c.bx, by: c.by, r: c.r, vax: 0, vay: 0, vbx: 0, vby: 0, t: 0, oculta: !!c.oculta }));
     let menor = Infinity;
-    for (const p of paredes) menor = Math.min(menor, p.ay, p.by);
+    for (const p of paredes) if (!p.oculta) menor = Math.min(menor, p.ay, p.by);
     mundo.chaoY = menor === Infinity ? 0 : menor;
     acordarTodos();
   }

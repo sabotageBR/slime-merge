@@ -91,6 +91,7 @@ kbd { font-family: var(--display); font-weight: 600; font-size: 0.85em; border: 
 .visuais b { font-family: var(--display); font-size: 1.7rem; color: #fff; -webkit-text-stroke: 0.14em var(--tinta); paint-order: stroke fill; }
 .visuais .rotulo { color: var(--tinta); }
 .visuais:focus-visible { outline: 3px dashed var(--azul); outline-offset: 3px; }
+.visuais.escolhas { background: var(--turquesa, #5fd9cf); }
 .nota { background: var(--ficha); border: 3px dashed var(--tinta); border-radius: 18px; padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; }
 .nota p { margin: 0; max-width: 70ch; }
 @media (max-width: 760px) {
@@ -114,6 +115,12 @@ kbd { font-family: var(--display); font-weight: 600; font-size: 0.85em; border: 
     </ul>
   </header>
 
+  <a class="visuais escolhas" href="escolhas.html">
+    <span class="rotulo">2026-10-15 · tudo no jogo</span>
+    <b>Escolhas de hoje</b>
+    <span>Borda, míssil da mira, talas, 13 níveis e as suas escolhas já estão no jogo: botões colados no pote, nível 13 de lava, os sons e as skins com o editor.</span>
+  </a>
+
   <a class="visuais" href="visuais.html">
     <span class="rotulo">Novo · escolha o visual</span>
     <b>Estúdio de visuais</b>
@@ -134,12 +141,12 @@ kbd { font-family: var(--display); font-weight: 600; font-size: 0.85em; border: 
     <div class="tela"><img src="../docs/modelos/1.gif" alt="Merge Lab: slimes com rostinhos caindo e se fundindo num pote listrado" width="300" loading="lazy"><a class="jogar" href="../index.html?modelo=1" data-jogo="1">Jogar o Merge Lab</a></div>
     <div class="corpo">
       <div class="titulo"><span class="numero">1</span><h2>Merge Lab</h2></div>
-      <p class="pitch">O conceito que você mandou, com física de verdade: soltar, fundir iguais e subir os 12 níveis.</p>
+      <p class="pitch">O conceito que você mandou, com física de verdade: soltar, fundir iguais e subir os 13 níveis.</p>
       <div class="blocos">
         <div class="bloco"><h3>O que é novo</h3><ul>
           <li>A pilha assenta e "derrete" no formato do pote: esperar abre espaço.</li>
           <li>A cor do nível novo nasce na costura e avança pelo corpo. Do nível 7 em diante, cada um tem uma textura: bolinhas, arco-íris, ondas, listras de bala e galáxia.</li>
-          <li>Os 4 botões da referência: trocar, chacoalhar, alargar (com talas de madeira) e mira.</li>
+          <li>Os 4 botões da referência: trocar, chacoalhar, alargar e mira.</li>
           <li>Prêmios de marco: calor (escoa), gelo (trava), tesoura (divide) e gota de tinta (sobe um nível).</li>
         </ul></div>
         <div class="bloco bom"><h3>Ponto forte na Poki</h3><p>Lido em um segundo, com a conversão para jogar (C2P) mais alta. A barra de "?" puxa a próxima partida, e o pote nunca transborda nos 3 primeiros minutos.</p></div>

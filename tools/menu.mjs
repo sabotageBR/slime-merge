@@ -1,5 +1,6 @@
 // Fluxo da build (sem ?modelo): sequencia diaria ao abrir, gotas no fim da partida, dobrar por
-// video, loja (comprar e equipar), missoes e troca de modo pelo menu (Desafio, Duelo, 2P).
+// video, loja (comprar e equipar), missoes, troca de modo pelo menu (Desafio, Duelo, 2P) e as skins
+// (Loja > Skins, a Minha no editor de pixel).
 // Jogo de verdade no Chrome headless com cliques pelo DevTools Protocol. Prints de cada aba
 // em .tmp/menu/. Falha com excecao na pagina ou estado errado.
 // Uso: node tools/menu.mjs [--tam=390x844] [--lang=pt]
@@ -98,6 +99,37 @@ for (const [W, H] of tamanhos) {
       await espera(500);
       await foto('7-' + chave);
     }
+
+    // skins: Loja > Skins, compra uma pronta do nivel 1 (equipa e vale na hora), compra a Minha
+    // (abre o editor), pinta, Enter salva, Esc fecha so o editor e Esc de novo volta ao jogo
+    await c.avaliar('__slime.perfil.ganhar(400)');
+    await c.tecla('Escape');
+    await espera(200);
+    await clicar('.aba[data-aba="loja"]');
+    await clicar('.abaLoja[data-grupo="skins"]');
+    await espera(400);
+    await clicar('#gradeLoja [data-skin]:not([data-skin="minha"])[data-acao="comprar"]');
+    const pronta = await c.avaliar('__slime.perfil.skins.equipado[1] || ""');
+    if (!pronta) falhas.push('a compra da skin nao equipou');
+    if ((await c.avaliar('__slime.J.modo.aparencias[1].id')) !== pronta) falhas.push('a skin comprada nao entrou na partida');
+    await foto('8-skins');
+    await clicar('#gradeLoja [data-skin="minha"][data-acao="comprar"]');
+    await espera(500);
+    if (await c.avaliar('document.getElementById("telaEditor").hidden')) falhas.push('a Minha comprada nao abriu o editor');
+    const g = await c.avaliar('(() => { const r = document.querySelector(".edGrade").getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; })()');
+    await c.arrastar(g[0] + g[2] * 0.25, g[1] + g[3] * 0.3, g[0] + g[2] * 0.75, g[1] + g[3] * 0.6, 8, 240);
+    await foto('9-editor');
+    await c.tecla('Enter');
+    await espera(200);
+    if (/^A+$/.test(await c.avaliar('__slime.perfil.skins.minhas[1].px'))) falhas.push('o editor nao salvou o desenho');
+    await c.tecla('Escape');
+    await espera(300);
+    if (!(await c.avaliar('document.getElementById("telaEditor").hidden'))) falhas.push('Esc nao fechou o editor');
+    if ((await estado()) !== 'pausa') falhas.push('o Esc do editor mexeu no jogo: ' + (await estado()));
+    await c.tecla('Escape');
+    await espera(300);
+    if ((await estado()) !== 'jogando') falhas.push('depois do editor, Esc nao voltou ao jogo');
+    if ((await c.avaliar('__slime.J.modo.aparencias[1].id')) !== 'minha') falhas.push('a Minha nao entrou na partida');
     // 2 jogadores no toque: o dedo do lado direito mira o pote direito
     if (c.erros.length) falhas.push('erros na pagina: ' + [...new Set(c.erros)].slice(0, 3).join(' | '));
     // missoes: progresso gravado

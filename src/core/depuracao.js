@@ -14,9 +14,16 @@
 //   ?raio=0.5&limiar=0.8   nucleo e limiar do campo do slime (ajuste do render)
 //   ?zoom=x0,y0,x1,y1  enquadra so esse retangulo do mundo (prints de detalhe)
 //   ?cesto=aquario&cenario=mar&objeto=kawaii   visual (src/jogo/cestos.js, render/cenarios.js, render/rostos.js)
-//   ?vitrine=1|2|3|4   Merge Lab com niveis no pote (1: 7 a 10 e o coringa; 2: 12; 3: 11; 4: 1 a 7)
+//   ?vitrine=1..5      Merge Lab com niveis no pote (1: 7 a 10 e o coringa; 2: 12; 3: 11; 4: 1 a 7; 5: 13)
 //   ?filme=120&cada=4  grava 120 quadros (4 passos de fisica entre eles) em <pre id="filme">
 //                      para tools/gif-modelos.mjs (deterministico, sem depender do rAF)
+//   ?bot=borda         o ?auto solta sempre em cima da borda, alternando os lados
+//   ?poder=alargar     usa o reforco depois do ?passos (prints do Alargar, da mira armada...)
+//   ?expr=choro        forca a expressao de todos os rostos (prints dos personagens)
+//   ?demoReforcos      os botoes em todos os estados (prints): acabado com video, 2, premio
+//   ?skins=todas       uma skin pronta equipada em cada nivel (medir o shader no celular), so na partida
+//   ?sons=fusao:bolha,musica:lofi   variantes do Estudio de sons (src/som/catalogo.js)
+//   ?qualidade=0|1|2   fixa a qualidade do render (alta, media, baixa) e desliga a adaptativa
 //
 // Fora disso, so o banco de testes de tools/sdkcheck.html liga os ganchos
 // (window.__slimeTeste = { modelo }); "local" continua falso, para o jogo se comportar
@@ -26,7 +33,7 @@ export function lerDepuracao() {
   const base = {
     local: false, ganchos: false, modelo: '', debug: false, semente: 0, passos: 0, auto: 0,
     semAnuncio: false, lang: '', semHud: false, render: '', material: '', raio: 0, limiar: 0, zoom: null,
-    filme: 0, cada: 4, vitrine: 0, cesto: '', cenario: '', objeto: '',
+    filme: 0, cada: 4, vitrine: 0, cesto: '', cenario: '', objeto: '', bot: '', poder: '', expr: '', demoReforcos: false, skins: '', qualidade: -1, sons: /** @type {Record<string, string>} */ ({}),
   };
   let local = false;
   try {
@@ -64,5 +71,12 @@ export function lerDepuracao() {
     cesto: q.get('cesto') || '',
     cenario: q.get('cenario') || '',
     objeto: q.get('objeto') || '',
+    bot: q.get('bot') || '',
+    poder: q.get('poder') || '',
+    expr: q.get('expr') || '',
+    demoReforcos: q.has('demoReforcos'),
+    skins: q.get('skins') || '',
+    qualidade: q.has('qualidade') ? Math.max(0, Math.min(2, Number(q.get('qualidade')) | 0)) : -1,
+    sons: Object.fromEntries((q.get('sons') || '').split(',').filter((p) => p.includes(':')).map((p) => p.split(':'))),
   });
 }

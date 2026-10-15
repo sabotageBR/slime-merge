@@ -38,6 +38,20 @@ const PROTOTIPOS = [
   'src/jogo/cores.js', 'src/jogo/goo.js', 'src/jogo/fases-molde.js', 'src/jogo/missoes.js',
 ];
 for (const r of PROTOTIPOS) rmSync(join(dist, r), { force: true });
+// audio: so os arquivos das variantes do PADRAO (src/som/catalogo.js); as outras ficam no
+// repositorio e no Estudio de sons
+const { CATEGORIAS, PADRAO, variante, arquivosDa } = await import('../src/som/catalogo.js');
+const { ARQUIVOS } = await import('../src/som/arquivos.js');
+// o catalogo fala em ids (fichas); a pasta tem os nomes dos arquivos (fichas.mp3)
+const usados = new Set(CATEGORIAS.flatMap((c) => arquivosDa(variante(c.id, PADRAO[c.id]))).map((id) => (ARQUIVOS[id] ? ARQUIVOS[id].arquivo : id)));
+const pastaSons = join(dist, 'src/som/arquivos');
+let kbAudio = 0;
+if (existsSync(pastaSons)) {
+  for (const f of readdirSync(pastaSons)) {
+    if (!usados.has(f)) rmSync(join(pastaSons, f), { force: true });
+    else kbAudio += statSync(join(pastaSons, f)).size / 1024;
+  }
+}
 const mainDist = join(dist, 'src/main.js');
 writeFileSync(mainDist, readFileSync(mainDist, 'utf8').split('\n').filter((l) => !/\/\/ prototipo\s*$/.test(l)).join('\n'));
 
@@ -68,6 +82,9 @@ for (const p of arquivos) {
   }
 }
 if (gz > 500 * 1024) falhas.push(`build acima de 500 KB gzip (${gz} bytes)`);
+for (const f of usados) if (!existsSync(join(pastaSons, f))) falhas.push(`som escolhido sem arquivo: ${f}`);
+if (kbAudio > 120) falhas.push(`audio acima de 120 KB (${kbAudio.toFixed(1)} KB)`);
+process.stdout.write(`audio: ${usados.size} arquivos, ${kbAudio.toFixed(1)} KB\n`);
 // thumb: assinatura PNG e largura/altura do IHDR (bytes 16..23, big-endian)
 let thumbLado = 0;
 if (!COM_THUMB) { /* ensaio sem thumb */ } else if (!existsSync(THUMB)) falhas.push(`thumb ausente: ${relative(RAIZ, THUMB)} (rode node tools/thumb.mjs --final)`);

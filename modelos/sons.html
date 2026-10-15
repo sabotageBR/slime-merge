@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Slime Merge: estúdio de sons</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800&display=swap">
+<style>
+/* Mesmo caderno do Estudio de visuais: fichas coladas no papel quadriculado. Cada ficha e uma
+   variante de som: o ▶ toca, o resto da ficha escolhe (e toca). A escolhida ganha a borda
+   turquesa dos power-ups. Ao lado (embaixo no celular) ficam a musica, o mixer e a escolha. */
+:root {
+  --papel: #f3f2ee;
+  --grade: rgba(40, 60, 90, 0.085);
+  --tinta: #17161c;
+  --tinta-suave: #4a4855;
+  --ficha: #ffffff;
+  --turquesa: #5fd9cf;
+  --turquesa-2: #3fbfb5;
+  --laranja: #ff8a2a;
+  --azul: #2a62d6;
+  --verde: #2f9e5b;
+  --onda: #8fd8cf;
+  --display: 'Fredoka', 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --texto: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: light;
+}
+@font-face { font-family: 'Fredoka'; src: url('fredoka-latin-700-normal.woff2') format('woff2'), url('../src/ui/fontes/fredoka-latin-700-normal.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Fredoka'; src: url('fredoka-latin-600-normal.woff2') format('woff2'), url('../src/ui/fontes/fredoka-latin-600-normal.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+* { box-sizing: border-box; }
+body {
+  margin: 0; color: var(--tinta); font-family: var(--texto); font-size: 16px; line-height: 1.5;
+  background-color: var(--papel);
+  background-image: linear-gradient(var(--grade) 1.5px, transparent 1.5px), linear-gradient(90deg, var(--grade) 1.5px, transparent 1.5px);
+  background-size: 28px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 48px;
+}
+.folha { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 360px); gap: 28px; align-items: start; }
+.esquerda { display: flex; flex-direction: column; gap: 30px; min-width: 0; }
+h1, h2 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; line-height: 1.1; }
+h1 { font-size: clamp(1.9rem, 5vw, 2.9rem); color: #fff; -webkit-text-stroke: 0.16em var(--tinta); paint-order: stroke fill; }
+h1 em { font-style: normal; color: var(--turquesa); }
+h2 { font-size: 1.45rem; }
+.lead { margin: 0; max-width: 68ch; color: var(--tinta-suave); }
+.lead b { color: var(--tinta); }
+.rotulo { font-family: var(--display); font-weight: 600; font-size: 0.82rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tinta-suave); }
+.topo { display: flex; flex-direction: column; gap: 10px; grid-column: 1 / -1; }
+.voltar { font-family: var(--display); font-weight: 600; color: var(--azul); text-decoration: none; }
+.indice { display: flex; flex-wrap: wrap; gap: 6px; }
+.indice a { font-family: var(--display); font-weight: 600; font-size: 0.85rem; color: var(--tinta); text-decoration: none; background: #fff; border: 2px solid var(--tinta); border-radius: 999px; padding: 2px 10px; }
+.indice a:hover { background: var(--turquesa); }
+section { display: flex; flex-direction: column; gap: 12px; scroll-margin-top: 16px; }
+.cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cab h2 { flex: 0 1 auto; }
+.cab .desc { flex: 1 1 260px; margin: 0; font-size: 0.92rem; color: var(--tinta-suave); line-height: 1.35; }
+.grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.opcao {
+  position: relative; display: flex; flex-direction: column; min-width: 0;
+  background: var(--ficha); border: 3px solid var(--tinta); border-radius: 16px; box-shadow: 0 4px 0 var(--tinta); overflow: hidden;
+}
+.opcao.escolhida { outline: 5px solid var(--turquesa); outline-offset: 2px; box-shadow: 0 4px 0 var(--tinta), 0 0 0 9px var(--turquesa-2); }
+.opcao .linha-topo { display: flex; align-items: stretch; border-bottom: 3px solid var(--tinta); background: var(--papel); }
+.opcao .tocar { flex: 0 0 auto; width: 52px; min-height: 48px; border: 0; border-right: 3px solid var(--tinta); background: var(--laranja); color: #fff; font-size: 1.25rem; cursor: pointer;
+  -webkit-text-stroke: 0.06em var(--tinta); paint-order: stroke fill; }
+.opcao .tocar:active { filter: brightness(0.92); }
+.opcao .tocar.tocando { background: var(--turquesa); }
+.opcao canvas { flex: 1 1 auto; min-width: 0; width: 100%; height: 48px; display: block; }
+.opcao .escolher { flex: 1 1 auto; display: flex; flex-direction: column; gap: 3px; padding: 9px 11px 11px; text-align: left; border: 0; background: transparent; font: inherit; color: inherit; cursor: pointer; }
+.opcao .escolher b { font-family: var(--display); font-weight: 700; font-size: 1.05rem; line-height: 1.2; }
+.opcao .escolher span { font-size: 0.87rem; color: var(--tinta-suave); line-height: 1.35; }
+.opcao .meta { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; margin-top: 4px; font-size: 0.78rem; font-weight: 800; color: var(--tinta-suave); }
+.opcao .selo { font-family: var(--display); font-weight: 600; font-size: 0.72rem; background: var(--verde); color: #fff; border-radius: 999px; padding: 1px 8px; }
+.opcao .atual { font-family: var(--display); font-weight: 600; font-size: 0.72rem; background: var(--tinta); color: #fff; border-radius: 999px; padding: 1px 8px; }
+.opcao .escolher:focus-visible, .opcao .tocar:focus-visible { outline: 3px dashed var(--azul); outline-offset: -5px; }
+
+.previa { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); display: flex; flex-direction: column; gap: 14px;
+  background: var(--ficha); border: 3px solid var(--tinta); border-radius: 22px; box-shadow: 0 5px 0 var(--tinta); padding: 16px;
+  max-height: calc(100vh - 32px); overflow: auto; }
+.bloco { display: flex; flex-direction: column; gap: 8px; }
+.escolha { font-family: var(--display); font-weight: 600; font-size: 1rem; line-height: 1.4; margin: 0; }
+.escolha output { display: block; font-family: var(--texto); font-weight: 800; color: var(--azul); }
+.resumo { margin: 0; padding: 0; list-style: none; font-size: 0.84rem; line-height: 1.35; color: var(--tinta-suave); columns: 2; column-gap: 12px; }
+.resumo li { break-inside: avoid; }
+.resumo b { color: var(--tinta); font-weight: 800; }
+.linha { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { font-family: var(--display); font-weight: 700; font-size: 0.98rem; border: 3px solid var(--tinta); border-radius: 14px; padding: 7px 12px; min-height: 44px; cursor: pointer;
+  background: #fff; color: var(--tinta); box-shadow: 0 3px 0 var(--tinta); }
+.btn.forte { background: var(--laranja); color: #fff; -webkit-text-stroke: 0.08em var(--tinta); paint-order: stroke fill; }
+.btn.contexto { min-height: 38px; font-size: 0.9rem; padding: 4px 10px; background: var(--turquesa); }
+.btn[aria-pressed="true"] { background: var(--turquesa); }
+.btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--tinta); }
+.dica { font-size: 0.85rem; color: var(--tinta-suave); margin: 0; }
+.aviso-som { margin: 0; font-family: var(--display); font-weight: 600; font-size: 0.95rem; background: #fff5c9; border: 2.5px dashed var(--tinta); border-radius: 12px; padding: 8px 10px; }
+.aviso-som.ligado { background: #dff7ef; border-style: solid; }
+details { border: 2.5px solid var(--tinta); border-radius: 14px; padding: 8px 10px; background: var(--papel); }
+details summary { font-family: var(--display); font-weight: 700; cursor: pointer; }
+details iframe { width: 100%; max-width: 100%; aspect-ratio: 390 / 700; border: 3px solid var(--tinta); border-radius: 14px; background: var(--papel); display: block; margin-top: 8px; }
+@media (max-width: 900px) {
+  .folha { grid-template-columns: minmax(0, 1fr); }
+  .previa { position: static; max-height: none; }
+  .esquerda { order: 3; }
+}
+@media (max-width: 480px) {
+  .grade { grid-template-columns: minmax(0, 1fr); }
+  .resumo { columns: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .btn:active { transform: none; } }
+</style>
+</head>
+<body>
+<main class="folha">
+  <header class="topo">
+    <a class="voltar" href="index.html">← os 5 modelos</a>
+    <span class="rotulo">Para escolher · 2026-10-15</span>
+    <h1>Estúdio de <em>sons</em></h1>
+    <p class="lead">Escolha <b>um som para cada momento do jogo</b>, ouvindo. O <b>▶</b> toca a variante; tocar no resto da ficha <b>escolhe</b> (e toca). <b>▶ no contexto</b> toca a cena inteira com o que você escolheu: fusões com o combo subindo, o míssil da mira, o fim com a contagem de gotas e as palmas. Quase tudo é sintetizado na hora (0 KB); as fichas com o selo <b>CC0 Kenney</b> são gravações de domínio público e pesam alguns KB. Use fone ou caixa de som: no alto-falante do celular os graves somem.</p>
+    <nav class="indice" id="indice" aria-label="Categorias"></nav>
+  </header>
+  <div class="esquerda" id="categorias"></div>
+
+  <aside class="previa" aria-label="Música, mixer e a sua escolha">
+    <p class="aviso-som" id="estadoSom" role="status">Toque em qualquer ▶ para ligar o som.</p>
+
+    <div class="bloco">
+      <span class="rotulo">Música de fundo</span>
+      <div class="linha">
+        <button class="btn forte" id="musicaTocar">▶ Tocar a escolhida</button>
+        <button class="btn" id="musicaParar">■ Parar</button>
+      </div>
+      <div class="linha">
+        <button class="btn" id="simPausa">Simular pausa</button>
+        <button class="btn" id="simFala">Simular fala</button>
+        <button class="btn" id="simAnuncio">Simular anúncio</button>
+      </div>
+      <p class="dica" id="estadoMusica">Parada.</p>
+    </div>
+
+    <div class="bloco">
+      <span class="rotulo">Mixer (como os botões do jogo)</span>
+      <div class="linha">
+        <button class="btn" id="bEfeitos" aria-pressed="true">🔊 Efeitos e falas</button>
+        <button class="btn" id="bMusica" aria-pressed="true">🎵 Música</button>
+      </div>
+    </div>
+
+    <div class="bloco">
+      <p class="escolha">Sua escolha pesa <output id="peso">0 KB</output></p>
+      <ul class="resumo" id="resumo"></ul>
+      <div class="linha">
+        <button class="btn forte" id="copiar">Copiar a escolha</button>
+        <button class="btn" id="limpar">Voltar ao padrão</button>
+      </div>
+      <p class="dica" id="aviso">A escolha fica salva neste navegador (slime.sons). Copie e cole na conversa para eu pôr no jogo.</p>
+    </div>
+
+    <details id="jogoDet">
+      <summary>Jogar ao lado</summary>
+      <p class="dica">O jogo ao lado já toca a sua escolha. Mudou algo? Feche e abra de novo para recarregar.</p>
+      <iframe id="jogo" title="Prévia do jogo" data-src="../index.html?modelo=1"></iframe>
+    </details>
+  </aside>
+</main>
+
+<script type="module">
+import { criarAudio } from '../src/core/audio.js';
+import { criarSons, pesoDaEscolha } from '../src/som/sons.js';
+import { criarMusica, tocarNota, PADRAO_MUSICA } from '../src/som/musica.js';
+import { PECAS, notasDoCompasso, duracaoCompasso } from '../src/som/pecas.js';
+import { CATEGORIAS, POR_ID, PADRAO, normalizarEscolha, arquivosDa } from '../src/som/catalogo.js';
+import { RECEITAS } from '../src/som/receitas.js';
+import { falar as falarSintese, FALAS_DO_JOGO } from '../src/som/falas.js';
+import { ARQUIVOS } from '../src/som/arquivos.js';
+
+const CHAVE = 'slime.sons';
+let escolha = { ...PADRAO };
+try { escolha = normalizarEscolha(JSON.parse(localStorage.getItem(CHAVE) || '{}')); } catch { /* sem armazenamento */ }
+
+const audio = criarAudio();
+const musica = criarMusica({ audio, cfg: { esperaMs: 80 } });
+const sons = criarSons({ audio, escolha, musica, carregarSozinho: false });
+const $ = (id) => document.getElementById(id);
+const fmt = (n, c = 1) => n.toLocaleString('pt-BR', { minimumFractionDigits: c, maximumFractionDigits: c });
+
+// ------------------------------------------------------------------ montar as fichas
+const raiz = $('categorias');
+for (const c of CATEGORIAS) {
+  const sec = document.createElement('section');
+  sec.id = 'cat-' + c.id;
+  sec.setAttribute('aria-labelledby', 't-' + c.id);
+  const cab = document.createElement('div');
+  cab.className = 'cab';
+  cab.innerHTML = `<h2 id="t-${c.id}"></h2><p class="desc"></p>`;
+  cab.querySelector('h2').textContent = c.nome;
+  cab.querySelector('.desc').textContent = c.desc;
+  if (c.id !== 'musica') {
+    const b = document.createElement('button');
+    b.className = 'btn contexto';
+    b.dataset.contexto = c.id;
+    b.textContent = '▶ no contexto';
+    cab.appendChild(b);
+  }
+  sec.appendChild(cab);
+  const grade = document.createElement('div');
+  grade.className = 'grade';
+  grade.dataset.grupo = c.id;
+  for (const v of c.variantes) {
+    const op = document.createElement('div');
+    op.className = 'opcao';
+    op.dataset.id = v.id;
+    const kb = arquivosDa(v).reduce((s, id) => s + ((ARQUIVOS[id] && ARQUIVOS[id].kb) || 0), 0);
+    const arquivo = arquivosDa(v).length > 0;
+    const silencio = !v.receita && !arquivo && c.id !== 'falas' && c.id !== 'musica' || v.id === 'nenhum' || v.id === 'nenhuma';
+    op.innerHTML = `<div class="linha-topo"><button class="tocar" type="button">▶</button><canvas width="300" height="96" aria-hidden="true"></canvas></div>`
+      + `<button class="escolher" type="button" aria-pressed="false"><b></b><span></span><small class="meta"></small></button>`;
+    op.querySelector('.tocar').setAttribute('aria-label', `Tocar ${v.nome}`);
+    if (silencio) op.querySelector('.tocar').disabled = true;
+    op.querySelector('.escolher b').textContent = v.nome;
+    op.querySelector('.escolher span').textContent = v.desc;
+    const meta = op.querySelector('.meta');
+    const peso = document.createElement('span');
+    peso.className = 'kb';
+    peso.textContent = arquivo ? `${fmt(kb)} KB` : silencio ? '0 KB · silêncio' : '0 KB · sintetizado';
+    meta.appendChild(peso);
+    const dur = document.createElement('span');
+    dur.className = 'dur';
+    meta.appendChild(dur);
+    if (arquivo) {
+      const s = document.createElement('i');
+      s.className = 'selo';
+      s.textContent = 'CC0 Kenney';
+      meta.appendChild(s);
+    }
+    if (PADRAO[c.id] === v.id) {
+      const s = document.createElement('i');
+      s.className = 'atual';
+      s.textContent = 'padrão';
+      meta.appendChild(s);
+    }
+    grade.appendChild(op);
+  }
+  sec.appendChild(grade);
+  raiz.appendChild(sec);
+  const a = document.createElement('a');
+  a.href = '#cat-' + c.id;
+  a.textContent = c.nome.replace(/ \(.*\)$/, '');
+  $('indice').appendChild(a);
+}
+
+// ------------------------------------------------------------------ escolha
+function nomeDe(cat, id) {
+  const v = POR_ID[cat].variantes.find((x) => x.id === id);
+  return v ? v.nome : id;
+}
+function marcar() {
+  for (const g of document.querySelectorAll('[data-grupo]')) {
+    const cat = g.dataset.grupo;
+    for (const op of g.querySelectorAll('.opcao')) {
+      const sim = op.dataset.id === escolha[cat];
+      op.classList.toggle('escolhida', sim);
+      op.querySelector('.escolher').setAttribute('aria-pressed', String(sim));
+    }
+  }
+  const ul = $('resumo');
+  ul.textContent = '';
+  for (const c of CATEGORIAS) {
+    const li = document.createElement('li');
+    const b = document.createElement('b');
+    b.textContent = c.nome.replace(/ \(.*\)$/, '') + ': ';
+    li.append(b, nomeDe(c.id, escolha[c.id]).replace(/ \(o de hoje\)$/, ' (hoje)'));
+    ul.appendChild(li);
+  }
+  $('peso').textContent = `${fmt(pesoDaEscolha(escolha))} KB`;
+}
+function gravar() {
+  try { localStorage.setItem(CHAVE, JSON.stringify(escolha)); } catch { /* sem armazenamento */ }
+}
+function escolher(cat, id) {
+  escolha[cat] = id;
+  sons.escolher(cat, id);
+  gravar();
+  marcar();
+}
+
+// ------------------------------------------------------------------ som
+let ligado = false;
+async function ligar() {
+  audio.iniciar();
+  const ok = await audio.pronto();
+  if (!ok) {
+    $('estadoSom').textContent = 'Este navegador não tem Web Audio: não dá para ouvir aqui.';
+    return false;
+  }
+  if (!ligado) {
+    ligado = true;
+    $('estadoSom').textContent = 'Som ligado. Carregando as gravações…';
+    $('estadoSom').classList.add('ligado');
+    sons.carregar({ todos: true }).then((n) => { $('estadoSom').textContent = `Som ligado · ${n} gravações prontas.`; });
+  }
+  return true;
+}
+
+/** Toca uma variante (o ▶ e a escolha). */
+async function tocarFicha(cat, id, botao) {
+  if (!(await ligar())) return;
+  const c = POR_ID[cat];
+  if (cat === 'musica') {
+    if (id === 'nenhuma') { musica.parar(); estadoMusica(); return; }
+    const mesma = musica.estado().ligada && musica.estado().peca === id;
+    if (mesma && botao) { musica.parar(); estadoMusica(); return; }
+    musica.iniciar(id);
+    estadoMusica();
+    return;
+  }
+  if (cat === 'falas') {
+    const frases = ['oba', 'uau', 'uhuu', 'aww'];
+    frases.forEach((f, i) => setTimeout(() => sons.falarCom(id, f, [5, 8, 2, 6][i], true), i * 900));
+    return;
+  }
+  const p = { ...(c.exemplo || {}) };
+  const dur = sons.tocarVariante(cat, id, p);
+  if (botao && dur) {
+    botao.classList.add('tocando');
+    setTimeout(() => botao.classList.remove('tocando'), Math.max(150, dur * 1000));
+  }
+}
+
+for (const g of document.querySelectorAll('[data-grupo]')) {
+  g.addEventListener('click', (e) => {
+    const op = e.target.closest('.opcao');
+    if (!op) return;
+    const cat = g.dataset.grupo;
+    const toc = e.target.closest('.tocar');
+    if (toc) { tocarFicha(cat, op.dataset.id, toc); return; }
+    if (e.target.closest('.escolher')) {
+      escolher(cat, op.dataset.id);
+      tocarFicha(cat, op.dataset.id, null);
+    }
+  });
+}
+
+// ------------------------------------------------------------------ no contexto
+/** Roteiro: [ms, fn] tocados em sequencia. */
+function roteiro(passos) {
+  for (const [ms, fn] of passos) setTimeout(fn, ms);
+}
+const T = (nome, p) => () => sons.tocar(nome, p);
+const F = (frase, nivel) => () => sons.falarCom(escolha.falas, frase, nivel, true);
+function mira() {
+  // os tempos do jogo (MISSIL em src/jogo/soltar.js): choro, missil 0,3 s depois, impacto em 0,75 s
+  return [[0, T('alvo')], [650, T('choro', { nivel: 4 })], [950, T('missil')], [1400, T('estouro')], [1420, T('splat')]];
+}
+function fusoes() {
+  const p = [];
+  for (let k = 1; k <= 5; k++) {
+    const t = (k - 1) * 720;
+    p.push([t, T('soltar', { nivel: 2 })], [t + 380, T('pouso', { forca: 2 })], [t + 520, T('fusao', { k, nivel: k + 1 })], [t + 520, T('combo', { k })]);
+  }
+  p.push([3 * 720 + 560, F('iupi', 3)], [4 * 720 + 900, F('uau', 7)]);
+  return p;
+}
+function contagem(t0, n) {
+  const p = [];
+  let t = t0;
+  for (let i = 0; i < n; i++) { p.push([t, T('gotas', { i })]); t += Math.max(70, 170 - i * 14); }
+  return p;
+}
+const CONTEXTOS = {
+  soltar: () => [0, 1, 2].flatMap((i) => [[i * 800, T('soltar', { nivel: i + 1 })], [i * 800 + 420, T('pouso', { forca: i + 1 })]]),
+  pouso: () => [0, 1, 2, 3].flatMap((i) => [[i * 600, T('soltar', { nivel: 2 })], [i * 600 + 330, T('pouso', { forca: 1 + i })]]),
+  fusao: fusoes,
+  combo: fusoes,
+  estouro: mira,
+  missil: mira,
+  choro: mira,
+  splat: mira,
+  alvo: mira,
+  trocar: () => [[0, T('trocar')], [500, T('soltar', { nivel: 3 })], [900, T('pouso', { forca: 2 })]],
+  chacoalhar: () => [[0, T('chacoalhar')], [250, T('pouso', { forca: 1 })], [380, T('pouso', { forca: 2 })], [560, T('pouso', { forca: 1 })]],
+  alargar: () => [[0, T('alargar')], [700, T('soltar', { nivel: 2 })], [1080, T('pouso', { forca: 2 })]],
+  ataque: () => [[0, T('fusao', { k: 2, nivel: 4 })], [0, T('combo', { k: 2 })], [300, T('ataque')], [900, T('pouso', { forca: 1 })], [1050, T('pouso', { forca: 2 })]],
+  interface: () => [[0, T('interface')], [350, T('interface')], [700, T('interface')]],
+  gotas: () => contagem(0, 10),
+  compra: () => [[0, T('interface')], [120, T('compra')]],
+  nivelNovo: () => [[0, T('fusao', { k: 2, nivel: 6 })], [0, T('combo', { k: 2 })], [260, T('nivelNovo')], [320, F('oba', 6)]],
+  missao: () => [[0, T('missao')], [150, F('missao', 4)], ...contagem(1100, 3)],
+  palmas: () => [[0, T('palmas')], [150, F('uhuu', 3)]],
+  fim: () => [[0, T('fim')], [300, F('aww', 6)], ...contagem(1300, 8), [2600, T('palmas')], [2700, F('uhuu', 3)]],
+  falas: () => FALAS_DO_JOGO.map((f, i) => [i * 950, F(f, [8, 2, 5, 1, 6, 3, 4, 10][i])]),
+};
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-contexto]');
+  if (!b) return;
+  if (!(await ligar())) return;
+  roteiro(CONTEXTOS[b.dataset.contexto]());
+});
+
+// ------------------------------------------------------------------ musica e mixer
+function estadoMusica(extra = '') {
+  const e = musica.estado();
+  const nome = e.peca ? nomeDe('musica', e.peca) : '';
+  $('estadoMusica').textContent = (e.ligada ? `Tocando: ${nome}.` : 'Parada.') + (extra ? ' ' + extra : '');
+  for (const op of document.querySelectorAll('[data-grupo="musica"] .opcao')) op.querySelector('.tocar').classList.toggle('tocando', e.ligada && e.peca === op.dataset.id);
+}
+$('musicaTocar').addEventListener('click', async () => {
+  if (!(await ligar())) return;
+  if (escolha.musica === 'nenhuma') { estadoMusica('A escolha é "Nenhuma".'); return; }
+  musica.iniciar(escolha.musica);
+  estadoMusica();
+});
+$('musicaParar').addEventListener('click', () => { musica.parar(); estadoMusica(); });
+$('simPausa').addEventListener('click', () => {
+  musica.abaixar(0.5);
+  estadoMusica('Pausa: música a 50% por 3 s.');
+  setTimeout(() => { musica.abaixar(1); estadoMusica(); }, 3000);
+});
+$('simFala').addEventListener('click', async () => {
+  if (!(await ligar())) return;
+  sons.falarCom(escolha.falas === 'nenhum' ? 'balbucio' : escolha.falas, 'uhuu', 3, true);
+  estadoMusica('Fala: a música abaixa a 70%.');
+});
+$('simAnuncio').addEventListener('click', () => {
+  audio.mudoParaAnuncio();
+  estadoMusica(`Anúncio: tudo calado (calado = ${audio.calado}).`);
+  setTimeout(() => { audio.voltarDoAnuncio(); estadoMusica('Voltou do anúncio: a música volta com fade.'); }, 3000);
+});
+function alternar(botao, fn) {
+  const v = botao.getAttribute('aria-pressed') !== 'true';
+  botao.setAttribute('aria-pressed', String(v));
+  fn(v);
+}
+$('bEfeitos').addEventListener('click', (e) => alternar(e.currentTarget, (v) => audio.definirMudo(!v)));
+$('bMusica').addEventListener('click', (e) => alternar(e.currentTarget, (v) => audio.definirMusica(v)));
+
+// ------------------------------------------------------------------ copiar, padrao e o jogo ao lado
+$('limpar').addEventListener('click', () => {
+  for (const c of CATEGORIAS) sons.escolher(c.id, PADRAO[c.id]);
+  escolha = { ...PADRAO };
+  gravar();
+  marcar();
+});
+function textoDaEscolha() {
+  const linhas = ['Estúdio de sons: minha escolha'];
+  for (const c of CATEGORIAS) linhas.push(`- ${c.nome}: ${nomeDe(c.id, escolha[c.id])} (${escolha[c.id]})`);
+  linhas.push(`Peso dos arquivos: ${fmt(pesoDaEscolha(escolha))} KB`);
+  linhas.push(`slime.sons = ${JSON.stringify(escolha)}`);
+  return linhas.join('\n');
+}
+$('copiar').addEventListener('click', () => {
+  const txt = textoDaEscolha();
+  const aviso = $('aviso');
+  const selecionar = () => {
+    const r = document.createRange();
+    r.selectNodeContents($('resumo'));
+    const s = getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
+    aviso.textContent = 'Não deu para copiar sozinho: o resumo ficou selecionado, copie e cole na conversa.';
+  };
+  try {
+    navigator.clipboard.writeText(txt).then(() => { aviso.textContent = 'Copiado. Cole na conversa para eu aplicar.'; }, selecionar);
+  } catch { selecionar(); }
+});
+$('jogoDet').addEventListener('toggle', () => {
+  const f = $('jogo');
+  // recarrega a cada abertura: o jogo le slime.sons so ao iniciar
+  if ($('jogoDet').open) f.src = f.dataset.src;
+  else f.removeAttribute('src');
+});
+
+// ------------------------------------------------------------------ ondas (offline) e medidas
+const TAXA = 22050;
+function Offline() { return window.OfflineAudioContext || window.webkitOfflineAudioContext || null; }
+/** Renderiza uma receita (ou uma fala) num OfflineAudioContext e devolve as amostras. */
+async function renderizar(tocarEm, dur) {
+  const O = Offline();
+  if (!O) return null;
+  const off = new O(1, Math.max(1, Math.ceil((dur + 0.1) * TAXA)), TAXA);
+  tocarEm({ ctx: off, destino: off.destination, ruido: null }, 0.005);
+  const buf = await off.startRendering();
+  return buf.getChannelData(0);
+}
+/** Duracao de uma receita sem renderizar (so agenda num offline curto). */
+function duracao(tocarEm) {
+  const O = Offline();
+  if (!O) return 0;
+  const off = new O(1, TAXA, TAXA);
+  return tocarEm({ ctx: off, destino: off.destination, ruido: null }, 0.005);
+}
+const decodificados = new Map();
+async function amostrasArquivo(id) {
+  if (decodificados.has(id)) return decodificados.get(id);
+  const O = Offline();
+  const info = ARQUIVOS[id];
+  if (!O || !info) return null;
+  const r = await fetch(new URL('../src/som/arquivos/' + info.arquivo, location.href));
+  const dados = await r.arrayBuffer();
+  const off = new O(1, TAXA, TAXA);
+  const buf = await new Promise((ok, falha) => {
+    const p = off.decodeAudioData(dados, ok, falha);
+    if (p && p.then) p.then(ok, falha);
+  });
+  const a = buf.getChannelData(0).slice(Math.floor(info.inicio * buf.sampleRate));
+  const out = { a, taxa: buf.sampleRate };
+  decodificados.set(id, out);
+  return out;
+}
+function medidas(a) {
+  let pico = 0;
+  let soma = 0;
+  let n = 0;
+  for (let i = 0; i < a.length; i++) {
+    const x = Math.abs(a[i]);
+    if (!Number.isFinite(a[i])) return { pico: NaN, rmsDb: NaN };
+    if (x > pico) pico = x;
+    if (x > 1e-4) { soma += x * x; n++; }
+  }
+  return { pico, rmsDb: n ? 10 * Math.log10(soma / n) : -120, inicio: Math.abs(a[0]), fim: Math.abs(a[a.length - 1]) };
+}
+function desenhar(canvas, a) {
+  const g = canvas.getContext('2d');
+  if (!g || !a) return;
+  const w = canvas.width;
+  const h = canvas.height;
+  g.clearRect(0, 0, w, h);
+  let pico = 1e-4;
+  for (let i = 0; i < a.length; i++) pico = Math.max(pico, Math.abs(a[i]));
+  const passo = Math.max(1, Math.floor(a.length / w));
+  g.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--onda').trim() || '#8fd8cf';
+  g.strokeStyle = '#17161c';
+  g.lineWidth = 2;
+  g.beginPath();
+  for (let x = 0; x < w; x++) {
+    let m = 0;
+    for (let i = x * passo; i < Math.min(a.length, (x + 1) * passo); i++) m = Math.max(m, Math.abs(a[i]));
+    const y = (m / pico) * (h / 2 - 6);
+    g.moveTo(x + 0.5, h / 2 - y);
+    g.lineTo(x + 0.5, h / 2 + y + 1);
+  }
+  g.stroke();
+}
+/** Como tocar cada variante offline (receita, fala ou o primeiro arquivo). */
+function tocadorDe(c, v) {
+  const p = { ...(c.exemplo || {}) };
+  if (c.id === 'falas' && v.id === 'balbucio') return (vv, t) => falarSintese(vv, t, 'oba', { nivel: 5 });
+  if (v.receita) return (vv, t) => RECEITAS[v.receita](vv, t, p);
+  return null;
+}
+/** Ondas das fichas, na mesma escala de tempo dentro de cada categoria (compara a duracao). */
+async function ondas() {
+  for (const c of CATEGORIAS) {
+    const fichas = [];
+    for (const op of document.querySelectorAll(`[data-grupo="${c.id}"] .opcao`)) {
+      const v = c.variantes.find((x) => x.id === op.dataset.id);
+      const durEl = op.querySelector('.dur');
+      try {
+        const toc = tocadorDe(c, v);
+        const arq = arquivosDa(v)[0];
+        if (toc) {
+          const d = duracao(toc);
+          durEl.textContent = `${fmt(d)} s`;
+          fichas.push({ op, a: await renderizar(toc, d) });
+        } else if (arq) {
+          const r = await amostrasArquivo(arq);
+          if (r) {
+            durEl.textContent = `${fmt(r.a.length / r.taxa)} s`;
+            // mesma taxa das receitas para a escala de tempo
+            const passo = r.taxa / TAXA;
+            fichas.push({ op, a: Float32Array.from({ length: Math.floor(r.a.length / passo) }, (_, i) => r.a[Math.floor(i * passo)]) });
+          }
+        } else if (c.id === 'musica' && v.id !== 'nenhuma') {
+          durEl.textContent = 'em laço';
+        }
+      } catch { /* sem onda */ }
+    }
+    const n = Math.max(1, ...fichas.map((f) => (f.a ? f.a.length : 0)));
+    for (const f of fichas) {
+      if (!f.a) continue;
+      const a = new Float32Array(n);
+      a.set(f.a.subarray(0, n));
+      desenhar(f.op.querySelector('canvas'), a);
+    }
+  }
+}
+ondas();
+
+/** Medida de todas as variantes (verificacao no Chrome headless). */
+async function medirTudo() {
+  const out = [];
+  for (const c of CATEGORIAS) {
+    for (const v of c.variantes) {
+      const toc = tocadorDe(c, v);
+      if (toc) {
+        const d = duracao(toc);
+        const a = await renderizar(toc, d);
+        out.push({ cat: c.id, id: v.id, tipo: 'receita', dur: d, ...medidas(a) });
+      }
+      for (const arq of arquivosDa(v)) {
+        const r = await amostrasArquivo(arq);
+        out.push({ cat: c.id, id: v.id + ':' + arq, tipo: 'arquivo', dur: r.a.length / r.taxa, ...medidas(r.a.map((x) => x * (c.voz ? 0.5 : 0.55) * (v.vol || 1))) });
+      }
+    }
+  }
+  for (const peca of Object.values(PECAS)) {
+    const barra = duracaoCompasso(peca);
+    const toc = (vv, t) => {
+      const g = vv.ctx.createGain();
+      g.gain.value = PADRAO_MUSICA.ganho * peca.ganho;
+      g.connect(vv.destino);
+      for (let n = 0; n < 4; n++) for (const nota of notasDoCompasso(peca.id, n)) tocarNota({ ...vv, destino: g }, t + n * barra + nota.t, nota);
+      return 4 * barra;
+    };
+    out.push({ cat: 'musica', id: peca.id, tipo: 'peca', dur: 4 * barra, ...medidas(await renderizar(toc, 4 * barra + 1)) });
+  }
+  for (const f of FALAS_DO_JOGO) {
+    const toc = (vv, t) => falarSintese(vv, t, f, { nivel: 4 });
+    const d = duracao(toc);
+    out.push({ cat: 'fala', id: f, tipo: 'receita', dur: d, ...medidas(await renderizar(toc, d)) });
+  }
+  return out;
+}
+window.__estudio = { audio, sons, musica, medirTudo, contextos: CONTEXTOS, get escolha() { return { ...escolha }; } };
+
+marcar();
+</script>
+</body>
+</html>

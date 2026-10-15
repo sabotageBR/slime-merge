@@ -1,9 +1,11 @@
-// Perfil do jogador (metajogo): a UNICA moeda (gotas), a loja de visuais, a sequencia diaria,
-// as missoes do dia, o desafio do dia, a liga do Duelo e a colecao de niveis.
+// Perfil do jogador (metajogo): a UNICA moeda (gotas), a loja de visuais, as skins por nivel,
+// a sequencia diaria, as missoes do dia, o desafio do dia, a liga do Duelo e a colecao de niveis.
 // Logica pura: a data entra de fora (`hoje` = 'AAAA-MM-DD'), nada de relogio nem Math.random.
 // O main.js grava `perfil.dados()` no armazenamento.
 
 import { criarRng, hashTexto } from '../core/rng.js';
+import { SKINS, PRECO_MINHA, BASES, decodificar, codificar, imagemVazia } from './skins.js';
+import { MAX_NIVEL } from './niveis.js';
 
 /** Precos da loja (o padrao de cada grupo e de graca). */
 export const LOJA = {
@@ -20,6 +22,9 @@ export const LOJA = {
     { id: 'bichinhos', preco: 400 }, { id: 'boneco', preco: 450 }, { id: 'chapeus', preco: 500 }, { id: 'monstrinhos', preco: 600 },
   ],
 };
+
+/** Gotas pela descoberta de um nivel (a primeira vez que alguem chega nele). */
+export const PREMIO_DESCOBERTA = 25;
 
 /** Premio da sequencia diaria (dia 1 a 7; depois repete o 7). */
 export const SEQUENCIA = [20, 30, 40, 50, 60, 80, 120];
@@ -79,6 +84,8 @@ export function criarPerfil(salvo, hoje) {
     desafio: { dia: '', melhor: 0, premiado: false },
     liga: { nivel: 0, vitorias: 0 },
     totalGotas: 0,
+    // skins por nivel: possui ['k:id'], equipado {k: id} (falta = padrao), minhas {k: {m, b, e, px}}
+    skins: { possui: [], equipado: {}, minhas: {} },
     ...(salvo || {}),
   };
   // garante os padroes (save antigo ou parcial)
@@ -86,6 +93,43 @@ export function criarPerfil(salvo, hoje) {
     if (!d.possui[g]) d.possui[g] = [];
     if (!d.possui[g].includes(LOJA[g][0].id)) d.possui[g].unshift(LOJA[g][0].id);
     if (!d.equipado[g] || !d.possui[g].includes(d.equipado[g])) d.equipado[g] = LOJA[g][0].id;
+  }
+  // skins: so o que existe no catalogo e imagens validas (save antigo, parcial ou mexido)
+  const sk = d.skins && typeof d.skins === 'object' ? d.skins : {};
+  d.skins = {
+    possui: Array.isArray(sk.possui) ? sk.possui.filter((x) => typeof x === 'string' && existeSkin(x)) : [],
+    equipado: {},
+    minhas: {},
+  };
+  for (const [k, m] of Object.entries(sk.minhas && typeof sk.minhas === 'object' ? sk.minhas : {})) {
+    if (d.skins.possui.includes(k + ':minha') && m && decodificar(m.px)) d.skins.minhas[k] = limparMinha(m);
+  }
+  for (const [k, id] of Object.entries(sk.equipado && typeof sk.equipado === 'object' ? sk.equipado : {})) {
+    if (typeof id === 'string' && id !== 'padrao' && possuiSkin(Number(k), id)) d.skins.equipado[k] = id;
+  }
+  // versao 2 (2026-10-15): o nivel 13 passou a existir. Antes, estourar dois 12 registrava um
+  // "nivel 13" que nao existia; quem fez isso volta a 12 (as gotas ja pagas ficam)
+  let migrou = false;
+  if ((d.versao || 1) < 2) {
+    migrou = d.visto > 12;
+    if (migrou) d.visto = 12;
+    d.versao = 2;
+  }
+
+  /** 'k:id' de uma skin pronta do catalogo ou da Minha. @param {string} chave */
+  function existeSkin(chave) {
+    const [k, id] = chave.split(':');
+    const n = Number(k);
+    if (!(n >= 1 && n <= MAX_NIVEL) || !id || id === 'padrao') return false;
+    return id === 'minha' || SKINS.some((x) => x.nivel === n && x.id === id);
+  }
+  /** @param {number} k @param {string} id */
+  function possuiSkin(k, id) {
+    return id === 'padrao' || d.skins.possui.includes(k + ':' + id);
+  }
+  /** A Minha como o perfil guarda (modo 0/1, cor do corpo, tamanho P/M/G, imagem). @param {any} m */
+  function limparMinha(m) {
+    return { m: m.m === 1 ? 1 : 0, b: Math.max(0, Math.min(BASES.length - 1, m.b | 0)), e: m.e === undefined ? 1 : Math.max(0, Math.min(2, m.e | 0)), px: m.px };
   }
 
   function ganhar(n) {
@@ -121,6 +165,8 @@ export function criarPerfil(salvo, hoje) {
     hoje,
     get gotas() { return d.gotas; },
     get visto() { return d.visto; },
+    /** true se o save antigo tinha o "nivel 13" do estouro (o main.js corrige os saves dos modos) */
+    get migrou() { return migrou; },
     get equipado() { return { ...d.equipado }; },
     get liga() { return { ...d.liga }; },
     ganhar,
@@ -141,11 +187,11 @@ export function criarPerfil(salvo, hoje) {
     get sequencia() { return { ...d.sequencia }; },
     /** Niveis ja vistos antes do perfil existir (save antigo do Merge Lab): marca sem premio. */
     marcarVisto(nivel) { if (nivel > d.visto) d.visto = nivel; },
-    /** Nivel novo descoberto: +25 gotas na primeira vez. */
+    /** Nivel novo descoberto: PREMIO_DESCOBERTA gotas na primeira vez. */
     descobrir(nivel) {
       if (nivel <= d.visto) return 0;
       d.visto = nivel;
-      return ganhar(25);
+      return ganhar(PREMIO_DESCOBERTA);
     },
     // ---- loja
     possui(grupo, id) { return d.possui[grupo].includes(id); },
@@ -163,6 +209,42 @@ export function criarPerfil(salvo, hoje) {
     equipar(grupo, id) {
       if (!this.possui(grupo, id)) return false;
       d.equipado[grupo] = id;
+      return true;
+    },
+    // ---- skins por nivel (aba Skins da Loja). So nos niveis ja descobertos (o usuario
+    // escolheu bloquear os outros em 2026-10-15, pela recomendacao do estudio)
+    /** Equipadas e as Minhas (copias). */
+    get skins() { return { equipado: { ...d.skins.equipado }, minhas: JSON.parse(JSON.stringify(d.skins.minhas)) }; },
+    possuiSkin,
+    /** @param {number} k @param {string} id */
+    precoSkin(k, id) {
+      if (id === 'padrao') return 0;
+      if (id === 'minha') return PRECO_MINHA;
+      const x = SKINS.find((y) => y.nivel === k && y.id === id);
+      return x ? x.preco : Infinity;
+    },
+    /** Compra e ja equipa. @param {number} k @param {string} id @returns {boolean} comprou */
+    comprarSkin(k, id) {
+      if (possuiSkin(k, id) || k > d.visto || !existeSkin(k + ':' + id)) return false;
+      const p = this.precoSkin(k, id);
+      if (!(p <= d.gotas)) return false;
+      d.gotas -= p;
+      d.skins.possui.push(k + ':' + id);
+      if (id === 'minha') d.skins.minhas[k] = { m: 0, b: 0, e: 1, px: codificar(imagemVazia()) };
+      d.skins.equipado[k] = id;
+      return true;
+    },
+    /** @param {number} k @param {string} id */
+    equiparSkin(k, id) {
+      if (!possuiSkin(k, id)) return false;
+      if (id === 'padrao') delete d.skins.equipado[k];
+      else d.skins.equipado[k] = id;
+      return true;
+    },
+    /** Grava o desenho da Minha (ja comprada). @param {number} k @param {any} m */
+    salvarMinha(k, m) {
+      if (!possuiSkin(k, 'minha') || !m || !decodificar(m.px)) return false;
+      d.skins.minhas[k] = limparMinha(m);
       return true;
     },
     /** O item mais barato que ainda falta (para a barra "proximo desbloqueio"). */

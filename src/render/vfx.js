@@ -1,10 +1,11 @@
-// Efeitos por cima do slime: respingos, brilhos da fusao e textos de combo ("Good! x2").
+// Efeitos por cima do slime: respingos, brilhos da fusao, textos de combo ("Good! x2") e a
+// explosao do missil da mira (clarao, anel de choque e fumaca).
 // Coordenadas do mundo; o tempo vem de fora (nada de relogio proprio).
 
 import { aplicar } from './camera.js';
 import { TINTA } from './fundo.js';
 
-/** @typedef {{ x: number, y: number, vx: number, vy: number, vida: number, total: number, r: number, cor: string, tipo: 'gota'|'brilho'|'estrela' }} Part */
+/** @typedef {{ x: number, y: number, vx: number, vy: number, vida: number, total: number, r: number, cor: string, tipo: 'gota'|'brilho'|'estrela'|'clarao'|'anel'|'fumaca' }} Part */
 /** @typedef {{ x: number, y: number, texto: string, cor: string, vida: number, total: number, escala: number, grupo: string }} Texto */
 
 export function criarVfx() {
@@ -27,6 +28,21 @@ export function criarVfx() {
         parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v + forca * 0.5, vida: 0.6 + rnd() * 0.4, total: 1, r: 0.08 + rnd() * 0.12, cor, tipo: 'gota' });
       }
     },
+    /**
+     * Explosao do missil: clarao, anel de choque, fumaca, gosma e brilhos.
+     * @param {number} x @param {number} y @param {string} cor @param {number} r raio do slime (u)
+     */
+    explosao(x, y, cor, r) {
+      parts.push({ x, y, vx: 0, vy: 0, vida: 0.16, total: 0.16, r: r * 1.9, cor: '#fff6c8', tipo: 'clarao' });
+      parts.push({ x, y, vx: 0, vy: 0, vida: 0.32, total: 0.32, r: r * 2.6, cor: '#ffffff', tipo: 'anel' });
+      for (let k = 0; k < 7; k++) {
+        const a = (k / 7) * Math.PI * 2 + rnd() * 0.6;
+        const v = 1.2 + rnd() * 1.6;
+        parts.push({ x: x + Math.cos(a) * r * 0.4, y: y + Math.sin(a) * r * 0.4, vx: Math.cos(a) * v, vy: Math.sin(a) * v + 0.8, vida: 0.45 + rnd() * 0.25, total: 0.7, r: r * (0.35 + rnd() * 0.25), cor: '#e9e6ee', tipo: 'fumaca' });
+      }
+      this.respingo(x, y, cor, 24, 11);
+      for (let k = 0; k < 6; k++) this.brilho(x + (rnd() - 0.5) * r, y + (rnd() - 0.5) * r, '#fff6c8');
+    },
     /** Brilhos (particulas que sairam na fusao). */
     brilho(x, y, cor = '#ffffff') {
       parts.push({ x, y, vx: (rnd() - 0.5) * 2, vy: 1 + rnd() * 2, vida: 0.5 + rnd() * 0.5, total: 1, r: 0.12 + rnd() * 0.1, cor, tipo: rnd() < 0.5 ? 'brilho' : 'estrela' });
@@ -40,7 +56,8 @@ export function criarVfx() {
     passo(dt) {
       for (const p of parts) {
         p.vida -= dt;
-        p.vy -= (p.tipo === 'gota' ? 30 : 2) * dt;
+        p.vy -= (p.tipo === 'gota' ? 30 : p.tipo === 'fumaca' ? -1.5 : 2) * dt;
+        if (p.tipo === 'fumaca') { p.vx *= 1 - 3 * dt; p.vy *= 1 - 3 * dt; }
         p.x += p.vx * dt;
         p.y += p.vy * dt;
       }
@@ -58,7 +75,41 @@ export function criarVfx() {
       for (const p of parts) {
         const a = Math.min(1, p.vida / 0.3);
         ctx.globalAlpha = a;
-        if (p.tipo === 'gota') {
+        const k = 1 - p.vida / p.total;
+        if (p.tipo === 'clarao') {
+          ctx.globalAlpha = 1 - k;
+          const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+          g.addColorStop(0, '#ffffff');
+          g.addColorStop(0.45, p.cor);
+          g.addColorStop(1, 'rgba(255, 200, 80, 0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (p.tipo === 'anel') {
+          // anel de choque: cresce rapido e afina
+          const rr = p.r * (0.25 + 0.75 * Math.sqrt(k));
+          ctx.globalAlpha = 1 - k;
+          ctx.lineWidth = 0.32 * (1 - k) + 0.04;
+          ctx.strokeStyle = TINTA;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, rr, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.lineWidth *= 0.55;
+          ctx.strokeStyle = p.cor;
+          ctx.stroke();
+        } else if (p.tipo === 'fumaca') {
+          const rr = p.r * (0.6 + k * 0.8);
+          ctx.globalAlpha = Math.min(1, p.vida / 0.25) * 0.95;
+          ctx.fillStyle = TINTA;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, rr + 0.06, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = p.cor;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, rr, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (p.tipo === 'gota') {
           ctx.fillStyle = TINTA;
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.r + 0.04, 0, Math.PI * 2);

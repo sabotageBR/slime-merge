@@ -72,3 +72,99 @@ são dele; o código segue estas notas.
   (`src/main.js`, `criarPote`, `criarCena`); os recipientes próprios da Loja, do Molde e do
   laboratório usam o estilo de vidro do cesto escolhido. As outras opções continuam no
   Estúdio de visuais para comparação.
+
+## 2026-10-14: modelo escolhido
+- **"Merge Lab com opção de Duelo."** Começou a produção (roteiro em `docs/producao.md`).
+
+## 2026-10-15: fusão de iguais encostados
+- **"Aqui deveria ter unido os laranjas"** (print com dois laranjas encostados no fundo): a
+  fusão passou a contar proximidade, inclusive entre slimes dormindo (`src/fisica/mundo.js`).
+
+## 2026-10-15: thumb da Poki
+- Pedido: **"Crie uma thumb de acordo com as politicas da poki"**. Regras conferidas no guia
+  (developers.poki.com/guide/game-thumbnail): quadrado sangrado de no mínimo 628 px, sem texto,
+  borda nem moldura, um assunto com pose dinâmica, personagem na skin padrão, fundo limpo,
+  parecida com o jogo, nada perto do #83FFE7 e legível nos tiles pequenos.
+- `tools/thumb.html` monta a cena com a física e o render do próprio jogo (béquer, céu do
+  jardim sem nuvens, raios e vinheta), sem os números da graduação. Três opções em
+  `marketing/thumb/comparar.png` (tiles em `comparar-tiles.png`):
+  - **fusao:** dois vermelhos iguais se espremendo no fundo do béquer, com o brilho no encosto;
+  - **pote:** um laranja caindo no béquer cheio, com riscos de movimento;
+  - **arcoiris:** o slime arco-íris (nível 8) no alto da pilha, feliz, com estrelas.
+- As três passam na régua (perto do #83FFE7 ≤ 0,15%, beirada ≥ ΔE 45, sem tarja, opacas).
+  O anel ciano-verde do arco-íris passava de 1% e um passo de cor da thumb o afasta.
+- **Oficial provisória: arcoiris** (recomendação: a mais legível nos tiles de 94 a 314 px),
+  em `marketing/thumb/slime-merge-{1256,628}.{png,jpg}`. **Escolha final pendente do usuário.**
+- Falta a thumb animada (vídeo no hover), que a Poki pede antes do lançamento global.
+- Pedido (fim do dia 2026-10-15): **"gere mais 3 opções de thumb"**. Novas: **lava** (o nível 13
+  de olhos abertos no topo da pilha; contraste 6,2:1, o maior das seis), **míssil** (o laranja
+  chorando com a retícula travada e o míssil mergulhando) e **close** (um uva grande de perto, o
+  rosto ocupando o quadro). As seis lado a lado em `marketing/thumb/comparar-6.png`; todas
+  passam na régua da Poki. A provisória (arco-íris) foi re-renderizada com a reescala dos níveis
+  e vai na build até a escolha.
+- Pedido (noite de 2026-10-15, com a `fusao` de referência): **"faça 3 thumbs de cores iniciais
+  mais neutras no estilo [fusão] que ocupe o ícone todo, para o usuário entender o jogo só pela
+  thumb"**. Novas: **fusao-azul**, **fusao-verde** e **fusao-lilas** (os níveis 1, 2 e 3). O par
+  igual se espreme no alto de uma pilha que enche o quadro (o céu fica só no alto, com as
+  estrelas do encosto), com vizinhos só dos três níveis calmos e de tamanho parecido. A pilha é
+  uma grade em favo pintada para que só o par seja igual entre os que se tocam; semente e ordem
+  das cores escolhidas olhando as variantes. Todas passam na régua da Poki; o aviso de contraste
+  (régua nossa) cai porque os cantos agora são slimes, não céu. Lado a lado em
+  `marketing/thumb/comparar.png` (tiles em `comparar-tiles.png`). **Escolha pendente do usuário.**
+
+## 2026-10-15: borda, míssil, botões, nível 13, skins e sons
+Pedidos com prints anotados do Merge Lab (plano em
+`~/.claude/plans/algumas-demandas-1-2-mutable-chipmunk.md`):
+- **"Deixar o usuário jogar o slime na borda do recipiente"** (a seta passava da parede). Escolha:
+  **em cima da borda**. O centro do slime vai até o topo do vidro; ele pousa, balança e escorrega
+  para dentro por uma guia invisível (uma aba a 30° no topo de cada parede, `src/jogo/pote.js`).
+  Isto **inverte** a regra de 2026-10-14 ("cabe inteiro no fundo"). No Duelo, a guia é cortada
+  antes do meio entre os potes e a mira recua o que a guia perdeu; o Alargar não deixa um pote
+  invadir o outro (bug antigo no vime, xícara, balde e caldeirão). De quebra: o toque rápido
+  soltava o slime de onde ele estava, não de onde o dedo tocou (a peça presa só chegava ao alvo
+  no passo seguinte); agora cai da mira (`soltar` em `src/fisica/mundo.js`).
+- **"Ao aumentar o pote, tire esses X de cada lado da parede"**: as talas de madeira do Alargar
+  saíram (a nota de 2026-10-14 fica como histórico).
+- **Mira:** "um símbolo de mira em vez desses círculos; quando seleciono, faz cara de choro, vem
+  um míssil teleguiado e explode, voando gosma na tela, que escorre, animação rápida". Feito:
+  retícula de mira (`src/render/guias.js`), choro em todos os 8 personagens (`src/render/rostos.js`),
+  míssil saindo do botão (`src/render/missil.js`), explosão (`vfx.explosao`) e gosma na tela que
+  escorre (`src/render/gosma.js`, canvas `cTela` por cima do HUD). Tempo total ~0,75 s até o
+  impacto e ~1,3 s de gosma. O alvo marcado não funde no meio do voo; o fim espera o impacto.
+- **Botões de reforço:** "alterar o layout e colocar ícones mais nítidos e coerentes". Ícones
+  novos (`src/ui/icones.js`: formas cheias, um contorno só) e três layouts para escolher
+  (A régua embaixo, B coluna colada ao pote, C grade compacta; registro em
+  `docs/visuais/reforcos-comparar-*.png`). **Escolha: B, colada no pote.** Na paisagem a coluna
+  encosta na parede direita do pote do jogador 1 e o pote cresce; no retrato, a fileira embaixo
+  da barra. Os ícones antigos e o `?reforcos`/`?icones` saíram. Depois (2026-10-15): **no Duelo
+  contra a CPU a coluna vai para a direita do pote da CPU** (antes ficava entre os potes) e **no
+  2 jogadores não há reforços** (nem botões nem as teclas 1-5; só o jogador 1 teria).
+- **"Quero aumentar mais 1 nível de cor."** Escolha: **reescalar todos** (o 13 tem o tamanho que
+  o 12 tinha; fator 1,14121). Quatro candidatas de visual (ouro, lava, aurora, cristal) em
+  `docs/visuais/nivel13-comparar.{jpg,gif}`. **Escolha: lava** (crosta escura com rachaduras
+  em brasa que pulsam; textura 7 do shader). As outras três saíram do código.
+- **Skins por nível com editor de pixel.** Escolhas: compra com gotas numa aba nova da Loja; a
+  "Minha" por nível, comprada uma vez e editável; o editor tem os dois modos (ladrilho 16×16 e
+  estampa no corpo inteiro). Estúdio de skins em `modelos/skins.html`. **Escolha do usuário (2 por
+  nível):** 1 bolhas e gotas · 2 melancia e folhinhas · 3 xadrez lilás e florzinhas · 4 morango e
+  bengala doce · 5 gomos e onça · 6 abelha e estrelinhas · 7 chuva e trovão · 8 mosaico e balões ·
+  9 bolhas do mar e âncoras · 10 xadrez de uva e morcegos · 11 granulado e cupcake · 12 galáxia
+  ciano e constelação · 13 tesouro e diamantes (`SKINS` em `src/jogo/skins.js`). As quatro
+  perguntas do estúdio ficaram sem resposta e valeu a primeira opção (a recomendada): **preços
+  como propostos** (paramétrica 80+10k, pixel 120+15k, Minha 150), **níveis ainda não descobertos
+  bloqueados**, a aba se chama **"Skins"** (o grupo "Slimes" dos personagens fica) e a **gosma
+  cinza do Duelo mantém a regra da cor** (todas as skins têm C+M+Y ≥ 0,25). Na Loja: pausa ›
+  Loja › Skins; a Minha comprada abre o editor; as skins valem na hora (a cor nova avança pelo
+  corpo) e nos dois potes do Duelo (a CPU usa as mesmas).
+- **Sons:** "quero escolher os efeitos musicais, algumas falas, palmas, moeda, conquista, água,
+  meleca". Estúdio de sons em `modelos/sons.html`. **Escolha do usuário (é o `PADRAO` de
+  `src/som/catalogo.js`):** soltar sopro (o de antes), pouso gelatina, fusão marimba, combo
+  sininhos, estouro explosão (o de antes), míssil plop + assobio, choro buáá, gosma ventosa,
+  trocar pluc-pluc, chacoalhar chocalho, alargar esticar, armar o alvo radar, ataque chuva de
+  plops, botões pop, gotas moedinha, compra pilha de fichas, nível novo fanfarra de metais,
+  missão ta-dá, palmas turminha, fim trombone triste, falas **locutor com voz de slime** (inglês,
+  CC0 Kenney) e **sem música** (o botão da música some enquanto a escolha for "nenhuma").
+  Gravações na build: 8 MP3, 38,7 KB.
+- Bugs achados no caminho: dois 12 que estouravam registravam um "nível 13" (gotas e `visto`;
+  migração do perfil versão 2); a tesoura dividia em dois iguais que se fundiam de novo no
+  quadro seguinte (pontos de graça) e não repintava os pedaços.

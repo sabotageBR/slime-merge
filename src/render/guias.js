@@ -1,8 +1,24 @@
-// Onboarding sem texto: a mao que arrasta e toca (e as teclas desenhadas no desktop), e o
-// anel da mira quando um reforco espera o alvo.
+// Onboarding sem texto: a mao que arrasta e toca (e as teclas desenhadas no desktop), e a
+// reticula de mira sobre cada slime quando um reforco espera o alvo (travada no alvo do missil).
 
 import { paraTela } from './camera.js';
 import { TINTA } from './fundo.js';
+import { desenharIcone } from '../ui/icones.js';
+
+/** Momento do ciclo da mao em que ela aperta (a demonstracao do main.js solta a peca nele). */
+export const TOQUE_MAO = 1.75;
+
+/**
+ * Onde a mao esta no tempo t: vai e volta (0..1,6 s) e toca (1,6..2,4 s).
+ * @param {{ x: number, amplitude: number }} m  vis.mao
+ * @param {number} t
+ */
+export function maoEm(m, t) {
+  const ciclo = t % 2.4;
+  const k = ciclo < 1.6 ? ciclo / 1.6 : 1;
+  const ida = k < 0.5 ? k * 2 : 2 - k * 2;
+  return { x: m.x + (ida - 0.5) * 2 * m.amplitude, ida, ciclo, apertando: ciclo > TOQUE_MAO && ciclo < 2.05 };
+}
 
 /**
  * @param {CanvasRenderingContext2D} ctx
@@ -15,13 +31,8 @@ import { TINTA } from './fundo.js';
 export function desenharGuias(ctx, cam, dpr, vis, t, mundo) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (vis.mao) {
-    const ciclo = t % 2.4;
-    // vai e volta (0..1,6 s) e toca (1,6..2,4 s)
-    const k = ciclo < 1.6 ? ciclo / 1.6 : 1;
-    const ida = k < 0.5 ? k * 2 : 2 - k * 2;
-    const wx = vis.mao.x + (ida - 0.5) * 2 * vis.mao.amplitude;
+    const { x: wx, ida, apertando } = maoEm(vis.mao, t);
     const [sx, sy] = paraTela(cam, wx, vis.mao.y - 0.4);
-    const apertando = ciclo > 1.75 && ciclo < 2.05;
     mao(ctx, sx, sy + (apertando ? 6 : 0), Math.max(26, cam.s * 1.1));
     if (vis.mao.tecla) teclas(ctx, sx, sy + Math.max(26, cam.s * 1.1) * 1.9, Math.max(18, cam.s * 0.62), ida, apertando);
   }
@@ -30,20 +41,71 @@ export function desenharGuias(ctx, cam, dpr, vis, t, mundo) {
   if (vis.espinhos) espinhos(ctx, cam, vis.espinhos);
   if (vis.bicos) bicos(ctx, cam, vis.bicos, t);
   if (vis.alvo && mundo) {
-    // anel pulsando em volta de cada slime que pode ser escolhido
-    const pulso = 1 + 0.08 * Math.sin(t * 8);
-    ctx.strokeStyle = '#ff8a2a';
-    ctx.lineWidth = 3;
-    ctx.setLineDash([7, 5]);
+    // reticula pulsando e girando devagar sobre cada slime do pote que pode ser escolhido
+    const cor = COR_ALVO[vis.alvo.id] || COR_ALVO.mira;
+    const pulso = 1 + 0.06 * Math.sin(t * 8);
     for (const s of mundo.slimes) {
-      if (!s.ativo || s.preso) continue;
+      if (!s.ativo || s.preso || s.dados.marcado || (s.dados.pote || 0) !== (vis.alvo.pote || 0)) continue;
       const [sx, sy] = paraTela(cam, s.cx, s.cy);
-      ctx.beginPath();
-      ctx.arc(sx, sy, s.raio0 * cam.s * 1.05 * pulso, 0, Math.PI * 2);
-      ctx.stroke();
+      const r = Math.max(16, s.raio0 * cam.s * 0.92 * pulso);
+      reticula(ctx, sx, sy, r, t * 0.8 + s.idx, cor, 1);
+      // nos outros reforcos de alvo, o icone do reforco no canto diz o que vai acontecer
+      if (vis.alvo.id !== 'mira') desenharIcone(ctx, vis.alvo.id, sx + r * 0.8, sy - r * 0.8, Math.max(18, r * 0.62), { cor });
     }
-    ctx.setLineDash([]);
   }
+  if (vis.missil) {
+    // travada no alvo: vermelha, fecha de 1,7r para 1,2r, para de girar e deixa o rosto (o
+    // choro) a vista: tracos para fora e sem o ponto do meio
+    const M = vis.missil;
+    const [sx, sy] = paraTela(cam, M.x, M.y);
+    const k = Math.min(1, M.t / M.choro);
+    const fecha = 1.7 - 0.5 * (1 - (1 - k) * (1 - k));
+    reticula(ctx, sx, sy, Math.max(20, M.r * cam.s * 0.92 * fecha), 0, COR_ALVO.mira, 1.3, true);
+  }
+}
+
+/** Cor da reticula de cada reforco de alvo. */
+const COR_ALVO = { mira: '#ff3b30', calor: '#ff8a2a', gelo: '#45b8ff', tesoura: '#a77bff', tinta: '#ff5fc8' };
+
+/**
+ * Reticula de mira (px): anel com contorno de tinta, quatro tracos para dentro e o ponto.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} x @param {number} y @param {number} r @param {number} giro @param {string} cor
+ * @param {number} grossura 1 normal; maior quando travada
+ * @param {boolean} [vazada] tracos para fora e sem o ponto (o alvo fica a vista)
+ */
+function reticula(ctx, x, y, r, giro, cor, grossura, vazada = false) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(giro);
+  ctx.lineCap = 'round';
+  const tracos = () => {
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    for (let k = 0; k < 4; k++) {
+      const a = (k * Math.PI) / 2;
+      const [r0, r1] = vazada ? [1.32, 0.86] : [1.22, 0.58];
+      ctx.moveTo(Math.cos(a) * r * r0, Math.sin(a) * r * r0);
+      ctx.lineTo(Math.cos(a) * r * r1, Math.sin(a) * r * r1);
+    }
+    ctx.stroke();
+  };
+  ctx.strokeStyle = TINTA;
+  ctx.lineWidth = 6 * grossura;
+  tracos();
+  ctx.strokeStyle = cor;
+  ctx.lineWidth = 3 * grossura;
+  tracos();
+  if (vazada) { ctx.restore(); return; }
+  ctx.fillStyle = TINTA;
+  ctx.beginPath();
+  ctx.arc(0, 0, 3.4 * grossura, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = cor;
+  ctx.beginPath();
+  ctx.arc(0, 0, 2 * grossura, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 /** Mao de desenho (indicador apontando para cima). */
