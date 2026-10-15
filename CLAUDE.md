@@ -14,6 +14,7 @@ e do `../stringcut`: ES modules nativos, sem bundler, sem `npm install`; ferrame
 - **Plano aprovado:** `~/.claude/plans/quero-desenvolver-um-jogo-humming-teapot.md` (2026-10-14).
 - **Referência visual:** `conceito/` (4 prints do jogo de referência e `powerups.jpg`).
 - **Escolhas do usuário:** `docs/autoria.md`. **Roteiro da produção:** `docs/producao.md`.
+- **Repositório:** https://github.com/sabotageBR/slime-merge (privado, branch `main`).
 
 ## A build (o que vai para a Poki)
 Abre direto no **sem fim** (Merge Lab). O menu (pausa, ESC/P, ou tocar nas gotas) tem 3 abas:
@@ -80,7 +81,7 @@ cenários e personagens por gotas) e **Missões** (3 do dia + sequência diária
 ## Comandos
 | Comando | O que faz |
 |---|---|
-| `npm test` | Física, cor, wrapper Poki, fronteiras, perfil e os modos com o bot (64 testes, ~4 min) |
+| `npm test` | Física, cor, wrapper Poki, fronteiras, perfil e os modos com o bot (65 testes, ~4 min) |
 | `npm run menu` | Fluxo da build no Chrome headless: sequência, gotas no fim, dobrar, loja, missões, troca de modo. Prints em `.tmp/menu/`. `-- --tam=640x360` |
 | `npm run empacotar` | Build da Poki em `dist/` e zip em `dist-poki/` (sem protótipos; < 500 KB gzip) |
 | `npm run servir` | `http://127.0.0.1:5370/` (jogo) e `/modelos/` (hub de avaliação); `-- --lan` mostra o endereço para o celular |
