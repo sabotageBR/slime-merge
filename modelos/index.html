@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Slime Merge: os 5 modelos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800&display=swap">
+<style>
+/* Caderno de laboratorio quadriculado: cada modelo e uma ficha colada no papel, com o GIF
+   do prototipo jogando sozinho a esquerda e a analise a direita. Um mundo visual so (o do
+   jogo): papel claro, tinta preta grossa, turquesa dos botoes. */
+:root {
+  --papel: #f3f2ee;
+  --grade: rgba(40, 60, 90, 0.085);
+  --tinta: #17161c;
+  --tinta-suave: #4a4855;
+  --ficha: #ffffff;
+  --turquesa: #5fd9cf;
+  --turquesa-2: #3fbfb5;
+  --laranja: #ff8a2a;
+  --azul: #2a62d6;
+  --verde-ok: #2f9e5a;
+  --vermelho-risco: #d2453c;
+  --display: 'Fredoka', 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --texto: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: light;
+}
+@font-face { font-family: 'Fredoka'; src: url('fredoka-latin-700-normal.woff2') format('woff2'), url('../src/ui/fontes/fredoka-latin-700-normal.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Fredoka'; src: url('fredoka-latin-600-normal.woff2') format('woff2'), url('../src/ui/fontes/fredoka-latin-600-normal.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+* { box-sizing: border-box; }
+body {
+  margin: 0; color: var(--tinta); font-family: var(--texto); font-size: 16px; line-height: 1.55;
+  background-color: var(--papel);
+  background-image: linear-gradient(var(--grade) 1.5px, transparent 1.5px), linear-gradient(90deg, var(--grade) 1.5px, transparent 1.5px);
+  background-size: 28px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+}
+.folha { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 34px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; line-height: 1.1; }
+h1 { font-size: clamp(2.1rem, 6vw, 3.4rem); color: #fff; -webkit-text-stroke: 0.16em var(--tinta); paint-order: stroke fill; letter-spacing: 0.01em; }
+h1 em { font-style: normal; color: var(--turquesa); }
+.topo { display: flex; flex-direction: column; gap: 14px; }
+.lead { font-size: 1.08rem; max-width: 64ch; margin: 0; color: var(--tinta-suave); }
+.lead b { color: var(--tinta); }
+.fatos { display: flex; flex-wrap: wrap; gap: 10px; padding: 0; margin: 4px 0 0; list-style: none; }
+.fatos li { font-family: var(--display); font-weight: 600; font-size: 0.92rem; background: var(--ficha); border: 2.5px solid var(--tinta); border-radius: 999px; padding: 4px 12px; box-shadow: 0 3px 0 var(--tinta); }
+.fatos li b { color: var(--azul); }
+
+.ficha {
+  display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 26px; align-items: start;
+  background: var(--ficha); border: 3px solid var(--tinta); border-radius: 22px; box-shadow: 0 5px 0 var(--tinta); padding: 22px;
+}
+.ficha .tela { display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
+.ficha .tela img { width: 100%; max-width: 100%; display: block; border: 3px solid var(--tinta); border-radius: 16px; background: var(--papel); }
+.corpo { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.rotulo { font-family: var(--display); font-weight: 600; font-size: 0.82rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tinta-suave); }
+.titulo { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.titulo h2 { font-size: clamp(1.7rem, 4vw, 2.2rem); }
+.numero { font-family: var(--display); font-weight: 700; width: 2.1rem; height: 2.1rem; flex: none; border-radius: 50%; display: grid; place-items: center;
+  border: 2.5px solid var(--tinta); background: var(--turquesa); color: #fff; -webkit-text-stroke: 0.12em var(--tinta); paint-order: stroke fill; font-size: 1.15rem; align-self: center; }
+.pitch { font-size: 1.12rem; font-weight: 700; margin: 0; max-width: 60ch; }
+.blocos { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px 22px; }
+.bloco { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.bloco ul { margin: 0; padding-left: 1.15em; display: flex; flex-direction: column; gap: 4px; }
+.bloco p { margin: 0; }
+.bloco.bom h3 { color: var(--verde-ok); }
+.bloco.risco h3 { color: var(--vermelho-risco); }
+.bloco h3 { font-size: 1.02rem; }
+.teclas { font-size: 0.93rem; color: var(--tinta-suave); }
+kbd { font-family: var(--display); font-weight: 600; font-size: 0.85em; border: 2px solid var(--tinta); border-bottom-width: 4px; border-radius: 7px; padding: 0 6px; background: #fff; color: var(--tinta); white-space: nowrap; }
+.jogar {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; font-family: var(--display); font-weight: 700; font-size: 1.2rem;
+  color: #fff; background: var(--laranja); border: 3px solid var(--tinta); border-radius: 16px; padding: 10px 18px; box-shadow: 0 4px 0 var(--tinta);
+  -webkit-text-stroke: 0.1em var(--tinta); paint-order: stroke fill; min-height: 48px;
+}
+.jogar:hover { transform: translateY(-1px); }
+.jogar:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--tinta); }
+.jogar:focus-visible, a:focus-visible { outline: 3px dashed var(--azul); outline-offset: 3px; }
+.medido { font-size: 0.9rem; color: var(--tinta-suave); border-top: 2px dashed rgba(23, 22, 28, 0.25); padding-top: 10px; margin: 0; }
+
+.lab { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 360px); gap: 24px; align-items: center;
+  background: repeating-linear-gradient(135deg, var(--turquesa) 0 18px, var(--turquesa-2) 18px 36px); border: 3px solid var(--tinta); border-radius: 22px; padding: 22px; box-shadow: 0 5px 0 var(--tinta); }
+.lab .caixa { background: var(--ficha); border: 3px solid var(--tinta); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.lab img { width: 100%; max-width: 100%; border: 3px solid var(--tinta); border-radius: 16px; background: var(--papel); display: block; }
+.lab h2 { font-size: 1.6rem; }
+.visuais { display: flex; flex-direction: column; gap: 4px; text-decoration: none; color: var(--tinta); background: var(--laranja);
+  border: 3px solid var(--tinta); border-radius: 22px; box-shadow: 0 5px 0 var(--tinta); padding: 18px 22px; }
+.visuais b { font-family: var(--display); font-size: 1.7rem; color: #fff; -webkit-text-stroke: 0.14em var(--tinta); paint-order: stroke fill; }
+.visuais .rotulo { color: var(--tinta); }
+.visuais:focus-visible { outline: 3px dashed var(--azul); outline-offset: 3px; }
+.nota { background: var(--ficha); border: 3px dashed var(--tinta); border-radius: 18px; padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; }
+.nota p { margin: 0; max-width: 70ch; }
+@media (max-width: 760px) {
+  .ficha, .lab { grid-template-columns: minmax(0, 1fr); padding: 16px; gap: 18px; }
+  .ficha .tela img { max-width: 300px; margin: 0 auto; }
+}
+@media (prefers-reduced-motion: reduce) { .jogar:hover, .jogar:active { transform: none; } }
+</style>
+</head>
+<body>
+<main class="folha">
+  <header class="topo">
+    <span class="rotulo">Protótipos para avaliação · 2026-10-14</span>
+    <h1>Slime Merge: <em>5 modelos</em></h1>
+    <p class="lead">Os cinco usam o mesmo motor de slime. Cada slime é um punhado de partículas que cede, escorre e <b>toma a forma do pote</b>. A cor é <b>tinta de verdade</b>: azul com amarelo dá verde, e misturar demais dá lama. Cada ficha mostra o protótipo jogando sozinho. Toque em <b>Jogar</b> para testar no celular ou no computador.</p>
+    <ul class="fatos">
+      <li>Física <b>determinística</b> (mesma semente, mesmo jogo)</li>
+      <li>Mistura <b>Kubelka-Munk</b> em 12 bandas</li>
+      <li>Build de <b>142 KB</b> em gzip</li>
+      <li>SDK da Poki testado em <b>5 cenários</b></li>
+    </ul>
+  </header>
+
+  <a class="visuais" href="visuais.html">
+    <span class="rotulo">Novo · escolha o visual</span>
+    <b>Estúdio de visuais</b>
+    <span>Escolhido: béquer, jardim e personagem clássico (já no jogo). As outras opções continuam lá para comparar.</span>
+  </a>
+
+  <section class="lab" id="lab">
+    <div class="caixa">
+      <span class="rotulo">Comece por aqui</span>
+      <h2>A sensação do slime</h2>
+      <p>Três potes recebem as mesmas gotas coloridas. À esquerda, a <b>gelatina</b> dos personagens: cede e se acomoda, mas mantém corpo e rosto. No meio, o <b>goo</b>, que escoa até desenhar o fundo do pote e marmoriza as cores. À direita, o <b>líquido</b>, que mistura tudo e vira lama, como tinta de verdade. Toque num pote para pingar mais.</p>
+      <a class="jogar" href="../index.html?modelo=lab" data-jogo="lab">Abrir o laboratório</a>
+    </div>
+    <img src="../docs/modelos/lab.gif" alt="Três potes lado a lado: gelatina, goo e líquido recebendo gotas azuis, amarelas e magenta" width="300">
+  </section>
+
+  <article class="ficha" id="m1">
+    <div class="tela"><img src="../docs/modelos/1.gif" alt="Merge Lab: slimes com rostinhos caindo e se fundindo num pote listrado" width="300" loading="lazy"><a class="jogar" href="../index.html?modelo=1" data-jogo="1">Jogar o Merge Lab</a></div>
+    <div class="corpo">
+      <div class="titulo"><span class="numero">1</span><h2>Merge Lab</h2></div>
+      <p class="pitch">O conceito que você mandou, com física de verdade: soltar, fundir iguais e subir os 12 níveis.</p>
+      <div class="blocos">
+        <div class="bloco"><h3>O que é novo</h3><ul>
+          <li>A pilha assenta e "derrete" no formato do pote: esperar abre espaço.</li>
+          <li>A cor do nível novo nasce na costura e avança pelo corpo. Do nível 7 em diante, cada um tem uma textura: bolinhas, arco-íris, ondas, listras de bala e galáxia.</li>
+          <li>Os 4 botões da referência: trocar, chacoalhar, alargar (com talas de madeira) e mira.</li>
+          <li>Prêmios de marco: calor (escoa), gelo (trava), tesoura (divide) e gota de tinta (sobe um nível).</li>
+        </ul></div>
+        <div class="bloco bom"><h3>Ponto forte na Poki</h3><p>Lido em um segundo, com a conversão para jogar (C2P) mais alta. A barra de "?" puxa a próxima partida, e o pote nunca transborda nos 3 primeiros minutos.</p></div>
+        <div class="bloco risco"><h3>Risco</h3><p>O gênero Suika é conhecido. O "derreter" e a cor têm de aparecer nos primeiros 15 segundos e no vídeo de capa.</p></div>
+      </div>
+      <p class="teclas">Arrastar e soltar · <kbd>←</kbd> <kbd>→</kbd> e <kbd>espaço</kbd> · <kbd>1</kbd> a <kbd>5</kbd> para os reforços · <kbd>Esc</kbd> pausa</p>
+      <p class="medido">Medido: o bot joga 3 minutos sem perder; a física roda em 1,7 a 3,3 ms por quadro com o pote mais que cheio (desktop).</p>
+    </div>
+  </article>
+
+  <article class="ficha" id="m2">
+    <div class="tela"><img src="../docs/modelos/2.gif" alt="Croma: slimes coloridos se misturando em verdes, violetas e lama" width="300" loading="lazy"><a class="jogar" href="../index.html?modelo=2" data-jogo="2">Jogar o Croma</a></div>
+    <div class="corpo">
+      <div class="titulo"><span class="numero">2</span><h2>Croma</h2></div>
+      <p class="pitch">Um Suika de tinta. Fundem slimes do mesmo tamanho, de qualquer cor, e o resultado é a mistura física das duas.</p>
+      <div class="blocos">
+        <div class="bloco"><h3>O que é novo</h3><ul>
+          <li>Caem só ciano, magenta, amarelo e branco. O resto você descobre misturando.</li>
+          <li>O Croma-dex tem 40 cores com nome, como verde-limão, ameixa e petróleo.</li>
+          <li>Misturar demais dá lama: um slime marrom e ranzinza que só funde com outra lama.</li>
+          <li>Um preto raro aparece como perigo.</li>
+        </ul></div>
+        <div class="bloco bom"><h3>Ponto forte na Poki</h3><p>A física de cor vira a regra do jogo, e a descoberta funciona como Little Alchemy. É o modelo mais diferente do que já existe no catálogo.</p></div>
+        <div class="bloco risco"><h3>Risco</h3><p>A lama pode frustrar quem não entende o porquê. Precisa ensinar sem texto que o tamanho conta e a cor não.</p></div>
+      </div>
+      <p class="teclas">Os mesmos controles e reforços do Merge Lab</p>
+      <p class="medido">Medido: em 60 s o bot descobre cores novas e forma lama quando mistura as três primárias.</p>
+    </div>
+  </article>
+
+  <article class="ficha" id="m3">
+    <div class="tela"><img src="../docs/modelos/3.gif" alt="Loja de Slime: cinco bicos de tinta despejando goo num pote" width="300" loading="lazy"><a class="jogar" href="../index.html?modelo=3" data-jogo="3">Jogar a Loja</a></div>
+    <div class="corpo">
+      <div class="titulo"><span class="numero">3</span><h2>Loja de Slime</h2></div>
+      <p class="pitch">O cliente pede uma cor. Você despeja, sova e entrega.</p>
+      <div class="blocos">
+        <div class="bloco"><h3>O que é novo</h3><ul>
+          <li>Segurar um bico despeja goo, que se junta numa massa e toma a forma do pote.</li>
+          <li>Sovar (arrastar dentro do pote) mistura de verdade, com marmorizado. Um toque cutuca.</li>
+          <li>A nota é por distância de cor: 3, 2 ou 1 estrela.</li>
+          <li>A dica é uma gota pulando no bico certo, o que também ajuda daltônicos.</li>
+        </ul></div>
+        <div class="bloco bom"><h3>Ponto forte na Poki</h3><p>É satisfatório de mexer (ASMR), e cada pedido é uma pausa natural para o intervalo comercial.</p></div>
+        <div class="bloco risco"><h3>Risco</h3><p>A conversão para jogar tende a ser menor, porque é preciso entender o pedido. Acertar a cor em tela pequena e escura engana.</p></div>
+      </div>
+      <p class="teclas">Segurar o bico · arrastar no pote · <kbd>1</kbd> a <kbd>5</kbd> despejam · <kbd>Enter</kbd> entrega</p>
+      <p class="medido">Medido: o bot entrega pedidos com estrelas, 21 estrelas em 8 pedidos.</p>
+    </div>
+  </article>
+
+  <article class="ficha" id="m4">
+    <div class="tela"><img src="../docs/modelos/4.gif" alt="Molde: goo rosa enchendo um molde em forma de coração" width="300" loading="lazy"><a class="jogar" href="../index.html?modelo=4" data-jogo="4">Jogar o Molde</a></div>
+    <div class="corpo">
+      <div class="titulo"><span class="numero">4</span><h2>Molde</h2></div>
+      <p class="pitch">Um puzzle de encher formas malucas. A forma do recipiente é o próprio puzzle.</p>
+      <div class="blocos">
+        <div class="bloco"><h3>O que é novo</h3><ul>
+          <li>São 8 fases: copo, coração, potes gêmeos, zigue-zague, verde, espinho, funil e lilás.</li>
+          <li>Arrastar inclina o molde, e o goo escorre para outra câmara.</li>
+          <li>O espinho corta o goo e o aquecedor derrete o slime no funil.</li>
+          <li>Algumas fases pedem uma cor que só sai misturando dentro do molde.</li>
+        </ul></div>
+        <div class="bloco bom"><h3>Ponto forte na Poki</h3><p>É a melhor vitrine do "slime que toma a forma do recipiente". Fases e estrelas seguram o jogador, como no Stringcut.</p></div>
+        <div class="bloco risco"><h3>Risco</h3><p>Precisa de muitas fases curadas à mão, e o gênero "encher" é comum no hiper-casual.</p></div>
+      </div>
+      <p class="teclas">Segurar o bico · arrastar para inclinar · <kbd>espaço</kbd> despeja · <kbd>←</kbd> <kbd>→</kbd> inclinam · <kbd>R</kbd> recomeça</p>
+      <p class="medido">Medido: o bot vence as primeiras fases em 90 s, com estrelas pelo desperdício.</p>
+    </div>
+  </article>
+
+  <article class="ficha" id="m5">
+    <div class="tela"><img src="../docs/modelos/5.gif" alt="Duelo: dois potes lado a lado com gosma cinza caindo no rival" width="300" loading="lazy"><a class="jogar" href="../index.html?modelo=5" data-jogo="5">Jogar o Duelo</a></div>
+    <div class="corpo">
+      <div class="titulo"><span class="numero">5</span><h2>Duelo</h2></div>
+      <p class="pitch">Dois potes. Cada fusão manda gosma cinza para o rival, e perde quem transbordar.</p>
+      <div class="blocos">
+        <div class="bloco"><h3>O que é novo</h3><ul>
+          <li>A gosma cinza não funde com nada, mas absorve a tinta das vizinhas e vira slime normal.</li>
+          <li>Melhor de 3, contra a CPU (3 níveis) ou outra pessoa no mesmo teclado.</li>
+          <li>As setas ligam o segundo jogador na hora, sem menu.</li>
+        </ul></div>
+        <div class="bloco bom"><h3>Ponto forte na Poki</h3><p>A categoria de 2 jogadores é forte no desktop, e a gosma que pega cor é uma mecânica própria.</p></div>
+        <div class="bloco risco"><h3>Risco</h3><p>No celular em pé os potes ficam pequenos, e a física custa o dobro. Pode virar um modo do modelo escolhido.</p></div>
+      </div>
+      <p class="teclas">Jogador 1: <kbd>A</kbd> <kbd>D</kbd> <kbd>S</kbd> ou o mouse · Jogador 2: <kbd>←</kbd> <kbd>→</kbd> <kbd>↓</kbd></p>
+      <p class="medido">Medido: em 60 s os dois potes fundem e trocam gosma, e o placar avança por rodada.</p>
+    </div>
+  </article>
+
+  <aside class="nota">
+    <h2>O que ainda não está nos protótipos</h2>
+    <p>Música, a thumb da Poki, a loja de skins (com uma moeda só) e o desafio diário. Isso vem na produção do modelo que você escolher. Missões, recorde, partida salva, revive por vídeo (simulado no localhost) e os eventos da Poki já estão nos cinco.</p>
+  </aside>
+</main>
+</body>
+</html>

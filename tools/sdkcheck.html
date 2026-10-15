@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>sdkcheck</title>
+<style>html,body{margin:0;background:#111;color:#eee;font:13px monospace}iframe{border:0;width:390px;height:844px;display:block}</style></head>
+<body><iframe id="f"></iframe><pre id="resultado"></pre>
+<script type="module">
+// Banco de testes do SDK da Poki (porte do 2048_cards para o Slime Merge): carrega o jogo num
+// iframe srcdoc (fora de "localhost": o jogo se comporta como na Poki, com os ganchos de
+// window.__slimeTeste) trocando a tag do SDK por um SDK falso que registra cada chamada.
+// ?cenario=normal|recusa|bloqueado|pendente|lsquebrado   ?raiz=dist/
+const q = new URLSearchParams(location.search);
+const cenario = q.get('cenario') || 'normal';
+const raiz = (q.get('raiz') || '').replace(/[^a-z0-9/_-]/gi, '');
+const log = [];
+const t0 = performance.now();
+const anotar = (...x) => log.push([Math.round(performance.now() - t0), ...x]);
+window.__log = log;
+const falhas = [];
+const conferir = (ok, msg) => { if (!ok) falhas.push(msg); };
+const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const sdkFalso = `
+<script>
+  const L = (...x) => parent.__anotar(...x);
+  window.PokiSDK = {
+    init() { L('init'); return ${cenario === 'pendente' ? 'new Promise(() => {})' : 'Promise.resolve()'}; },
+    gameLoadingFinished() { L('gameLoadingFinished'); },
+    gameplayStart() { L('gameplayStart'); },
+    gameplayStop() { L('gameplayStop'); },
+    commercialBreak(aoIniciar) { L('commercialBreak', parent.__calado()); if (aoIniciar) aoIniciar(); return new Promise((r) => setTimeout(() => { L('fimCommercial', parent.__calado()); r(); }, 1500)); },
+    rewardedBreak(o) { L('rewardedBreak', parent.__calado()); const ini = typeof o === 'function' ? o : o && o.onStart; if (ini) ini(); return new Promise((r) => setTimeout(() => { L('fimRewarded'); r(${cenario === 'recusa' ? 'false' : 'true'}); }, 600)); },
+    measure(a, b, c) { L('measure', a + '/' + b + '/' + c); },
+    movePill() { L('movePill'); },
+    getDeviceInfo() { return { category: 'mobile' }; },
+  };
+<\/script>`;
+const lsQuebrado = `
+<script>
+  const quebra = () => { throw new Error('quota'); };
+  Storage.prototype.getItem = quebra; Storage.prototype.setItem = quebra; Storage.prototype.removeItem = quebra;
+<\/script>`;
+window.__anotar = anotar;
+window.__calado = () => { try { return !!f.contentWindow.__slime.audio.calado; } catch { return 'n/a'; } };
+
+const f = document.getElementById('f');
+let html = await (await fetch('../' + raiz + 'index.html')).text();
+const tag = /<!-- Unico script externo permitido pela Poki. -->\s*<script src="https:\/\/game-cdn\.poki\.com\/scripts\/v2\/poki-sdk\.js"><\/script>/;
+conferir(tag.test(html), 'index.html sem a tag do SDK da Poki no formato esperado');
+const teste = `<script>window.__slimeTeste = { modelo: '1' };<\/script>`;
+const extra = cenario === 'bloqueado' ? '' : cenario === 'lsquebrado' ? lsQuebrado + sdkFalso : sdkFalso;
+html = html.replace(tag, extra).replace('<head>', '<head><base href="/' + raiz + '">' + teste);
+f.srcdoc = html;
+await new Promise((r) => (f.onload = r));
+const w = () => f.contentWindow;
+const S = () => w().__slime;
+const nomes = () => log.map((l) => l[1]);
+const ponteiro = (tipo, x, y) => w().dispatchEvent(new (w().PointerEvent)(tipo, { clientX: x, clientY: y, pointerId: 1, bubbles: true }));
+const clicar = (id) => w().document.getElementById(id).click();
+const perder = () => { const s = S().J.modo.S; s.tempo = 999; s.jogadores[0].pote.perigoT = 9; };
+
+await espera(1200);
+conferir(!!S(), 'jogo nao subiu (sem __slime)');
+conferir(S() && S().J.modo, 'modo nao montou');
+if (cenario === 'bloqueado' || cenario === 'pendente') {
+  await espera(4500);
+  conferir(w().document.body.classList.contains('sem-anuncio'), 'sem SDK os botoes de video deviam sumir');
+  // segue jogavel: solta, perde e joga de novo
+  ponteiro('pointerdown', 195, 300); ponteiro('pointerup', 195, 300);
+  await espera(600);
+  conferir(S().J.estado === 'jogando', 'sem SDK o jogo nao seguiu');
+  perder();
+  await espera(800);
+  clicar('bDeNovo');
+  await espera(800);
+  conferir(S().J.estado === 'jogando', 'sem SDK o "Jogar de novo" travou');
+} else {
+  await espera(400);
+  conferir(nomes().includes('init'), 'init nao chamado');
+  conferir(nomes().includes('gameLoadingFinished'), 'gameLoadingFinished nao chamado');
+  conferir(!nomes().includes('gameplayStart'), 'gameplayStart antes do primeiro toque');
+  // primeiro toque abre o gameplay
+  ponteiro('pointerdown', 195, 300); ponteiro('pointerup', 195, 300);
+  await espera(300);
+  conferir(nomes().includes('gameplayStart'), 'gameplayStart nao saiu no primeiro toque');
+  conferir(nomes().includes('measure') && log.some((l) => l[2] === 'game/toque/first'), 'measure game/toque/first faltou');
+  // pausa e volta
+  w().dispatchEvent(new (w().KeyboardEvent)('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
+  await espera(200);
+  conferir(nomes().at(-1) === 'gameplayStop', 'Esc nao mandou gameplayStop');
+  clicar('bContinuar');
+  await espera(200);
+  conferir(nomes().at(-1) === 'gameplayStart', 'Continuar nao mandou gameplayStart');
+  // fim, revive (rewarded) e jogar de novo (commercial)
+  perder();
+  await espera(800);
+  conferir(S().J.estado === 'fim', 'o fim nao apareceu');
+  clicar('bReviver');
+  await espera(1600);
+  const rew = log.find((l) => l[1] === 'rewardedBreak');
+  conferir(!!rew, 'rewardedBreak nao chamado');
+  conferir(rew && rew[2] === true, 'audio nao estava mudo no rewarded');
+  conferir(S().J.estado === 'jogando', 'depois do video o jogo nao voltou');
+  if (cenario === 'recusa') conferir(S().J.modo.hud().pontos === 0, 'video recusado deu premio (devia recomecar, nao reviver)');
+  perder();
+  await espera(800);
+  clicar('bDeNovo');
+  await espera(2600);
+  const com = log.find((l) => l[1] === 'commercialBreak');
+  conferir(!!com, 'commercialBreak nao chamado no Jogar de novo');
+  conferir(com && com[2] === true, 'audio nao estava mudo no commercial');
+  conferir(nomes().at(-1) === 'gameplayStart' || nomes().slice(-3).includes('gameplayStart'), 'depois do commercial nao voltou o gameplayStart');
+  // protocolo: nada repetido, nada durante anuncio, start so depois do loading
+  let jogando = false;
+  let anuncio = false;
+  let carregou = false;
+  for (const [, n] of log) {
+    if (n === 'gameLoadingFinished') carregou = true;
+    if (n === 'gameplayStart') { conferir(!jogando, 'gameplayStart repetido'); conferir(carregou, 'gameplayStart antes do loading'); conferir(!anuncio, 'gameplayStart durante anuncio'); jogando = true; }
+    if (n === 'gameplayStop') { conferir(jogando, 'gameplayStop repetido'); conferir(!anuncio, 'gameplayStop durante anuncio'); jogando = false; }
+    if (n === 'commercialBreak' || n === 'rewardedBreak') { conferir(!jogando, n + ' com o jogo rodando'); anuncio = true; }
+    if (n === 'fimCommercial' || n === 'fimRewarded') anuncio = false;
+    if (n === 'measure') conferir(!anuncio, 'measure durante anuncio');
+  }
+}
+const res = { cenario, passou: !falhas.length, falhas: [...new Set(falhas)], log };
+document.getElementById('resultado').textContent = 'RESULTADO ' + JSON.stringify(res);
+</script>
+</body>
+</html>

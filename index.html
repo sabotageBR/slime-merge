@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Slime Merge</title>
+<link rel="preload" href="src/ui/fontes/fredoka-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="src/ui/estilo.css">
+<!-- Unico script externo permitido pela Poki. -->
+<script src="https://game-cdn.poki.com/scripts/v2/poki-sdk.js"></script>
+</head>
+<body data-orient="retrato">
+<canvas id="cFundo" class="camada"></canvas>
+<canvas id="cSlime" class="camada"></canvas>
+<canvas id="cTopo" class="camada"></canvas>
+<div id="hud">
+  <header id="topo">
+    <div class="placar">
+      <div class="pontos"><small data-t="pontos">Score</small><b id="pontos">0</b></div>
+      <div class="recorde"><small data-t="recorde">Best</small><b id="recorde">0</b></div>
+    </div>
+    <div class="proximo" id="proximoCaixa"><canvas id="cProximo" width="96" height="96"></canvas><small data-t="proximo">Next</small></div>
+    <div class="gotas clicavel" id="gotasHud" title="💧"><span aria-hidden="true">💧</span><b id="gotas">0</b></div>
+    <button id="bPausa" class="btn redondo" aria-label="Pause">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
+    </button>
+  </header>
+  <div id="area"></div>
+  <div id="meta"></div>
+  <nav id="base"></nav>
+</div>
+<div id="dica" hidden></div>
+<div id="aviso" role="status" aria-live="polite" hidden></div>
+<div id="menu" class="tela" hidden>
+  <div class="cartao menuCartao" role="dialog" aria-modal="true" aria-label="Menu">
+    <div class="abas" role="tablist">
+      <button role="tab" class="aba" data-aba="jogar" aria-selected="true" data-t="abaJogar">Play</button>
+      <button role="tab" class="aba" data-aba="loja" aria-selected="false" data-t="abaLoja">Shop</button>
+      <button role="tab" class="aba" data-aba="missoes" aria-selected="false" data-t="abaMissoes">Missions</button>
+    </div>
+    <section class="painel rolavel" data-painel="jogar">
+      <button class="acao grande" id="bContinuar" data-t="continuar">Continue</button>
+      <div class="modos" id="listaModos"></div>
+      <div class="linha">
+        <button class="acao clara" id="bRecomecar" data-t="recomecar">Restart</button>
+        <button class="acao clara" id="bSom" aria-label="Sound">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="ligado" d="M17 9a4 4 0 0 1 0 6M19.5 6.5a8 8 0 0 1 0 11"/><path class="desligado" d="m17 9 5 6M22 9l-5 6"/></svg>
+        </button>
+      </div>
+    </section>
+    <section class="painel rolavel" data-painel="loja" hidden>
+      <div class="carteira"><span aria-hidden="true">💧</span><b id="lojaGotas">0</b></div>
+      <div class="abasLoja" role="tablist">
+        <button class="abaLoja" data-grupo="cesto" aria-selected="true" data-t="grupoCesto">Jars</button>
+        <button class="abaLoja" data-grupo="cenario" aria-selected="false" data-t="grupoCenario">Places</button>
+        <button class="abaLoja" data-grupo="objeto" aria-selected="false" data-t="grupoObjeto">Slimes</button>
+      </div>
+      <div class="gradeLoja" id="gradeLoja"></div>
+    </section>
+    <section class="painel rolavel" data-painel="missoes" hidden>
+      <div class="sequencia" id="sequencia"></div>
+      <div class="missoes" id="listaMissoes"></div>
+    </section>
+  </div>
+</div>
+<div id="fim" class="tela" hidden>
+  <div class="cartao">
+    <h2 id="fimTitulo" data-t="fim">Overflow!</h2>
+    <div class="placarFim"><b id="fimPontos">0</b><small id="fimSub"></small></div>
+    <div class="ganhoFim" id="fimGanho" hidden><span aria-hidden="true">💧</span><b id="fimGotas">+0</b></div>
+    <button class="acao grande" id="bDeNovo" data-t="deNovo">Play again</button>
+    <div class="linha">
+      <button class="acao anuncio" id="bReviver"><span data-t="reviver">Revive</span><i class="selo" aria-hidden="true">🎬</i></button>
+      <button class="acao anuncio" id="bDobrar"><span data-t="dobrar">×2</span><i class="selo" aria-hidden="true">🎬</i></button>
+    </div>
+    <button class="acao clara" id="bMenuFim" data-t="menu">Menu</button>
+  </div>
+</div>
+<div id="anuncio" class="tela" hidden><div class="cartao"><span>Ad (local test)</span><b id="anNum">3</b></div></div>
+<div id="depuracao" hidden></div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

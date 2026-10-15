@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Slime Merge: estúdio de visuais</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800&display=swap">
+<style>
+/* Mesmo caderno do hub: fichas coladas no papel quadriculado. Aqui as fichas sao botoes de
+   escolha (a selecionada ganha a borda turquesa listrada dos power-ups) e a previa jogavel
+   fica ao lado no desktop e embaixo no celular. */
+:root {
+  --papel: #f3f2ee;
+  --grade: rgba(40, 60, 90, 0.085);
+  --tinta: #17161c;
+  --tinta-suave: #4a4855;
+  --ficha: #ffffff;
+  --turquesa: #5fd9cf;
+  --turquesa-2: #3fbfb5;
+  --laranja: #ff8a2a;
+  --azul: #2a62d6;
+  --display: 'Fredoka', 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --texto: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: light;
+}
+@font-face { font-family: 'Fredoka'; src: url('fredoka-latin-700-normal.woff2') format('woff2'), url('../src/ui/fontes/fredoka-latin-700-normal.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Fredoka'; src: url('fredoka-latin-600-normal.woff2') format('woff2'), url('../src/ui/fontes/fredoka-latin-600-normal.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+* { box-sizing: border-box; }
+body {
+  margin: 0; color: var(--tinta); font-family: var(--texto); font-size: 16px; line-height: 1.5;
+  background-color: var(--papel);
+  background-image: linear-gradient(var(--grade) 1.5px, transparent 1.5px), linear-gradient(90deg, var(--grade) 1.5px, transparent 1.5px);
+  background-size: 28px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 48px;
+}
+.folha { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 360px); gap: 28px; align-items: start; }
+.esquerda { display: flex; flex-direction: column; gap: 30px; min-width: 0; }
+h1, h2 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; line-height: 1.1; }
+h1 { font-size: clamp(1.9rem, 5vw, 2.9rem); color: #fff; -webkit-text-stroke: 0.16em var(--tinta); paint-order: stroke fill; }
+h1 em { font-style: normal; color: var(--turquesa); }
+h2 { font-size: 1.55rem; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+h2 small { font-family: var(--texto); font-size: 0.95rem; font-weight: 700; color: var(--tinta-suave); }
+.lead { margin: 0; max-width: 66ch; color: var(--tinta-suave); }
+.lead b { color: var(--tinta); }
+.rotulo { font-family: var(--display); font-weight: 600; font-size: 0.82rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tinta-suave); }
+.topo { display: flex; flex-direction: column; gap: 10px; grid-column: 1 / -1; }
+.voltar { font-family: var(--display); font-weight: 600; color: var(--azul); text-decoration: none; }
+section { display: flex; flex-direction: column; gap: 14px; }
+.grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; }
+.grade.larga { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.opcao {
+  position: relative; display: flex; flex-direction: column; gap: 0; padding: 0; text-align: left; cursor: pointer; font: inherit; color: inherit;
+  background: var(--ficha); border: 3px solid var(--tinta); border-radius: 16px; box-shadow: 0 4px 0 var(--tinta); overflow: hidden;
+}
+.opcao img { width: 100%; max-width: 100%; display: block; aspect-ratio: 390 / 700; object-fit: cover; border-bottom: 3px solid var(--tinta); background: var(--papel); }
+.larga .opcao img { aspect-ratio: 780 / 500; }
+.opcao .txt { padding: 9px 11px 11px; display: flex; flex-direction: column; gap: 3px; }
+.opcao b { font-family: var(--display); font-weight: 700; font-size: 1.05rem; }
+.opcao span { font-size: 0.88rem; color: var(--tinta-suave); line-height: 1.35; }
+.opcao .num { position: absolute; top: 8px; left: 8px; font-family: var(--display); font-weight: 700; width: 1.9rem; height: 1.9rem; border-radius: 50%;
+  display: grid; place-items: center; background: #fff; border: 2.5px solid var(--tinta); font-size: 1rem; }
+.opcao .atual { position: absolute; top: 9px; right: 8px; font-family: var(--display); font-weight: 600; font-size: 0.75rem; background: var(--tinta); color: #fff; border-radius: 999px; padding: 2px 8px; }
+.opcao[aria-pressed="true"] { outline: 5px solid var(--turquesa); outline-offset: 2px; box-shadow: 0 4px 0 var(--tinta), 0 0 0 9px var(--turquesa-2); }
+.opcao[aria-pressed="true"] .num { background: var(--turquesa); color: #fff; -webkit-text-stroke: 0.1em var(--tinta); paint-order: stroke fill; }
+.opcao:focus-visible { outline: 3px dashed var(--azul); outline-offset: 3px; }
+
+.previa { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); display: flex; flex-direction: column; gap: 12px;
+  background: var(--ficha); border: 3px solid var(--tinta); border-radius: 22px; box-shadow: 0 5px 0 var(--tinta); padding: 16px; }
+.previa iframe { width: 100%; max-width: 100%; aspect-ratio: 390 / 700; border: 3px solid var(--tinta); border-radius: 16px; background: var(--papel); display: block; }
+.escolha { font-family: var(--display); font-weight: 600; font-size: 1rem; line-height: 1.4; }
+.escolha output { display: block; font-family: var(--texto); font-weight: 800; color: var(--azul); }
+.linha { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { font-family: var(--display); font-weight: 700; font-size: 1rem; border: 3px solid var(--tinta); border-radius: 14px; padding: 8px 14px; min-height: 44px; cursor: pointer;
+  background: #fff; color: var(--tinta); box-shadow: 0 3px 0 var(--tinta); }
+.btn.forte { background: var(--laranja); color: #fff; -webkit-text-stroke: 0.08em var(--tinta); paint-order: stroke fill; }
+.btn[aria-pressed="true"] { background: var(--turquesa); }
+.btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--tinta); }
+.dica { font-size: 0.85rem; color: var(--tinta-suave); margin: 0; }
+@media (max-width: 900px) {
+  .folha { grid-template-columns: minmax(0, 1fr); }
+  .previa { position: static; }
+  .esquerda { order: 3; }
+  .previa iframe { max-width: 360px; margin: 0 auto; }
+}
+@media (prefers-reduced-motion: reduce) { .btn:active { transform: none; } }
+</style>
+</head>
+<body>
+<main class="folha">
+  <header class="topo">
+    <a class="voltar" href="index.html">← os 5 modelos</a>
+    <span class="rotulo">Para escolher · 2026-10-14</span>
+    <h1>Estúdio de <em>visuais</em></h1>
+    <p class="lead">Escolha um <b>cesto</b>, um <b>cenário</b> e um <b>personagem</b>. Toque numa ficha e a prévia ao lado já mostra a combinação no jogo de verdade. O cesto também muda a física, porque o slime toma a forma dele: o aquário redondo e a xícara têm a boca mais estreita, e o caldeirão faz a pilha rolar para o meio. Os prints usam a mesma partida para a comparação ser justa.</p>
+  </header>
+  <div class="esquerda">
+
+    <section id="cestos" aria-labelledby="t-cestos">
+      <h2 id="t-cestos">Cestos <small>8 formatos</small></h2>
+      <div class="grade" data-grupo="cesto">
+        <button class="opcao" data-id="pote"><img src="../docs/visuais/cestos-pote.jpg" alt="Pote de paredes listradas" loading="lazy"><i class="num">1</i><span class="txt"><b>Pote listrado</b><span>O do conceito: paredes retas e listradas, fácil de ler.</span></span></button>
+        <button class="opcao" data-id="vime"><img src="../docs/visuais/cestos-vime.jpg" alt="Cesta de vime trançada" loading="lazy"><i class="num">2</i><span class="txt"><b>Cesta de vime</b><span>Trançada à mão, cantos redondos e borda de trança.</span></span></button>
+        <button class="opcao" data-id="aquario"><img src="../docs/visuais/cestos-aquario.jpg" alt="Aquário redondo de vidro" loading="lazy"><i class="num">3</i><span class="txt"><b>Aquário redondo</b><span>Vidro com cascalho: o slime escorre pela curva. Boca estreita, mais difícil.</span></span></button>
+        <button class="opcao" data-id="becher"><img src="../docs/visuais/cestos-becher.jpg" alt="Béquer de laboratório com marcas" loading="lazy"><i class="num">4</i><i class="atual">escolhido</i><span class="txt"><b>Béquer</b><span>Vidro de laboratório com marcas de ml e reflexo na frente.</span></span></button>
+        <button class="opcao" data-id="balde"><img src="../docs/visuais/cestos-balde.jpg" alt="Balde de madeira com alça" loading="lazy"><i class="num">5</i><span class="txt"><b>Balde de madeira</b><span>Tábuas, aros de metal e alça de arame.</span></span></button>
+        <button class="opcao" data-id="caldeirao"><img src="../docs/visuais/cestos-caldeirao.jpg" alt="Caldeirão de ferro com brilho verde" loading="lazy"><i class="num">6</i><span class="txt"><b>Caldeirão</b><span>Ferro com pés e brilho verde. Fundo redondo: a pilha rola para o meio.</span></span></button>
+        <button class="opcao" data-id="xicara"><img src="../docs/visuais/cestos-xicara.jpg" alt="Xícara de porcelana com pires" loading="lazy"><i class="num">7</i><span class="txt"><b>Xícara</b><span>Porcelana com pires e alça. Fundo estreito, abre muito em cima.</span></span></button>
+        <button class="opcao" data-id="vidro"><img src="../docs/visuais/cestos-vidro.jpg" alt="Pote de vidro com rosca" loading="lazy"><i class="num">8</i><span class="txt"><b>Pote de vidro</b><span>Vidro com rosca e ombro na boca.</span></span></button>
+      </div>
+    </section>
+
+    <section id="cenarios" aria-labelledby="t-cenarios">
+      <h2 id="t-cenarios">Cenários <small>8 lugares</small></h2>
+      <div class="grade" data-grupo="cenario">
+        <button class="opcao" data-id="caderno"><img src="../docs/visuais/cenarios-caderno.jpg" alt="Papel quadriculado" loading="lazy"><i class="num">1</i><span class="txt"><b>Caderno</b><span>Papel quadriculado neutro: o slime é o destaque.</span></span></button>
+        <button class="opcao" data-id="laboratorio"><img src="../docs/visuais/cenarios-laboratorio.jpg" alt="Laboratório com azulejos e prateleira de vidrarias" loading="lazy"><i class="num">2</i><span class="txt"><b>Laboratório</b><span>Azulejos, bancada e uma prateleira de vidrarias.</span></span></button>
+        <button class="opcao" data-id="cozinha"><img src="../docs/visuais/cenarios-cozinha.jpg" alt="Cozinha com azulejo xadrez amarelo" loading="lazy"><i class="num">3</i><span class="txt"><b>Cozinha</b><span>Azulejo xadrez, janela e bancada de madeira.</span></span></button>
+        <button class="opcao" data-id="mar"><img src="../docs/visuais/cenarios-mar.jpg" alt="Fundo do mar com algas e bolhas" loading="lazy"><i class="num">4</i><span class="txt"><b>Fundo do mar</b><span>Raios de luz, algas balançando e bolhas subindo.</span></span></button>
+        <button class="opcao" data-id="espaco"><img src="../docs/visuais/cenarios-espaco.jpg" alt="Espaço com estrelas e planeta" loading="lazy"><i class="num">5</i><span class="txt"><b>Espaço</b><span>Estrelas piscando, planeta com anel e chão de crateras.</span></span></button>
+        <button class="opcao" data-id="doceria"><img src="../docs/visuais/cenarios-doceria.jpg" alt="Doceria rosa com granulado" loading="lazy"><i class="num">6</i><span class="txt"><b>Doceria</b><span>Granulado, cobertura escorrendo e piso xadrez rosa.</span></span></button>
+        <button class="opcao" data-id="jardim"><img src="../docs/visuais/cenarios-jardim.jpg" alt="Jardim com nuvens e flores" loading="lazy"><i class="num">7</i><i class="atual">escolhido</i><span class="txt"><b>Jardim</b><span>Céu com nuvens passando, morros e flores na grama.</span></span></button>
+        <button class="opcao" data-id="quarto"><img src="../docs/visuais/cenarios-quarto.jpg" alt="Quarto com papel de parede listrado" loading="lazy"><i class="num">8</i><span class="txt"><b>Quarto</b><span>Papel de parede listrado, quadro e mesa de madeira.</span></span></button>
+      </div>
+    </section>
+
+    <section id="objetos" aria-labelledby="t-objetos">
+      <h2 id="t-objetos">Personagens <small>8 estilos</small></h2>
+      <div class="grade larga" data-grupo="objeto">
+        <button class="opcao" data-id="classico"><img src="../docs/visuais/objetos-classico.jpg" alt="Slimes com olhos grandes" loading="lazy"><i class="num">1</i><i class="atual">escolhido</i><span class="txt"><b>Clássico</b><span>Olhos grandes que seguem o slime da vez.</span></span></button>
+        <button class="opcao" data-id="kawaii"><img src="../docs/visuais/objetos-kawaii.jpg" alt="Slimes kawaii com bochechas rosadas" loading="lazy"><i class="num">2</i><span class="txt"><b>Kawaii</b><span>Olhos com brilho, bochechas rosadas e boquinha.</span></span></button>
+        <button class="opcao" data-id="bichinhos"><img src="../docs/visuais/objetos-bichinhos.jpg" alt="Slimes com orelhas de gato, urso e coelho" loading="lazy"><i class="num">3</i><span class="txt"><b>Bichinhos</b><span>Orelhas de gato, urso ou coelho conforme o nível, com focinho.</span></span></button>
+        <button class="opcao" data-id="monstrinhos"><img src="../docs/visuais/objetos-monstrinhos.jpg" alt="Slimes monstrinhos com chifres e um olho" loading="lazy"><i class="num">4</i><span class="txt"><b>Monstrinhos</b><span>Chifres, ciclope nos níveis ímpares e dentinhos.</span></span></button>
+        <button class="opcao" data-id="chapeus"><img src="../docs/visuais/objetos-chapeus.jpg" alt="Slimes com chapéus diferentes" loading="lazy"><i class="num">5</i><span class="txt"><b>Chapéus por nível</b><span>Do laço à coroa de rei: a evolução aparece no próprio slime.</span></span></button>
+        <button class="opcao" data-id="boneco"><img src="../docs/visuais/objetos-boneco.jpg" alt="Slimes com olhos de boneco" loading="lazy"><i class="num">6</i><span class="txt"><b>Olhos de boneco</b><span>Pupilas soltas que caem e balançam quando o slime se mexe.</span></span></button>
+        <button class="opcao" data-id="frutinhas"><img src="../docs/visuais/objetos-frutinhas.jpg" alt="Slimes de frutinha com folha" loading="lazy"><i class="num">7</i><span class="txt"><b>Frutinhas</b><span>Folha, cabinho e sementinhas, com um rosto menor.</span></span></button>
+        <button class="opcao" data-id="docinho"><img src="../docs/visuais/objetos-docinho.jpg" alt="Slimes sem rosto, brilhantes como bala" loading="lazy"><i class="num">8</i><span class="txt"><b>Docinho</b><span>Sem rosto: bala brilhante com cristais de açúcar.</span></span></button>
+      </div>
+    </section>
+  </div>
+
+  <aside class="previa" aria-label="Prévia da combinação">
+    <span class="rotulo">Prévia jogável</span>
+    <iframe id="jogo" title="Prévia do jogo com a combinação escolhida" src="../index.html?modelo=1" data-jogo="1"></iframe>
+    <div class="linha" role="group" aria-label="Modelo da prévia">
+      <button class="btn" data-modelo="1" aria-pressed="true">Merge Lab</button>
+      <button class="btn" data-modelo="2" aria-pressed="false">Croma</button>
+      <button class="btn" data-modelo="5" aria-pressed="false">Duelo</button>
+    </div>
+    <p class="escolha">Sua escolha:<output id="resumo">Béquer · Jardim · Clássico</output></p>
+    <div class="linha">
+      <button class="btn forte" id="copiar">Copiar a escolha</button>
+      <button class="btn" id="limpar">Voltar ao escolhido</button>
+    </div>
+    <p class="dica" id="aviso">A escolha fica salva neste navegador e vale também quando você abre os modelos pelo hub.</p>
+  </aside>
+</main>
+<script>
+(() => {
+  const CHAVE = 'slime.visual';
+  const PADRAO = { cesto: 'becher', cenario: 'jardim', objeto: 'classico' };
+  let escolha = { ...PADRAO };
+  try { escolha = { ...PADRAO, ...(JSON.parse(localStorage.getItem(CHAVE) || '{}') || {}) }; } catch { /* sem armazenamento */ }
+  const jogo = document.getElementById('jogo');
+  const base = jogo.getAttribute('src');
+  let modelo = '1';
+  const nomeDe = (grupo, id) => {
+    const b = document.querySelector(`[data-grupo="${grupo}"] [data-id="${id}"] b`);
+    const n = document.querySelector(`[data-grupo="${grupo}"] [data-id="${id}"] .num`);
+    return b ? `${n.textContent}. ${b.textContent}` : id;
+  };
+  function marcar() {
+    for (const g of document.querySelectorAll('[data-grupo]')) {
+      const grupo = g.dataset.grupo;
+      for (const b of g.querySelectorAll('.opcao')) b.setAttribute('aria-pressed', String(b.dataset.id === escolha[grupo]));
+    }
+    document.getElementById('resumo').textContent = `Cesto ${nomeDe('cesto', escolha.cesto)} · Cenário ${nomeDe('cenario', escolha.cenario)} · Personagem ${nomeDe('objeto', escolha.objeto)}`;
+  }
+  function recarregar() {
+    try { localStorage.setItem(CHAVE, JSON.stringify(escolha)); } catch { /* sem armazenamento */ }
+    // a pagina do jogo le a escolha ao abrir: troca o endereco (com um numero novo) para recarregar
+    const url = base.includes('index.html') ? base.replace(/modelo=[^&]*/, 'modelo=' + modelo) : base.replace(/jogo-[^.]+\.html/, `jogo-${modelo}.html`);
+    jogo.src = url + (url.includes('?') ? '&' : '?') + 'v=' + Date.now();
+  }
+  for (const g of document.querySelectorAll('[data-grupo]')) {
+    g.addEventListener('click', (e) => {
+      const b = e.target.closest('.opcao');
+      if (!b) return;
+      escolha[g.dataset.grupo] = b.dataset.id;
+      marcar();
+      recarregar();
+    });
+  }
+  for (const b of document.querySelectorAll('[data-modelo]')) {
+    b.addEventListener('click', () => {
+      modelo = b.dataset.modelo;
+      for (const x of document.querySelectorAll('[data-modelo]')) x.setAttribute('aria-pressed', String(x === b));
+      recarregar();
+    });
+  }
+  document.getElementById('limpar').addEventListener('click', () => { escolha = { ...PADRAO }; marcar(); recarregar(); });
+  document.getElementById('copiar').addEventListener('click', () => {
+    const txt = document.getElementById('resumo').textContent;
+    const aviso = document.getElementById('aviso');
+    const selecionar = () => {
+      const r = document.createRange();
+      r.selectNodeContents(document.getElementById('resumo'));
+      const s = getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+      aviso.textContent = 'Texto selecionado: copie e cole na conversa.';
+    };
+    try {
+      navigator.clipboard.writeText(txt).then(() => { aviso.textContent = 'Copiado. Cole na conversa para eu aplicar.'; }, selecionar);
+    } catch { selecionar(); }
+  });
+  marcar();
+  recarregar();
+})();
+</script>
+</body>
+</html>
