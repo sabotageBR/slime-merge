@@ -6,12 +6,10 @@
 
 import { criarSoltar } from '../soltar.js';
 import { NIVEIS, particulasNivel, pontosNivel } from '../niveis.js';
-import { pintar, pigmentoMedio } from '../../cor/difusao.js';
-import { hexDaMistura } from '../../cor/km.js';
+import { pintarCinza, taxaCinza, passoCinza } from '../cinza.js';
 import { colorir, transmutar, tabelaDaPartida, ligarAparencias } from './merge.js';
 
 const PESOS = [34, 28, 22, 16];
-const CINZA = [0, 0, 0, 0.1];
 const CPU = [
   { espera: 1.25, erro: 2.2 },
   { espera: 0.95, erro: 1.2 },
@@ -40,12 +38,8 @@ export function criarModo(o = {}) {
     const s = S.mundo.criarSlime({ x, y, n: particulasNivel(spec.nivel), material: 'gelatina', nivel: spec.nivel, preso });
     if (!s) return null;
     s.dados.pote = J.idx;
-    if (spec.cinza) {
-      s.dados.cinza = true;
-      s.dados.hex = '#8a8a90';
-      s.dados.expr = 'bravo';
-      pintar(S.mundo, s, CINZA);
-    } else {
+    if (spec.cinza) pintarCinza(S.mundo, s);
+    else {
       s.dados.hex = ap(spec.nivel).hex;
       colorir(S.mundo, s, ap(spec.nivel));
     }
@@ -127,20 +121,11 @@ export function criarModo(o = {}) {
         }
       }
       // cinza que pegou cor vira nivel 1 normal
-      for (const s of m.slimes) {
-        if (!s.ativo || !s.dados.cinza || s.preso) continue;
-        const pig = pigmentoMedio(m, s);
-        s.dados.hex = hexDaMistura(pig);
-        // conta o pigmento colorido absorvido (a mistura pode sair sem croma, e ainda conta)
-        if (pig[0] + pig[1] + pig[2] > 0.22) {
-          s.dados.cinza = false;
-          s.dados.expr = 'feliz';
-          s.dados.exprT = 0.6;
-          s.nivel = 1;
-          transmutar(m, s, ap(1), s.cx, s.cy);
-          S.eventos.push({ tipo: 'som', nome: 'graduar' });
-        }
-      }
+      passoCinza(m, (s) => {
+        s.nivel = 1;
+        transmutar(m, s, ap(1), s.cx, s.cy);
+        S.eventos.push({ tipo: 'som', nome: 'graduar' });
+      });
     },
     transbordou(S, J) {
       // perde a rodada quem transbordar
@@ -181,14 +166,7 @@ export function criarModo(o = {}) {
   ligarAparencias(jogo, AP, (s) => !!s.dados.cinza);
 
   // gosma cinza: troca de pigmento entre slimes diferentes so quando um deles e cinza
-  const S0 = () => jogo.S;
-  const taxa = (a, b) => {
-    const sl = S0().mundo.slimes;
-    const A = sl[a];
-    const B = sl[b];
-    return (A.dados.cinza ? 1 : 0) + (B.dados.cinza ? 1 : 0) === 1 ? 2.5 : 0;
-  };
-  jogo.S.R.difusao.entreSlimes = taxa;
+  jogo.S.R.difusao.entreSlimes = taxaCinza(() => jogo.S.mundo);
 
   const tecla = jogo.tecla;
   jogo.tecla = (codigo, baixo) => {

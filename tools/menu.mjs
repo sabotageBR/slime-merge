@@ -43,9 +43,14 @@ for (const [W, H] of tamanhos) {
     if (await c.avaliar('document.getElementById("aviso").hidden')) falhas.push('o aviso da sequencia nao apareceu');
     await foto('1-jogo');
 
-    // fim com pontos: gotas pela raiz dos pontos, e o dobrar (video simulado de 3 s)
+    // o sem fim nao acaba (2.0.0): o transbordo depois dos 3 min e um "Ufa!" e o jogo segue
+    await c.avaliar('(() => { const S = __slime.J.modo.S; S.tempo = 999; S.jogadores[0].pote.perigoT = 9; })()');
+    await espera(500);
+    if ((await estado()) !== 'jogando') falhas.push('o sem fim acabou no transbordo: ' + (await estado()));
+    // fim com pontos (a tela de fim do desafio e do duelo; aqui com o resgate permanente desligado):
+    // gotas pela raiz dos pontos, e o dobrar (video simulado de 3 s)
     const antes = await c.avaliar('__slime.perfil.gotas');
-    await c.avaliar('(() => { const S = __slime.J.modo.S; S.jogadores[0].pontos = 10000; S.tempo = 999; S.jogadores[0].pote.perigoT = 9; })()');
+    await c.avaliar('(() => { const S = __slime.J.modo.S; S.R.resgatarSempre = () => false; S.jogadores[0].pontos = 10000; S.tempo = 999; S.jogadores[0].pote.perigoT = 9; })()');
     await espera(700);
     if ((await estado()) !== 'fim') falhas.push('o fim nao apareceu: ' + (await estado()));
     const ganho = await c.avaliar('document.getElementById("fimGotas").textContent');

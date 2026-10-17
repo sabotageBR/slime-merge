@@ -168,3 +168,18 @@ Pedidos com prints anotados do Merge Lab (plano em
 - Bugs achados no caminho: dois 12 que estouravam registravam um "nível 13" (gotas e `visto`;
   migração do perfil versão 2); a tesoura dividia em dois iguais que se fundiam de novo no
   quadro seguinte (pontos de graça) e não repintava os pedaços.
+
+## 2026-10-17: Player Fit Test da 1.2.0 e a pressão do sem fim (2.0.0)
+- Pedido: "analise o player fit test e crie um plano de como aumentar drasticamente a retenção". A
+  análise (5m27s, a curva igual à da 1.1.1, só 8% das partidas chegando ao fim, a novidade acabando no
+  minuto 3) está em `docs/producao.md`; o plano, em
+  `~/.claude/plans/analise-o-player-fit-delightful-penguin.md`.
+- **Estrutura: "Sem fim com pressão"** (entre mundos, pressão e os dois em A/B): uma partida só, com a
+  escada das gotas e um evento a cada ~60 s.
+- **Derrota: "Nunca"**: o "Ufa!" vale sempre no sem fim (o desafio do dia continua perdendo).
+- **Intervalo comercial: nas pausas naturais, do 3º em diante** (a opção recomendada, escrita para os
+  mundos): sem mundos, a pausa natural é o fim de um evento, a partir do 3º, com 150 s de jogo desde o
+  anterior.
+- **Pendente:** aprovar o visual dos eventos pelas folhas `docs/visuais/eventos-390x844.jpg` e
+  `eventos-1031x580.jpg` (aviso no pote, pílula com ícone e contagem, gosma cinza, "Evolução!"), antes de
+  enviar a 2.0.0 e pedir dois Player Fit Tests.

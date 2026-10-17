@@ -9,6 +9,8 @@ import { svgIcone, ICONE_MISSAO } from './icones.js';
 
 /** Premios de marco (o 5o espaco): placa dourada. */
 const PREMIOS = ['calor', 'gelo', 'tesoura', 'tinta'];
+/** Icone de cada evento da pressao do sem fim (src/jogo/pressao.js) na pilula da meta. */
+const ICONE_EVENTO = { coringas: '🌈', gosma: '☁️', pedido: '🎯', terremoto: '〰️', gigante: '⬇️', calor: '🔥', gelo: '❄️' };
 
 /** Icones dos prototipos (Croma, Loja e Molde); os dos reforcos estao em src/ui/icones.js. */
 const ICONES_PROTOTIPOS = {
@@ -284,7 +286,14 @@ export function criarHud(doc, T) {
           // a meta da vez: a pilula com a bolinha do nivel e o alvo pulsando na barra. No meio da
           // partida ela alterna com uma meta curta (missao do dia ou meta da partida) e o progresso
           const mi = ob && ob.missao;
+          const ev = ob && ob.evento;
+          // o evento: icone, nome (no pedido, o nivel pedido) e a contagem do tempo que resta
+          const resta = ev && ev.resta > 0 ? ` · ${ev.resta}s` : '';
           const pilula = !ob ? ''
+            : ev
+              ? `<div class="objetivo evento ${ev.tipo}${ev.aviso ? ' aviso' : ''}${ev.ok ? ' ok' : ''}"><b aria-hidden="true">${ICONE_EVENTO[ev.id] || '•'}</b>`
+                + (ev.id === 'pedido' && ev.alvo ? `<span>${texto('pilula.pedido', {})}</span>${bola(ev.alvo)}<span>${ev.ok ? ' ✓' : resta}</span>` : `<span>${texto('ev.' + ev.id, {})}${resta}</span>`)
+                + '</div>'
             : mi
               ? `<div class="objetivo missao"><b aria-hidden="true">${ICONE_MISSAO[mi.tipo] || '•'}</b><span>${texto('missao.' + mi.tipo, { n: mi.meta })} · ${mi.prog}/${mi.meta} · +${mi.premio} 💧</span></div>`
               : `<div class="objetivo${ob.cresce ? ' cresce' : ''}">${bola(ob.nivel)}<span>${texto(ob.cresce ? 'objetivoCresce' : 'objetivoProximo', { n: ob.nivel })}${ob.premio ? ` · +${ob.premio} 💧` : ''}</span></div>`;

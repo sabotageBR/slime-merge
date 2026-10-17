@@ -120,3 +120,50 @@ Test").
   - Verificado com `npm test` (138), `npm run menu`, `jogar 1 5`, `sdkcheck`, `telas`, os eventos novos no
     Chrome em tempo real, toque com CPU 12× mais lenta (média → baixa → mínima) e a build aberta.
     `dist-poki/slime-merge-1.2.0.zip` (325 KB gzip).
+- **Player Fit Test da 1.2.0** (16/10 21:45, 500 gameplays): **5m27s**. Histograma 94 · 94 · 71 · 36 · 33 ·
+  172 (3m+ 48%, 5m+ 34%); a série 1.0.0 5m32 · 1.1.1 5m01/5m07 · 1.2.0 5m27 está parada. Game Events (637
+  gameplays: 312 celular, 246 desktop, ~79 tablet):
+  - curva `tempo/N/min` 70 · 55 · 44 · 36 · 29% (5 min) · 12% (10) · 4% (20); de quem toca, 78/62/49/32%,
+    igual à 1.1.1: ~20% saem a cada minuto, do 1 ao 5, no celular e no desktop;
+  - **só 8% das partidas chegam ao fim** (`partida/fim`, todas nos níveis 9 a 13): 92% saem com o pote vivo.
+    De quem perde, 57% clicam em "de novo";
+  - a novidade acaba no minuto 3: alcançam o nível 6 81%, o 7 69%, o 8 55%, o 9 40%, o 10 27%, o 11 ~12%,
+    o 12 ~6% e o 13 ~4%;
+  - metajogo: só 5% abrem o menu; o Hexa Drop já mostrou que barra, prêmio e skins não mexem na perda por minuto;
+  - celular: 69% caem para a qualidade baixa ou mínima no minuto 0; `fps/0` 6% (min 1), 19% (3) e 22% (5);
+    o desktop, a 55+ fps, perde 55% do min 1 ao 5 (o celular, 64%);
+  - furos: `fps1/*` não chegou nenhuma vez (a única categoria com dígito) e `sair/*` (só
+    `visibilitychange`) pegou ~100 das ~450 saídas.
+- **Retenção, versão 2.0.0** (2026-10-17; plano em `~/.claude/plans/analise-o-player-fit-delightful-penguin.md`;
+  escolhas do usuário: **sem fim com pressão, sem derrota, intervalo nas pausas naturais**, `docs/autoria.md`):
+  - **escada** (`src/jogo/pressao.js`): do nível 9 em diante cada nível novo sobe o piso das gotas, até o
+    teto 4 (caem 4 a 8, pesos 40/30/18/9/3); os slimes abaixo do piso evoluem ("Evolução!"), a fila e o
+    preso também. Com a pressão, o coringa não funde com o maior nível da partida: na chuva de
+    coringas o bot subia do 9 ao 13 em 12 s;
+  - **agenda:** um evento a cada 60 s a partir dos 90 s, avisado 2 s antes no pote e na pílula (contagem
+    nos que acabam pelo relógio): coringas (3 prismas), gosma cinza (3 + ⌊max/4⌋, do tamanho do piso;
+    `src/jogo/cinza.js`, a mesma do Duelo), pedido ("faça um nível X" em 45 s: prêmio físico e 15 gotas),
+    terremoto (3 chacoalhadas), gota gigante (até o 9), calor (5 s) e gelo (8 s). O estado vai no save;
+    a partida da 1.2.0 ganha agenda 30 s depois de voltar e evolui o que ficou abaixo do piso;
+  - **sem derrota:** o "Ufa!" vale a partida inteira (`resgatarSempre`) e zera o combo; o sem fim não tem
+    mais tela de fim (o desafio e o Duelo têm); as gotas dos pontos (mesma conta do fim) entram em cada
+    nível novo e no fim de cada evento, com a missão de pontos (`pagarParcial`; `pagos` vai no save);
+  - **intervalo comercial:** no fim de um evento, a partir do 3º, sem mira armada, com 150 s de jogo desde o
+    anterior; antes o sem fim quase não tinha intervalo (só no "de novo");
+  - **telemetria:** `evento/<id>/start`, `evento/pedido/<ok|falhou>`, `escada/p<piso>/m<min>`,
+    `ritmo/n<nivel>/m<min>` (o minuto de cada nível novo), `intervalo/evento/show`; `fps1` virou `fpsini`;
+    `sair` também no `pagehide`; `partida/ufa` vale em qualquer minuto; o sem fim não manda `level/N/fail`;
+  - defeito: o Alargar já usado oferecia vídeo, e o +1 nunca servia: agora fica cinza e sem 🎬;
+  - **ritmo simulado** (bot a cada 2 s, que chega ao 9 entre 104 e 214 s como o jogador real; 3 sementes):
+    12 entre 376 e 517 s (na 1.2.0, o jogador real levava ~16 min), 0 a 4 resgates em 10 min, 700 a 835
+    partículas no minuto 8 (sem a pressão, 628 a 715);
+  - **válvula de física do celular: medida e fora.** `iter` 3 → 2 economiza ~5% e o pote dorme menos
+    (1 de 6 slimes dormindo contra 5 de 6); fica para decidir pela telemetria `custo/*` da 2.0.0 (próximas
+    alavancas: partículas maiores nos slimes grandes, que mudam o visual, ou 3 subpassos);
+  - prints para a aprovação do usuário: `docs/visuais/eventos-390x844.jpg` e `eventos-1031x580.jpg`
+    (`node tools/prints-eventos.mjs`);
+  - verificado com `npm test` (148), `npm run menu`, `jogar 1 5`, `sdkcheck` (o "normal" falhou uma vez por
+    tempo com a CPU ocupada e passou de novo), `telas` e os prints dos eventos em retrato e paisagem;
+  - **metas do próximo teste (2 PFTs):** média ≥ 7:00; 5m+ ≥ 45%; 3m+ ≥ 58%; 1–2m ≤ 14%; `tempo/10/min` ≥
+    20%; perda por minuto do 1 ao 5 ≤ 14%; nível 10 na mediana ≤ 4 min; nível 13 para ≥ 20%; `fps/0/m5` no
+    celular ≤ 10%.

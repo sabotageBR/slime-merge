@@ -57,7 +57,8 @@ const nomes = () => log.map((l) => l[1]);
 const ultimoGameplay = () => nomes().filter((n) => n.startsWith('gameplay')).at(-1);
 const ponteiro = (tipo, x, y) => w().dispatchEvent(new (w().PointerEvent)(tipo, { clientX: x, clientY: y, pointerId: 1, bubbles: true }));
 const clicar = (id) => w().document.getElementById(id).click();
-const perder = () => { const s = S().J.modo.S; s.tempo = 999; s.jogadores[0].pote.perigoT = 9; };
+// o sem fim nao acaba (2.0.0): para ver a tela de fim (a do desafio e do duelo), o resgate permanente sai
+const perder = () => { const s = S().J.modo.S; s.R.resgatarSempre = () => false; s.tempo = 999; s.jogadores[0].pote.perigoT = 9; };
 
 await espera(1200);
 conferir(!!S(), 'jogo nao subiu (sem __slime)');

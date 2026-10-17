@@ -35,6 +35,7 @@ export const MISSIL = Object.freeze({ choro: 0.3, impacto: 0.75 });
  * @property {number} [largura]  largura do pote no comeco da partida (o Merge Lab nasce estreito)
  * @property {(S: any, J: any, s: any, id: string) => boolean} [aplicar]  reforco de alvo do modo
  * @property {(S: any) => boolean} [semReforcos]  true = sem reforcos (Duelo de 2 jogadores: so o 1 teria)
+ * @property {(S: any) => boolean} [resgatarSempre]  true = o "Ufa!" vale a partida inteira (sem fim, sem derrota)
  * @property {(S: any) => any} [salvar]
  * @property {(S: any, p: any) => void} [restaurar]
  */
@@ -118,6 +119,8 @@ export function criarSoltar(R, o = {}) {
 
   function usarPoder(J, id) {
     if (S.acabou || J.perdeu || semReforcos()) return;
+    // o Alargar so abre uma vez por partida: depois disso o botao nao oferece video (o +1 nao serviria)
+    if (id === 'alargar' && J.pote.alargado) return;
     if (BASE.includes(id) && !(J.poderes[id] > 0)) {
       // reforco acabado: o botao mostra o selo do video; o main.js pede o rewarded
       if (!J.semVideo) eventos.push({ tipo: 'pedirVideo', id });
@@ -227,10 +230,13 @@ export function criarSoltar(R, o = {}) {
   function transbordou(J) {
     if (R.transbordou && R.transbordou(S, J)) return;
     // os 3 primeiros minutos nao punem (regra da Poki para a sessao 0): todo transbordo
-    // nesse tempo estoura o topo da pilha com um "Ufa!"
-    if (S.tempo < 180) {
+    // nesse tempo estoura o topo da pilha com um "Ufa!". No sem fim (2.0.0) vale sempre, e o
+    // custo e a aposta: o topo estoura e o combo zera
+    if (S.tempo < 180 || (R.resgatarSempre && R.resgatarSempre(S))) {
       J.resgatou = true;
       tirarTopo(J, 3);
+      J.pote.combo = 0;
+      J.pote.comboT = 0;
       eventos.push({ tipo: 'texto', x: J.pote.cx, y: 9, texto: 'ufa', cor: '#ffd23a', escala: 1.4 });
       // telemetria: quantos resgates e em que minuto (o main.js mede)
       if (J.idx === 0) eventos.push({ tipo: 'resgate' });
@@ -393,7 +399,11 @@ export function criarSoltar(R, o = {}) {
         proximoNivel: prox && !prox.prisma ? prox.nivel || 0 : 0,
         // sem reforcos os botoes ficam escondidos (o prototipo do Duelo vira 2 jogadores no meio)
         poderes: [
-          ...BASE.map((id) => ({ id, qtd: J.poderes[id], ativo: J.alvoPoder === id || (id === 'mira' && !!J.missil), video: J.poderes[id] === 0 && !J.semVideo && !(id === 'mira' && J.missil), oculto: semReforcos() })),
+          ...BASE.map((id) => {
+            // Alargar ja usado: cinza e sem o selo do video (nao abre de novo nesta partida)
+            const gasto = id === 'alargar' && J.pote.alargado;
+            return { id, qtd: gasto ? 0 : J.poderes[id], ativo: J.alvoPoder === id || (id === 'mira' && !!J.missil), video: !gasto && J.poderes[id] === 0 && !J.semVideo && !(id === 'mira' && J.missil), oculto: semReforcos() };
+          }),
           ...(R.premios ? PREMIOS.map((id) => ({ id, qtd: 1, oculto: J.premio !== id || semReforcos(), ativo: J.alvoPoder === id })) : []),
         ],
       };

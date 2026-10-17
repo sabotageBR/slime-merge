@@ -182,6 +182,13 @@ body[data-orient="paisagem"] #meta { flex-direction: row; justify-content: cente
   border: 0.15em solid var(--tinta); box-shadow: 0 0.14em 0 var(--tinta); font-size: 0.82em; white-space: nowrap; }
 .objetivo.cresce { background: #e4faf7; }
 .objetivo.missao { background: #fff4d1; }
+/* eventos da pressao do sem fim: a cor pelo tipo; o aviso (2 s antes) pulsa */
+.objetivo.evento.alivio { background: #e3f9dc; }
+.objetivo.evento.aperto { background: #ffe2d6; }
+.objetivo.evento.meta { background: #fff4d1; }
+.objetivo.evento.caos { background: #ddf3ff; }
+.objetivo.evento.aviso { animation: avisoEvento 0.5s ease-in-out infinite; }
+@keyframes avisoEvento { 50% { transform: scale(1.12); } }
 .objetivo b { font-size: 1.1em; line-height: 1; padding-left: 0.15em; }
 .objetivo i, .quase i, #revelacao .bola { display: inline-grid; place-items: center; border-radius: 50%; border: 0.12em solid var(--tinta);
   font-style: normal; color: #fff; background: #2c2c34; }

@@ -25,6 +25,8 @@
 //   ?sons=fusao:bolha,musica:lofi   variantes do Estudio de sons (src/som/catalogo.js)
 //   ?qualidade=0..3    fixa a qualidade do render (alta, media, baixa, minima) e desliga a adaptativa
 //   ?revelar=7         cartao de slime novo do nivel 7 parado na tela (prints)
+//   ?pressao=0         sem fim sem a pressao da 2.0.0 (escada, eventos e o "Ufa!" permanente), para comparar
+//   ?evento=gosma      o primeiro evento da agenda e esse, ja (coringas, gosma, pedido, terremoto, gigante, calor, gelo)
 //
 // Fora disso, so o banco de testes de tools/sdkcheck.html liga os ganchos
 // (window.__slimeTeste = { modelo }); "local" continua falso, para o jogo se comportar
@@ -34,7 +36,7 @@ export function lerDepuracao() {
   const base = {
     local: false, ganchos: false, modelo: '', debug: false, semente: 0, passos: 0, auto: 0,
     semAnuncio: false, lang: '', semHud: false, render: '', material: '', raio: 0, limiar: 0, zoom: null,
-    filme: 0, cada: 4, vitrine: 0, cesto: '', cenario: '', objeto: '', bot: '', poder: '', expr: '', demoReforcos: false, skins: '', qualidade: -1, revelar: 0, sons: /** @type {Record<string, string>} */ ({}),
+    filme: 0, cada: 4, vitrine: 0, cesto: '', cenario: '', objeto: '', bot: '', poder: '', expr: '', demoReforcos: false, skins: '', qualidade: -1, revelar: 0, pressao: true, evento: '', sons: /** @type {Record<string, string>} */ ({}),
   };
   let local = false;
   try {
@@ -79,6 +81,8 @@ export function lerDepuracao() {
     skins: q.get('skins') || '',
     qualidade: q.has('qualidade') ? Math.max(0, Math.min(3, Number(q.get('qualidade')) | 0)) : -1,
     revelar: Math.max(0, Math.min(13, num('revelar', 7) | 0)),
+    pressao: q.get('pressao') !== '0',
+    evento: q.get('evento') || '',
     sons: Object.fromEntries((q.get('sons') || '').split(',').filter((p) => p.includes(':')).map((p) => p.split(':'))),
   });
 }

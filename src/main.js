@@ -17,6 +17,7 @@ import { criarCena, QUALIDADES } from './render/cena.js';
 import { criarHud } from './ui/hud.js';
 import { criarMenu } from './ui/menu.js';
 import { criarPerfil, gotasDaPartida, PREMIO_DESCOBERTA } from './jogo/perfil.js';
+import { GOTAS_PEDIDO } from './jogo/pressao.js';
 import { MAX_NIVEL } from './jogo/niveis.js';
 import { criarMissoes } from './jogo/missoes.js';
 import { criarQualidade, faixaFps, faixaMs } from './render/qualidade.js';
@@ -74,6 +75,7 @@ const J = {
   custoN: 0,
   faixa1: '', // faixa de fps do minuto 1, repetida depois: a permanencia por faixa de fps
   saiu: false, // a primeira vez que a aba sumiu ja foi medida
+  ultimoAnuncio: 0, // tempo de jogo (s) do ultimo intervalo comercial (o espaco entre eles)
   metas: /** @type {ReturnType<typeof criarMissoes>|null} */ (null), // metas da partida (meio do sem fim)
 };
 /** Minutos de jogo em que o fps medio vai para a telemetria (poucos, para nao inflar). */
@@ -88,6 +90,8 @@ const MINUTOS_CUSTO = [1, 5];
 const NIVEL_METAS = 9;
 const TROCA_META = 8;
 const TIPOS_META = ['fusao', 'combo', 'poder'];
+/** s de jogo ativo entre dois intervalos nas pausas naturais do sem fim (o fim de um evento). */
+const ESPACO_ANUNCIO = 150;
 /** Dicas que o aparelho ja viu (uma vez cada). */
 const dicasVistas = armazem.ler('dicas', {}) || {};
 // qualidade do render: desce sozinha quando o aparelho nao segura o fps (?qualidade= fixa).
@@ -417,7 +421,7 @@ function configModo(chave, nova = false) {
   const vis = visualAtual();
   // niveis ja vistos: a mao que ensina so aparece para quem nunca fundiu
   const comVisto = (s) => ({ ...s, visto: Math.max(s.visto || 1, perfil.visto), ...(nova ? { partida: null } : {}) });
-  const base = { semente: dep.semente || ((Date.now() / 1000) | 0), toque, lang: idioma, vitrine: dep.vitrine || (window.parent !== window ? escolhaHub.vitrine || 0 : 0), cesto: vis.cesto, visto: perfil.visto, aparencias: tabelaSkins() };
+  const base = { semente: dep.semente || ((Date.now() / 1000) | 0), toque, lang: idioma, vitrine: dep.vitrine || (window.parent !== window ? escolhaHub.vitrine || 0 : 0), cesto: vis.cesto, visto: perfil.visto, aparencias: tabelaSkins(), pressao: dep.pressao };
   if (chave === 'desafio') {
     const d = perfil.desafio();
     const s = armazem.ler('desafio', {}) || {};
@@ -438,7 +442,8 @@ async function carregarModo(chave, nova = false) {
   J.modo = mod.criarModo(cfg);
   J.chave = chave;
   J.cesto = cfg.cesto;
-  J.pagos = 0;
+  // o sem fim paga as gotas ao longo da partida: a partida que volta lembra o que ja pagou
+  J.pagos = chave === 'semfim' && cfg.salvo && cfg.salvo.partida ? cfg.salvo.pagos || 0 : 0;
   J.meta = cfg.regra ? cfg.regra.meta : 0;
   J.premiado = cfg.regra ? cfg.regra.premiado : false;
   donoDoDedo.clear();
@@ -478,6 +483,11 @@ function tratarEventos() {
         sons.tocar('estouro');
         if (e.cor) cena.vfx.respingo(e.x, e.y, e.cor, 18, 8);
         break;
+      case 'brilhos':
+        // um slime que evoluiu na escada
+        if (e.cor) cena.vfx.respingo(e.x, e.y, e.cor, 6, 4);
+        for (let k = 0; k < 4; k++) cena.vfx.brilho(e.x + (k - 1.5) * 0.4, e.y + ((k * 3) % 4 - 1.5) * 0.3);
+        break;
       case 'missil':
         // impacto do missil da mira: explosao no pote e gosma voando na tela
         sons.tocar('estouro');
@@ -490,6 +500,8 @@ function tratarEventos() {
         break;
       case 'nivel':
         poki.measure('level', String(e.n), e.acao);
+        // o ritmo real: em que minuto de jogo cada nivel novo chega (o painel nao mostra o tempo)
+        if (e.acao === 'complete' && J.chave === 'semfim') { poki.measure('ritmo', 'n' + e.n, 'm' + J.minutos); pagarParcial(); }
         // partida nova: as metas da partida recomecam
         if (e.acao === 'start' && e.n === 1) J.metas = null;
         break;
@@ -505,8 +517,23 @@ function tratarEventos() {
         pedirVideo(e.id);
         break;
       case 'resgate':
-        // "Ufa!" dos 3 primeiros minutos: o pote transbordou e o topo estourou
+        // "Ufa!": o pote transbordou e o topo estourou (no sem fim, a partida inteira)
         if (J.chave === 'semfim') poki.measure('partida', 'ufa', 'm' + J.minutos);
+        break;
+      case 'escada':
+        // o piso das gotas subiu (do nivel 9 em diante) e os pequenos evoluiram
+        poki.measure('escada', 'p' + e.piso, 'm' + J.minutos);
+        break;
+      case 'evento':
+        // pressao do sem fim: um evento a cada ~60 s (src/jogo/pressao.js)
+        if (e.acao === 'start') poki.measure('evento', e.id, 'start');
+        else if (e.acao === 'ok' || e.acao === 'falhou') poki.measure('evento', e.id, e.acao);
+        if (e.acao === 'ok') {
+          const g = perfil.ganhar(GOTAS_PEDIDO);
+          hud.aviso(`${T.pedidoFeito} +${g} 💧`);
+          gravarPerfil();
+        }
+        if (e.acao === 'fim') pagarParcial();
         break;
       case 'fim':
         // o level/N/fail ja foi, mas o painel da Poki mostra 0% (o Failed e sobre o Started)
@@ -517,8 +544,11 @@ function tratarEventos() {
         terminar(e);
         break;
       case 'intervalo':
-        // pausa natural do modo (troca de pedido/fase): o intervalo comercial pode vir aqui
+        // pausa natural do modo (troca de pedido/fase; no sem fim, o fim de um evento a partir do 3o):
+        // o intervalo comercial pode vir aqui, com ESPACO_ANUNCIO s de jogo desde o anterior
+        if (e.origem === 'evento' && (!J.tocou || J.estado !== 'jogando' || J.tempoJogo - J.ultimoAnuncio < ESPACO_ANUNCIO)) break;
         if (!dep.semAnuncio && poki.sdkPronto) {
+          if (e.origem) poki.measure('intervalo', e.origem, 'show');
           poki.gameplayStop();
           anuncio('commercial').then(() => { if (J.tocou && J.estado === 'jogando') poki.gameplayStart(); });
         }
@@ -637,6 +667,20 @@ async function pedirVideo(id) {
   if (J.tocou && J.estado === 'jogando') poki.gameplayStart();
 }
 
+/**
+ * Sem fim sem derrota (2.0.0): as gotas dos pontos entram ao longo da partida (em cada nivel novo e
+ * no fim de cada evento), pela mesma conta do fim, e a missao de pontos anda junto.
+ */
+function pagarParcial() {
+  if (J.chave !== 'semfim' || !J.modo) return;
+  const pts = J.modo.hud().pontos || 0;
+  if (pts <= J.pagos) return;
+  perfil.ganhar(gotasDaPartida(pts) - gotasDaPartida(J.pagos));
+  J.pagos = pts;
+  perfilSujo = true;
+  registrar('pontos', pts);
+}
+
 /** Gotas do fim: pontos da partida (raiz), premio do desafio, liga do duelo. */
 function pagarFim(e) {
   const pts = typeof e.pontos === 'number' ? e.pontos : 0;
@@ -678,7 +722,7 @@ function salvar() {
   if (!J.modo || !J.modo.salvar) return;
   const dados = J.modo.salvar();
   if (J.chave === 'desafio') armazem.gravar('desafio', { ...dados, dia: perfil.hoje });
-  else armazem.gravar(chaveSalvo(J.chave), J.chave === 'semfim' ? { ...dados, cesto: J.cesto } : dados);
+  else armazem.gravar(chaveSalvo(J.chave), J.chave === 'semfim' ? { ...dados, cesto: J.cesto, pagos: J.pagos } : dados);
 }
 
 async function jogarDeNovo() {
@@ -727,6 +771,7 @@ async function anuncio(tipo) {
   J.estado = 'anuncio';
   laco.pausar(true);
   let ok = false;
+  if (tipo === 'commercial') J.ultimoAnuncio = J.tempoJogo;
   if (poki.sdkPronto) {
     ok = tipo === 'rewarded' ? await poki.rewardedBreak() : (await poki.commercialBreak(), false);
   } else if (dep.local && tipo === 'rewarded') {
@@ -741,18 +786,23 @@ async function anuncio(tipo) {
 
 poki.onAdStart = () => audio.mudoParaAnuncio();
 poki.onAdEnd = () => audio.voltarDoAnuncio();
+/**
+ * Em que tela o jogador estava quando a pagina sumiu (a 1a vez; quase sempre e a saida). Melhor
+ * esforco: a pagina pode morrer antes do envio. So o visibilitychange pegava ~100 das ~450 saidas
+ * da 1.2.0 (trocar de jogo na Poki tira o iframe sem esconder a aba): o pagehide tambem conta.
+ */
+function medirSaida() {
+  if (J.saiu || !J.carregou) return;
+  J.saiu = true;
+  poki.measure('sair', J.tocou ? J.estado : 'toque', 'm' + J.minutos);
+}
 document.addEventListener('visibilitychange', () => {
   audio.pausarAba(document.hidden);
   if (!document.hidden) return;
   salvar();
-  // em que tela o jogador estava quando a aba sumiu (a 1a vez; quase sempre e a saida).
-  // Melhor esforco: a pagina pode morrer antes do envio
-  if (!J.saiu && J.carregou) {
-    J.saiu = true;
-    poki.measure('sair', J.tocou ? J.estado : 'toque', 'm' + J.minutos);
-  }
+  medirSaida();
 });
-window.addEventListener('pagehide', salvar);
+window.addEventListener('pagehide', () => { salvar(); medirSaida(); });
 
 // ------------------------------------------------------------------ laco
 let ladoBorda = 1;
@@ -793,8 +843,9 @@ function passoJogo(dt) {
         const faixa = faixaFps(J.fpsQ / J.fpsT);
         poki.measure('fps', faixa, 'm' + min);
         if (min === 1) J.faixa1 = faixa;
-        // quem rodou o minuto 1 nessa faixa ainda esta aqui: a permanencia por faixa de fps
-        else if (J.faixa1) poki.measure('fps1', J.faixa1, 'm' + min);
+        // quem rodou o minuto 1 nessa faixa ainda esta aqui: a permanencia por faixa de fps. A
+        // categoria era "fps1" e nao chegou nenhuma vez no painel da 1.2.0 (a unica com digito)
+        else if (J.faixa1) poki.measure('fpsini', J.faixa1, 'm' + min);
       }
       // ms medios por passo de fisica e por desenho: no aparelho lento, qual dos dois pesa
       if (MINUTOS_CUSTO.includes(min) && J.custoN > 0) {
@@ -857,6 +908,8 @@ function desenharJogo(dt = 0) {
  * @param {any} h o hud do modo (troca o objetivo)
  */
 function metaDaVez(h) {
+  // o evento da vez (pressao do sem fim) fica com a pilula ate acabar
+  if (h.objetivo && h.objetivo.evento) return;
   if (J.chave !== 'semfim' || !J.modo.S || J.modo.S.jogadores[0].maxNivel < NIVEL_METAS) return;
   let lista = perfil.missoes().filter((m) => !m.feita && TIPOS_META.includes(m.tipo));
   if (!lista.length) {
@@ -949,6 +1002,8 @@ async function iniciar() {
     J.modo.passo(PASSO);
     J.modo.eventos.length = 0;
   }
+  // prints dos eventos (?evento=gosma): depois dos ?passos (o pote ja montado), o aviso entra ja
+  if (dep.evento && J.modo.forcarEvento) J.modo.forcarEvento(dep.evento);
   if (dep.poder && J.modo.poder) J.modo.poder(dep.poder);
   if (dep.demoReforcos && J.modo.S) {
     // prints dos botoes: um de cada estado (normal, acabado com video, 2, ativo, premio)

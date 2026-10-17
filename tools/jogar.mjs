@@ -119,14 +119,14 @@ for (const m of lista) {
     }
     // fim de jogo, revive e jogar de novo (Merge Lab)
     if (m === '1') {
-      await c.avaliar('(() => { const S = __slime.J.modo.S; S.tempo = 999; S.jogadores[0].pote.perigoT = 9; })()');
+      await c.avaliar('(() => { const S = __slime.J.modo.S; S.R.resgatarSempre = () => false; S.tempo = 999; S.jogadores[0].pote.perigoT = 9; })()');
       await espera(600);
       if ((await estado(c)) !== 'fim' || (await c.avaliar('document.getElementById("fim").hidden'))) falhas.push('o fim nao apareceu');
       const [rx, ry] = await rect(c, 'bReviver');
       await c.clicar(rx, ry);
       await espera(3900);
       if ((await estado(c)) !== 'jogando') falhas.push('o revive nao voltou ao jogo: ' + (await estado(c)));
-      await c.avaliar('(() => { const S = __slime.J.modo.S; S.tempo = 999; S.jogadores[0].pote.perigoT = 9; })()');
+      await c.avaliar('(() => { const S = __slime.J.modo.S; S.R.resgatarSempre = () => false; S.tempo = 999; S.jogadores[0].pote.perigoT = 9; })()');
       await espera(600);
       const [dx, dy] = await rect(c, 'bDeNovo');
       await c.clicar(dx, dy);
