@@ -1,6 +1,6 @@
 // Renderiza a thumb da Poki (tools/thumb.html) pelo Chrome headless (porte do 2048_cards).
 // Uso:
-//   node tools/thumb.mjs [opcoes]  as opcoes (padrao: as 9 de OPCOES) em
+//   node tools/thumb.mjs [opcoes]  as opcoes (padrao: as 10 de OPCOES) em
 //                                  marketing/thumb/opcoes/<opcao>-<tamanho>.png, lado a lado em
 //                                  marketing/thumb/comparar.png, os tiles pequenos em
 //                                  marketing/thumb/comparar-tiles.png, e as medidas de cada uma
@@ -21,7 +21,7 @@ import { chrome } from './shot.mjs';
  * no fim do dia).
  */
 const ESCOLHIDA = 'arcoiris';
-const OPCOES = ['fusao', 'pote', 'arcoiris', 'lava', 'missil', 'close', 'fusao-azul', 'fusao-verde', 'fusao-lilas'];
+const OPCOES = ['fusao', 'pote', 'arcoiris', 'lava', 'missil', 'close', 'fusao-azul', 'fusao-verde', 'fusao-lilas', 'fusao-cheia'];
 /** Tamanhos entregues: o minimo da Poki (628) e o dobro. */
 const TAMANHOS = [1256, 628];
 /**

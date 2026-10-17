@@ -111,6 +111,17 @@ são dele; o código segue estas notas.
   das cores escolhidas olhando as variantes. Todas passam na régua da Poki; o aviso de contraste
   (régua nossa) cai porque os cantos agora são slimes, não céu. Lado a lado em
   `marketing/thumb/comparar.png` (tiles em `comparar-tiles.png`). **Escolha pendente do usuário.**
+- Pedido seguinte: **"Faça a fusão azul com um slime vermelho e amarelo atrás"**. Na fusao-azul o
+  par agora se apoia num vermelho (nível 4) e num amarelo (nível 6), que sobe por trás do azul da
+  direita (opção `apoio` de `fusaoInicial`). Testados também os dois ladeando o par: ficavam quase
+  todos cortados pela borda. Com o fundo quente o azul salta até no tile de 94 px.
+- Pedido seguinte: **"Faça um que cobre o ícone inteiro de slime"**. Nova opção **fusao-cheia**: a
+  azul com uma fileira de cinco soltos por cima do par (lilás e verde nos lados, um vermelho no
+  meio, amarelo e laranja nos cantos) e o quadro baixo o bastante para não sobrar céu (medido:
+  nenhum pixel de céu). Os olhos do vermelho de cima ficam um pouco cortados pela borda.
+- **"Tira a marca em cima do azul, parece uma letra japonesa"** (print com as estrelas
+  circuladas): as estrelas do encosto saíram das quatro fusões de cores calmas (azul, verde,
+  lilás e cheia). As outras opções (fusao, arcoiris, lava, close) ainda têm estrelas.
 
 ## 2026-10-15: borda, míssil, botões, nível 13, skins e sons
 Pedidos com prints anotados do Merge Lab (plano em

@@ -80,10 +80,10 @@ function puxar(c, a, b, v, quadros) {
   }
 }
 /**
- * O empurrao do encosto (o amasso de quem vai fundir) e as estrelas no ponto de encosto, numa
- * escala e do tamanho do par (1 no nivel 4). Devolve o ponto de encosto.
+ * O empurrao do encosto (o amasso de quem vai fundir) e, se pedidas, as estrelas no ponto de
+ * encosto, numa escala e do tamanho do par (1 no nivel 4). Devolve o ponto de encosto.
  */
-function encostar(c, a, b, e) {
+function encostar(c, a, b, e, estrelas = true) {
   for (let i = 0; i < c.m.n; i++) {
     if (c.m.sl[i] === a.idx) c.m.vx[i] = 6 * (b.cx > a.cx ? 1 : -1);
     if (c.m.sl[i] === b.idx) c.m.vx[i] = -6 * (b.cx > a.cx ? 1 : -1);
@@ -91,27 +91,33 @@ function encostar(c, a, b, e) {
   rodar(c, 0.07);
   const px = (a.cx * b.raio0 + b.cx * a.raio0) / (a.raio0 + b.raio0);
   const py = (a.cy + b.cy) / 2;
-  for (let k = 0; k < 9; k++) c.vfx.brilho(px + ((k % 3) - 1) * 0.3 * e, py + (1.0 + (((k * 5) % 3) - 1) * 0.35) * e);
+  if (estrelas) for (let k = 0; k < 9; k++) c.vfx.brilho(px + ((k % 3) - 1) * 0.3 * e, py + (1.0 + (((k * 5) % 3) - 1) * 0.35) * e);
   rodar(c, 0.12);
   return [px, py];
 }
 /**
  * O estilo da fusao com as cores do comeco (azul, verde e lilas: mais calmas que o vermelho) e
  * o quadro cheio: o par de iguais grande no alto da pilha, ladeado e apoiado em slimes de
- * tamanho parecido, e o ceu so no alto, com as estrelas do encosto. A pilha e uma grade em favo
+ * tamanho parecido, e o ceu so no alto. Sem as estrelas do encosto (pedido do usuario: em cima do
+ * azul pareciam uma letra japonesa). A pilha e uma grade em favo
  * (fileiras de 4 e 5 desencontradas) pintada para que so o par seja igual entre os que se tocam
  * (a thumb diz "iguais se juntam"); as fileiras sao postas no lugar e a fisica so assenta. O par
  * cai em cima dos dois do meio e os dois escorregam para o mesmo vale: o amasso da fusao.
  * Com x e y os outros dois niveis calmos (o k reaparece embaixo, longe do par, como numa
  * partida):  [y, k, k, x]  [k, x, y, k]  [x, y, k, x, y]  [k, x, y, k]  (de cima para baixo)
  * @param {number} k nivel do par @param {number} x @param {number} y @param {number} semente
- * @param {{ lado: number, alto: number }} Q quadro: lado em diametros do par, altura do encosto (0..1)
+ * @param {{ lado?: number, alto?: number, lados?: number[], apoio?: number[], teto?: number[][], assenta?: number }} Q
+ *   quadro (lado em diametros do par, altura do encosto de 0 a 1) e, se pedidos, os niveis
+ *   colados nos lados do par ([esquerda, direita], padrao [y, x]), os dois em que ele se apoia
+ *   (padrao [x, y]) e os soltos por cima ([nivel, x a partir do encosto]: o quadro todo de
+ *   slime, sem ceu), com os quadros que eles assentam
  */
-function fusaoInicial(k, x, y, semente, Q = { lado: 2.5, alto: 0.54 }) {
+function fusaoInicial(k, x, y, semente, Q = {}) {
+  const { lado: emD = 2.5, alto = 0.54, lados = [y, x], apoio = [x, y], teto = null, assenta = 40 } = Q;
   const c = novoMundo(semente);
   const W = 1.9;
   let topo = 0;
-  for (const fila of [[k, x, y, k], [x, y, k, x, y], [k, x, y, k]]) {
+  for (const fila of [[k, x, y, k], [x, y, k, x, y], [k, ...apoio, k]]) {
     fila.forEach((n, i) => slime(c.m, n, (i - (fila.length - 1) / 2) * W, topo + 0.1 + diametroNivel(n) / 2));
     rodar(c, 0.6);
     topo = 0;
@@ -120,8 +126,9 @@ function fusaoInicial(k, x, y, semente, Q = { lado: 2.5, alto: 0.54 }) {
   const d = diametroNivel(k);
   const a = slime(c.m, k, -d / 2, topo + 0.1 + d / 2);
   const b = slime(c.m, k, d / 2, topo + 0.1 + d / 2);
-  const e = slime(c.m, y, -d - diametroNivel(y) / 2 - 0.05, topo + 0.1 + diametroNivel(y) / 2);
-  const f = slime(c.m, x, d + diametroNivel(x) / 2 + 0.05, topo + 0.1 + diametroNivel(x) / 2);
+  const [le, ld] = lados.map(diametroNivel);
+  const e = slime(c.m, lados[0], -d - le / 2 - 0.05, topo + 0.1 + le / 2);
+  const f = slime(c.m, lados[1], d + ld / 2 + 0.05, topo + 0.1 + ld / 2);
   // o par se puxa e os vizinhos de lado apertam (o quadro cheio, sem fresta de ceu)
   for (let q = 0; q < 90; q++) {
     for (let i = 0; i < c.m.n; i++) {
@@ -130,12 +137,18 @@ function fusaoInicial(k, x, y, semente, Q = { lado: 2.5, alto: 0.54 }) {
     }
     puxar(c, a, b, 0.2, 1);
   }
-  const [px, py] = encostar(c, a, b, 1);
-  const lado = d * Q.lado;
-  const y0 = py - lado * Q.alto;
-  // as estrelas ficam do tamanho das da fusao (sem o zoom do quadro), centradas no encosto
-  const escala = d / diametroNivel(4);
-  return { ...c, janela: [px - lado / 2, y0, px + lado / 2, y0 + lado], olhar: [px, py + d * 0.1], foco: [px, py + d * 0.2], heroi: HEX[k - 1], estrelas: [px, py, escala] };
+  if (teto) {
+    // o teto: todos juntos acima da pilha, assentados so um instante (sem esmagar o par)
+    let alto2 = 0;
+    for (const s of c.m.vivos()) alto2 = Math.max(alto2, s.topo);
+    const meio = (a.cx + b.cx) / 2;
+    for (const [n, dx] of teto) slime(c.m, n, meio + dx, alto2 + 0.1 + diametroNivel(n) / 2);
+    puxar(c, a, b, 0.12, assenta);
+  }
+  const [px, py] = encostar(c, a, b, 1, false);
+  const lado = d * emD;
+  const y0 = py - lado * alto;
+  return { ...c, janela: [px - lado / 2, y0, px + lado / 2, y0 + lado], olhar: [px, py + d * 0.1], foco: [px, py + d * 0.2], heroi: HEX[k - 1] };
 }
 
 /**
@@ -218,10 +231,16 @@ const CENAS = {
     const missil = { x: a.cx, y: a.cy, r: a.raio0, cor: HEX[4], t: 0.665, choro: 0.3, impacto: 0.75, origem: [1.08, -0.05] };
     return { ...c, janela: [a.cx - lado * 0.42, y0, a.cx + lado * 0.58, y0 + lado], olhar: [a.cx + 2.5, a.cy + 2.5], foco: [a.cx, a.cy], heroi: HEX[4], missil };
   },
-  // as tres de cores calmas (pedido de 2026-10-15): o par azul, o verde e o lilas
-  'fusao-azul': () => fusaoInicial(1, 3, 2, 31),
+  // as tres de cores calmas (pedido de 2026-10-15): o par azul, o verde e o lilas; o azul
+  // com um vermelho e um amarelo atras do par (pedido seguinte), que fazem o azul saltar
+  'fusao-azul': () => fusaoInicial(1, 3, 2, 36, { apoio: [4, 6] }),
   'fusao-verde': () => fusaoInicial(2, 1, 3, 34),
   'fusao-lilas': () => fusaoInicial(3, 2, 1, 34, { lado: 2.5, alto: 0.5 }),
+  // a azul com o icone todo de slime (pedido seguinte): uma fileira solta por cima do par e o
+  // quadro baixo o bastante para nao sobrar ceu
+  'fusao-cheia': () => fusaoInicial(1, 3, 2, 36, {
+    apoio: [4, 6], teto: [[6, -2.9], [3, -1.3], [4, 0], [2, 1.5], [5, 3.1]], alto: 0.65, lado: 2.4, assenta: 38,
+  }),
   close() {
     // de perto: um uva grande no alto da pilha olhando para quem ve o tile (o rosto ocupa o
     // quadro: o mais legivel nos tiles pequenos)
@@ -358,11 +377,7 @@ function thumb(cv, s) {
   ctx.drawImage(glcv, 0, 0);
   desenharRostos(ctx, m, cam, 1, t, { olhar: cena.olhar, estilo: 'classico' });
   desenharReflexos(ctx, cam, 1, m.paredes, potes);
-  if (cena.estrelas) {
-    const [ex, ey, e] = cena.estrelas;
-    const [sx, sy] = paraTela(cam, ex, ey);
-    vfx.desenhar(ctx, { s: cam.s * e, cx: ex, cy: ey, sx, sy }, 1);
-  } else vfx.desenhar(ctx, cam, 1);
+  vfx.desenhar(ctx, cam, 1);
   if (cena.missil) {
     // a reticula travada e o missil saindo do canto de baixo (onde fica o botao da mira)
     const M = cena.missil;
