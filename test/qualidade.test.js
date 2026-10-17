@@ -2,7 +2,7 @@
 // algumas janelas seguidas, nunca sobe, e ignora pausas e o aquecimento.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { criarQualidade, faixaFps } from '../src/render/qualidade.js';
+import { criarQualidade, faixaFps, faixaMs } from '../src/render/qualidade.js';
 
 /** Alimenta `seg` s de quadros a `fps`. @returns {number} quantas vezes desceu */
 function rodar(q, fps, seg) {
@@ -52,4 +52,16 @@ test('nivel inicial (?qualidade=) e faixas de fps da telemetria', () => {
   assert.equal(criarQualidade({ inicial: 2 }).nivel, 2);
   assert.equal(criarQualidade({ inicial: 9 }).nivel, 2);
   assert.deepEqual([60, 55, 54.9, 45, 44, 30, 29, 0].map(faixaFps), ['55', '55', '45', '45', '30', '30', '0', '0']);
+});
+
+test('com 4 degraus (a minima) desce ate o 3; o celular comeca na media', () => {
+  const q = criarQualidade({ niveis: 4, inicial: 1, aquecer: 0 });
+  assert.equal(q.nivel, 1);
+  rodar(q, 20, 30);
+  assert.equal(q.nivel, 3);
+  assert.equal(criarQualidade({ niveis: 4, inicial: 9 }).nivel, 3);
+});
+
+test('faixas de custo (ms) da telemetria: fisica e desenho', () => {
+  assert.deepEqual([0, 3.9, 4, 7.9, 8, 15.9, 16, 80].map(faixaMs), ['4', '4', '8', '8', '16', '16', '16+', '16+']);
 });

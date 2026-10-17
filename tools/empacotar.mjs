@@ -35,7 +35,7 @@ for (const item of ['index.html', 'LICENCAS.txt', 'src']) cpSync(join(RAIZ, item
 // ficam no repositorio e no hub. No main.js saem as linhas marcadas com "// prototipo".
 const PROTOTIPOS = [
   'src/jogo/modos/croma.js', 'src/jogo/modos/loja.js', 'src/jogo/modos/molde.js', 'src/jogo/modos/lab.js',
-  'src/jogo/cores.js', 'src/jogo/goo.js', 'src/jogo/fases-molde.js', 'src/jogo/missoes.js',
+  'src/jogo/cores.js', 'src/jogo/goo.js', 'src/jogo/fases-molde.js',
 ];
 for (const r of PROTOTIPOS) rmSync(join(dist, r), { force: true });
 // audio: so os arquivos das variantes do PADRAO (src/som/catalogo.js); as outras ficam no

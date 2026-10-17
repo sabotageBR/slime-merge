@@ -208,6 +208,25 @@ test('telemetria de nivel: start na partida nova (nao na restaurada) e complete 
   assert.ok(modo.eventos.some((e) => e.tipo === 'registro' && e.chave === 'poder' && e.id === 'chacoalhar'));
 });
 
+test('telemetria do resgate: o "Ufa!" dos 3 primeiros minutos emite resgate; depois o transbordo acaba a partida', async () => {
+  const { criarModo } = await import(MODOS.merge);
+  const modo = criarModo({ semente: 3, salvo: {}, toque: true });
+  const J = modo.S.jogadores[0];
+  const quadros = (n) => { const ev = []; for (let k = 0; k < n; k++) { modo.passo(1 / 60); ev.push(...modo.eventos.splice(0)); } return ev; };
+  quadros(10);
+  // pote no limite da graca: transbordaria neste quadro
+  J.pote.perigoT = 10;
+  let ev = quadros(2);
+  assert.equal(ev.filter((e) => e.tipo === 'resgate').length, 1);
+  assert.ok(ev.some((e) => e.tipo === 'texto' && e.texto === 'ufa'));
+  assert.ok(!ev.some((e) => e.tipo === 'fim'));
+  modo.S.tempo = 200;
+  J.pote.perigoT = 10;
+  ev = quadros(2);
+  assert.ok(ev.some((e) => e.tipo === 'fim'));
+  assert.ok(!ev.some((e) => e.tipo === 'resgate'), 'resgate depois dos 3 minutos');
+});
+
 test('a mao do onboarding fica ate a primeira gota (mesmo parado) e some depois', async () => {
   const { criarModo } = await import(MODOS.merge);
   const modo = criarModo({ semente: 3, salvo: {}, toque: false });

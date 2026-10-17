@@ -92,3 +92,31 @@ Test").
   a direita do pote da CPU (antes ficava entre os potes); no 2 jogadores não há reforços (botões, clique
   e teclas 1-5; só o jogador 1 teria). Verificado com `npm test` (133), `npm run menu` e prints em
   paisagem (1031×580, 800×600, 1280×720, 640×360).
+- **Player Fit Test da 1.1.1** (15/10 20:20 e 16/10 09:46, 500 gameplays cada): média de 5m01s e 5m07s
+  (a 1.0.0 teve 5m32s); 0–2 min 38% e 38,6% (igual à 1.0.0); 5 min+ 29,2% e 33,6% (37% na 1.0.0). Duas
+  rodadas da mesma build diferem 4,4 pontos no 5 min+. Game Events (1.261 gameplays):
+  - de quem toca, ficam 79%, 61% e 48% nos minutos 1 a 3 e 33% no 5; no celular, do minuto 2 para o 3
+    saem 24% (no desktop, 14%); desktop sem toque: 19% (era 25%);
+  - celular: 46% abaixo de 55 fps no minuto 1; abaixo de 30 fps, 10% no minuto 1 e 22% no 5; 47% descem
+    para média e 34% para baixa no minuto 0; o celular chega menos aos níveis altos (12: 5% × 12%);
+  - ritmo: o nível 9 aos ~3 min; o 10, o 11 e o 12 levam 2, 4 e 7 min cada;
+  - o `level/N/fail` aparece com Failed 0% (o painel calcula sobre o Started, e só o nível 1 tem start).
+- **Retenção, versão 1.2.0** (2026-10-16, pedido do usuário: frentes de telemetria, celular e metas no meio
+  da partida; o A/B dentro da build ficou de fora):
+  - **cartão de slime novo** (pedido do usuário): no retrato virou uma faixa baixa por cima da linha do HUD;
+    a 13% do topo, cobria a slime segura e a mira no celular; na paisagem ficou igual; `?revelar=N` para prints;
+  - **telemetria:** `partida/fim/m<min>` e `partida/fim/n<nivel>` (sem fim), `partida/ufa/m<min>` (o
+    resgate emite `resgate`), `sair/<estado>/m<min>` na primeira vez que a aba some (`toque` antes do 1º
+    toque), `custo/<fisica|desenho>-<4|8|16|16+>/m<1|5>` (ms médios do minuto, `faixaMs`) e
+    `fps1/<faixa do minuto 1>/m<3|5|10>` (a permanência por faixa de fps), `meta/<tipo>-<meta>/complete`;
+  - **celular:** com toque, começa na qualidade média (no celular, o `qualidade/media/m0` deixa de
+    aparecer); 4º degrau `minima` (só o canvas do slime em dpr 0,75, célula 0,17, sem brilho; rostos e pote
+    nítidos). A válvula da física (`MAX_PASSOS`) espera a telemetria `custo/*`;
+  - **metas no meio da partida:** do nível 9 em diante no sem fim, a pílula alterna a cada 8 s entre o
+    próximo nível e uma meta curta com progresso (no 13, só a meta): a missão do dia aberta mais perto de
+    acabar (fusão, combo ou reforço); sem nenhuma, as metas da partida de `src/jogo/missoes.js` (fusão
+    10/20/35/50, combo 2/3/4, reforço 1/2/3; 10 a 25 gotas; valem até o fim da partida). A vitrine passou a
+    pôr o `maxNivel` do pote;
+  - Verificado com `npm test` (138), `npm run menu`, `jogar 1 5`, `sdkcheck`, `telas`, os eventos novos no
+    Chrome em tempo real, toque com CPU 12× mais lenta (média → baixa → mínima) e a build aberta.
+    `dist-poki/slime-merge-1.2.0.zip` (325 KB gzip).

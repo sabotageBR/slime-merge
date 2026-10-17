@@ -4,6 +4,9 @@
 // solto: ficam nitidos de 48 a 96 px (pedido do usuario em 2026-10-15: "icones mais nitidos e
 // coerentes"). O mesmo desenho vai para o HUD (SVG) e para o canvas (Path2D).
 
+/** Icones das missoes do dia e das metas da partida (o menu e a pilula da meta no HUD). */
+export const ICONE_MISSAO = { fusao: '🫧', nivel: '⬆️', combo: '✖️', pontos: '⭐', poder: '🪄', duelo: '⚔️' };
+
 /**
  * f: formas cheias (prefixo '!' = regra par-impar, para aneis); l: tracos grossos brancos;
  * d: detalhes cheios em tinta; dl: tracos finos em tinta.

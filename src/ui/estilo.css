@@ -181,18 +181,22 @@ body[data-orient="paisagem"] #meta { flex-direction: row; justify-content: cente
 .objetivo { display: inline-flex; align-items: center; gap: 0.4em; padding: 0.2em 0.75em 0.2em 0.3em; border-radius: 1em; background: #fff;
   border: 0.15em solid var(--tinta); box-shadow: 0 0.14em 0 var(--tinta); font-size: 0.82em; white-space: nowrap; }
 .objetivo.cresce { background: #e4faf7; }
+.objetivo.missao { background: #fff4d1; }
+.objetivo b { font-size: 1.1em; line-height: 1; padding-left: 0.15em; }
 .objetivo i, .quase i, #revelacao .bola { display: inline-grid; place-items: center; border-radius: 50%; border: 0.12em solid var(--tinta);
   font-style: normal; color: #fff; background: #2c2c34; }
 .objetivo i { width: 1.45em; height: 1.45em; font-size: 0.9em; }
 .evolucao i.alvo { box-shadow: 0 0 0 0.14em #fff, 0 0 0 0.28em var(--laranja); animation: alvoEvol 1.3s ease-in-out infinite; }
 @keyframes alvoEvol { 50% { transform: scale(1.18); } }
 
-/* ---- slime novo: cartao no alto (na paisagem, na coluna da esquerda), sem pegar toque */
-#revelacao { position: fixed; z-index: 6; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 13%); transform: translateX(-50%);
-  pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: 0.15em; background: #fff;
-  border: 0.2em solid var(--tinta); border-radius: 1.1em; box-shadow: 0 0.25em 0 var(--tinta); padding: 0.6em 1.3em 0.55em; }
-body[data-orient="paisagem"] #revelacao { left: 12%; top: 46%; }
-#revelacao .bola { width: 3.2em; height: 3.2em; border-width: 0.16em; font-size: 1em; }
+/* ---- slime novo, sem pegar toque. No retrato, faixa baixa por cima da linha do HUD no alto: a 13%
+   do topo o cartao cobria a slime segura e a mira no celular. Na paisagem, cartao na coluna da esquerda */
+#revelacao { position: fixed; z-index: 6; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 0.35em); transform: translateX(-50%);
+  pointer-events: none; display: grid; grid-template-columns: auto auto; align-items: center; column-gap: 0.55em; background: #fff;
+  border: 0.2em solid var(--tinta); border-radius: 1.1em; box-shadow: 0 0.25em 0 var(--tinta); padding: 0.35em 1.1em 0.35em 0.4em; }
+#revelacao .bola { grid-row: span 2; width: 2.3em; height: 2.3em; border-width: 0.16em; font-size: 1em; }
+body[data-orient="paisagem"] #revelacao { left: 12%; top: 46%; display: flex; flex-direction: column; gap: 0.15em; padding: 0.6em 1.3em 0.55em; }
+body[data-orient="paisagem"] #revelacao .bola { width: 3.2em; height: 3.2em; }
 #revelacao b { font-size: 1.25em; color: #fff; -webkit-text-stroke: 0.2em var(--tinta); paint-order: stroke fill; white-space: nowrap; }
 #revelacao small { font-size: 0.85em; white-space: nowrap; }
 #revelacao.entra { animation: revela 2.6s ease-out both; }

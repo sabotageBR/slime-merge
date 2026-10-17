@@ -13,12 +13,13 @@ import { criarSons } from './som/sons.js';
 import { criarMusica } from './som/musica.js';
 import { criarLaco, PASSO } from './core/laco.js';
 import { criarEntrada } from './core/entrada.js';
-import { criarCena } from './render/cena.js';
+import { criarCena, QUALIDADES } from './render/cena.js';
 import { criarHud } from './ui/hud.js';
 import { criarMenu } from './ui/menu.js';
 import { criarPerfil, gotasDaPartida, PREMIO_DESCOBERTA } from './jogo/perfil.js';
 import { MAX_NIVEL } from './jogo/niveis.js';
-import { criarQualidade, faixaFps } from './render/qualidade.js';
+import { criarMissoes } from './jogo/missoes.js';
+import { criarQualidade, faixaFps, faixaMs } from './render/qualidade.js';
 import { maoEm, TOQUE_MAO } from './render/guias.js';
 import { aparencias, SKINS } from './jogo/skins.js';
 import { criarEditor } from './ui/editor.js';
@@ -68,13 +69,31 @@ const J = {
   dica: /** @type {{ id: string, t: number }|null} */ (null),
   fpsQ: 0, // quadros e tempo real do minuto de jogo (telemetria do fps)
   fpsT: 0,
+  custoF: 0, // soma dos ms de fisica e de desenho amostrados no minuto (telemetria do custo)
+  custoD: 0,
+  custoN: 0,
+  faixa1: '', // faixa de fps do minuto 1, repetida depois: a permanencia por faixa de fps
+  saiu: false, // a primeira vez que a aba sumiu ja foi medida
+  metas: /** @type {ReturnType<typeof criarMissoes>|null} */ (null), // metas da partida (meio do sem fim)
 };
 /** Minutos de jogo em que o fps medio vai para a telemetria (poucos, para nao inflar). */
 const MINUTOS_FPS = [1, 3, 5, 10];
+/** Minutos em que o custo medio de fisica e desenho vai para a telemetria. */
+const MINUTOS_CUSTO = [1, 5];
+/**
+ * Meio da partida no sem fim: do nivel 9 em diante (o 9 chega aos ~3 min e o 10, 11 e 12 levam 2,
+ * 4 e 7 min cada no Player Fit Test da 1.1.1), a pilula da meta alterna a cada TROCA_META s com uma
+ * meta curta dos TIPOS_META.
+ */
+const NIVEL_METAS = 9;
+const TROCA_META = 8;
+const TIPOS_META = ['fusao', 'combo', 'poder'];
 /** Dicas que o aparelho ja viu (uma vez cada). */
 const dicasVistas = armazem.ler('dicas', {}) || {};
-// qualidade do render: desce sozinha quando o aparelho nao segura o fps (?qualidade= fixa)
-const qualidade = criarQualidade({ inicial: Math.max(0, dep.qualidade) });
+// qualidade do render: desce sozinha quando o aparelho nao segura o fps (?qualidade= fixa).
+// O celular comeca na media: no Player Fit Test da 1.1.1, 47% dos celulares desciam para ela (e 34%
+// ate a baixa) ja no 1o minuto, com o pote vazio, trocando a resolucao duas vezes no comeco
+const qualidade = criarQualidade({ niveis: QUALIDADES.length, inicial: dep.qualidade >= 0 ? dep.qualidade : toque ? 1 : 0 });
 
 // ------------------------------------------------------------------ perfil (uma moeda: gotas)
 /** Data local AAAA-MM-DD: a sequencia e as missoes viram a meia-noite do jogador. */
@@ -471,6 +490,8 @@ function tratarEventos() {
         break;
       case 'nivel':
         poki.measure('level', String(e.n), e.acao);
+        // partida nova: as metas da partida recomecam
+        if (e.acao === 'start' && e.n === 1) J.metas = null;
         break;
       case 'registro':
         if (e.chave === 'poder') usouPoder(e.id);
@@ -483,7 +504,16 @@ function tratarEventos() {
       case 'pedirVideo':
         pedirVideo(e.id);
         break;
+      case 'resgate':
+        // "Ufa!" dos 3 primeiros minutos: o pote transbordou e o topo estourou
+        if (J.chave === 'semfim') poki.measure('partida', 'ufa', 'm' + J.minutos);
+        break;
       case 'fim':
+        // o level/N/fail ja foi, mas o painel da Poki mostra 0% (o Failed e sobre o Started)
+        if (J.chave === 'semfim') {
+          poki.measure('partida', 'fim', 'm' + J.minutos);
+          poki.measure('partida', 'fim', 'n' + J.modo.S.jogadores[0].maxNivel);
+        }
         terminar(e);
         break;
       case 'intervalo':
@@ -513,6 +543,15 @@ function registrar(chave, valor) {
     hud.aviso(`${T.missaoFeita} +${m.premio} 💧`);
     poki.measure('missao', m.tipo, 'complete');
     missao = true;
+  }
+  // metas da partida (meio do sem fim): o premio entra na hora e a proxima sobe um degrau
+  if (J.metas && J.chave === 'semfim') {
+    for (const m of J.metas.registrar(chave, valor)) {
+      perfil.ganhar(m.premio);
+      hud.aviso(`${T.missaoFeita} +${m.premio} 💧`);
+      poki.measure('meta', m.tipo + '-' + m.meta, 'complete');
+      missao = true;
+    }
   }
   if (chave === 'nivel') {
     const g = perfil.descobrir(valor);
@@ -704,7 +743,14 @@ poki.onAdStart = () => audio.mudoParaAnuncio();
 poki.onAdEnd = () => audio.voltarDoAnuncio();
 document.addEventListener('visibilitychange', () => {
   audio.pausarAba(document.hidden);
-  if (document.hidden) salvar();
+  if (!document.hidden) return;
+  salvar();
+  // em que tela o jogador estava quando a aba sumiu (a 1a vez; quase sempre e a saida).
+  // Melhor esforco: a pagina pode morrer antes do envio
+  if (!J.saiu && J.carregou) {
+    J.saiu = true;
+    poki.measure('sair', J.tocou ? J.estado : 'toque', 'm' + J.minutos);
+  }
 });
 window.addEventListener('pagehide', salvar);
 
@@ -743,9 +789,23 @@ function passoJogo(dt) {
       J.minutos = min;
       poki.measure('tempo', String(min), 'min');
       // fps medio do minuto que acabou (o abandono do celular depois de 5 min)
-      if (MINUTOS_FPS.includes(min) && J.fpsT > 0) poki.measure('fps', faixaFps(J.fpsQ / J.fpsT), 'm' + min);
+      if (MINUTOS_FPS.includes(min) && J.fpsT > 0) {
+        const faixa = faixaFps(J.fpsQ / J.fpsT);
+        poki.measure('fps', faixa, 'm' + min);
+        if (min === 1) J.faixa1 = faixa;
+        // quem rodou o minuto 1 nessa faixa ainda esta aqui: a permanencia por faixa de fps
+        else if (J.faixa1) poki.measure('fps1', J.faixa1, 'm' + min);
+      }
+      // ms medios por passo de fisica e por desenho: no aparelho lento, qual dos dois pesa
+      if (MINUTOS_CUSTO.includes(min) && J.custoN > 0) {
+        poki.measure('custo', 'fisica-' + faixaMs(J.custoF / J.custoN), 'm' + min);
+        poki.measure('custo', 'desenho-' + faixaMs(J.custoD / J.custoN), 'm' + min);
+      }
       J.fpsQ = 0;
       J.fpsT = 0;
+      J.custoF = 0;
+      J.custoD = 0;
+      J.custoN = 0;
     }
     if (!J.usouPoder && !J.dica && !dicasVistas.poder && J.chave === 'semfim' && J.tempoJogo >= 60) abrirDica();
     if (J.dica && (J.dica.t += dt) > 8) fecharDica();
@@ -777,6 +837,7 @@ function desenharJogo(dt = 0) {
   const h = J.modo.hud();
   // a meta da vez mostra as gotas da descoberta quando o nivel ainda e novo para o jogador
   if (h.objetivo && h.objetivo.novo) h.objetivo = { ...h.objetivo, premio: PREMIO_DESCOBERTA };
+  metaDaVez(h);
   // no desafio, o lugar do recorde mostra a meta do dia (com o ✓ quando o premio ja saiu)
   if (J.chave === 'desafio') h.recorde = formatar(T.meta, { n: fmtNumero(J.meta) }) + (J.premiado || (h.pontos || 0) >= J.meta ? ' ✓' : '');
   hud.atualizar(h);
@@ -789,6 +850,24 @@ function desenharJogo(dt = 0) {
   if (dep.debug) hud.depurar(laco.medidas, J.modo.mundo, cena, J.modo);
 }
 
+/**
+ * Meio da partida no sem fim: a pilula alterna entre o proximo nivel e uma meta curta com o
+ * progresso (no nivel 13 fica so a meta). Primeiro a missao do dia aberta mais perto de acabar; sem
+ * nenhuma, as metas da partida (src/jogo/missoes.js), que nascem aqui e valem ate o fim da partida.
+ * @param {any} h o hud do modo (troca o objetivo)
+ */
+function metaDaVez(h) {
+  if (J.chave !== 'semfim' || !J.modo.S || J.modo.S.jogadores[0].maxNivel < NIVEL_METAS) return;
+  let lista = perfil.missoes().filter((m) => !m.feita && TIPOS_META.includes(m.tipo));
+  if (!lista.length) {
+    if (!J.metas) J.metas = criarMissoes(Date.now() >>> 0);
+    lista = J.metas.lista();
+  }
+  if (h.objetivo && Math.floor(J.t / TROCA_META) % 2 === 0) return;
+  const m = lista.reduce((a, b) => (b.prog / b.meta > a.prog / a.meta ? b : a));
+  h.objetivo = { missao: { tipo: m.tipo, prog: m.prog, meta: m.meta, premio: m.premio } };
+}
+
 /** Fps do jogo rodando: a qualidade adaptativa e a media do minuto para a telemetria. */
 function medirQuadro(dt) {
   if (J.estado !== 'jogando') { qualidade.reiniciar(); return; }
@@ -796,7 +875,13 @@ function medirQuadro(dt) {
     cena.definirQualidade(qualidade.nivel);
     poki.measure('qualidade', cena.qualidade, 'm' + J.minutos);
   }
-  if (J.tocou && dt > 0 && dt < 0.25) { J.fpsQ++; J.fpsT += dt; }
+  if (J.tocou && dt > 0 && dt < 0.25) {
+    J.fpsQ++;
+    J.fpsT += dt;
+    J.custoF += laco.medidas.passoMs;
+    J.custoD += laco.medidas.desenhoMs;
+    J.custoN++;
+  }
 }
 
 hud.aoPausar(() => alternarPausa());
@@ -849,7 +934,7 @@ async function iniciar() {
   const pronto = poki.init();
   // as teclas da dica (setas e espaco) precisam do foco no iframe da Poki sem clique antes
   try { window.focus(); } catch { /* sem permissao de foco: o primeiro clique foca */ }
-  if (dep.qualidade >= 0) cena.definirQualidade(dep.qualidade);
+  if (qualidade.nivel > 0) cena.definirQualidade(qualidade.nivel);
   await carregarModo(inicial);
   pronto.then(() => { if (!poki.sdkPronto && !dep.local) document.body.classList.add('sem-anuncio'); });
   // sequencia diaria: o premio do dia entra ao abrir, com um aviso que nao interrompe o jogo
@@ -874,6 +959,8 @@ async function iniciar() {
   J.estado = 'jogando';
   if (dep.filme) { filmar(dep.filme, dep.cada); return; }
   laco.iniciar();
+  // prints do cartao de slime novo: depois do 1o desenho (a barra de evolucao ja tem as cores)
+  if (dep.revelar) setTimeout(() => hud.revelar(dep.revelar, `${formatar(T.nivelN, { n: dep.revelar })} · +${PREMIO_DESCOBERTA} 💧`, true), 300);
   // reserva: se o rAF nao andar (aba em segundo plano, iframe escondido), o loading sai assim mesmo
   setTimeout(() => { if (!J.carregou) { J.carregou = true; poki.gameLoadingFinished(); } }, 1500);
   if (dep.ganchos) {

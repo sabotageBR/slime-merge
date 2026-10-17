@@ -67,3 +67,12 @@ export function criarQualidade(o = {}) {
 export function faixaFps(fps) {
   return fps >= 55 ? '55' : fps >= 45 ? '45' : fps >= 30 ? '30' : '0';
 }
+
+/**
+ * Faixa de custo em ms por quadro para a telemetria (o teto da faixa): 4, 8, 16 e 16+.
+ * Mostra se no aparelho lento o gargalo e a fisica ou o desenho.
+ * @param {number} ms
+ */
+export function faixaMs(ms) {
+  return ms < 4 ? '4' : ms < 8 ? '8' : ms < 16 ? '16' : '16+';
+}

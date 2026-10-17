@@ -7,9 +7,9 @@ import { LOJA, SEQUENCIA } from '../jogo/perfil.js';
 import { SKINS, aparencia } from '../jogo/skins.js';
 import { MAX_NIVEL } from '../jogo/niveis.js';
 import { criarMiniaturas } from './miniaturas.js';
+import { ICONE_MISSAO } from './icones.js';
 
 const ICONE_MODO = { semfim: '🧪', desafio: '📅', duelo: '⚔️', duelo2: '👥' };
-const ICONE_MISSAO = { fusao: '🫧', nivel: '⬆️', combo: '✖️', pontos: '⭐', poder: '🪄', duelo: '⚔️' };
 
 /**
  * @param {Document} doc

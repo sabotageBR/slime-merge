@@ -26,6 +26,10 @@ export const QUALIDADES = [
   { nome: 'alta', dpr: 2, celula: 0.085, brilho: 1 },
   { nome: 'media', dpr: 1.5, celula: 0.11, brilho: 1 },
   { nome: 'baixa', dpr: 1, celula: 0.14, brilho: 0 },
+  // ultimo degrau (1.2.0): no Player Fit Test da 1.1.1, 22% dos celulares ainda passavam do minuto 5
+  // abaixo de 30 fps na baixa. So o canvas do slime perde resolucao (slime: dpr dele; rostos e pote
+  // ficam nitidos), e a celula maior tambem barateia o P2G na CPU (campo.js)
+  { nome: 'minima', dpr: 1, slime: 0.75, celula: 0.17, brilho: 0 },
 ];
 
 /**
@@ -46,6 +50,8 @@ export function criarCena(el, o = {}) {
   let W = 0;
   let H = 0;
   let dpr = 1;
+  /** dpr do canvas do slime (menor que o dos outros so na qualidade minima) */
+  let dprSlime = 1;
   /** @type {import('./camera.js').Camera|null} */
   let cam = null;
   /** @type {ReturnType<typeof criarCampo>|null} */
@@ -66,9 +72,11 @@ export function criarCena(el, o = {}) {
     H = Math.max(0, window.innerHeight | 0);
     const q = QUALIDADES[qual];
     dpr = Math.min(q.dpr, window.devicePixelRatio || 1);
+    dprSlime = Math.min(q.slime || q.dpr, dpr);
     for (const c of [el.fundo, el.slime, el.topo]) {
-      const w = Math.max(1, Math.round(W * dpr));
-      const h = Math.max(1, Math.round(H * dpr));
+      const d = c === el.slime ? dprSlime : dpr;
+      const w = Math.max(1, Math.round(W * d));
+      const h = Math.max(1, Math.round(H * d));
       if (c.width !== w) c.width = w;
       if (c.height !== h) c.height = h;
     }
@@ -131,11 +139,11 @@ export function criarCena(el, o = {}) {
     if (comp && !comp.perdeu()) {
       const c = garantirCampo(modo.campoJanela || modo.janela);
       c.acumular(m);
-      comp.desenhar(c, cam, dpr, { tempo: t, brilho: q.brilho, limiar, traco: Math.max(1.6, Math.min(2.8, cam.s * 0.055)) });
+      comp.desenhar(c, cam, dprSlime, { tempo: t, brilho: q.brilho, limiar, traco: Math.max(1.6, Math.min(2.8, cam.s * 0.055)) });
     } else if (ctxSlime2d) {
       ctxSlime2d.setTransform(1, 0, 0, 1, 0, 0);
       ctxSlime2d.clearRect(0, 0, el.slime.width, el.slime.height);
-      desenharSlimes2D(ctxSlime2d, m, cam, dpr);
+      desenharSlimes2D(ctxSlime2d, m, cam, dprSlime);
     }
     // por cima
     ctxTopo.setTransform(1, 0, 0, 1, 0, 0);

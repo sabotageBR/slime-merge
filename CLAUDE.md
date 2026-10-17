@@ -36,6 +36,10 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
   vez fica acima da barra; cartão de slime novo; dica do reforço aos 60 s; demonstração para quem
   não toca; "quase lá" e o próximo item da loja no fim; qualidade adaptativa do render
   (`src/render/qualidade.js`); a telemetria nova está listada no roteiro.
+- **Retenção (1.2.0, depois dos 2 Player Fit Tests da 1.1.1):** cartão de slime novo no alto (fora da
+  mira no retrato); o celular começa na qualidade média e há o degrau `minima`; do nível 9 em diante a
+  pílula alterna com uma meta curta (missão do dia ou as metas da partida de `src/jogo/missoes.js`);
+  telemetria `partida/*`, `sair/*`, `custo/*`, `fps1/*` e `meta/*` (lista no roteiro).
 - Protótipos (Croma, Loja, Molde, lab) só por `?modelo=` ou pelo hub; o `tools/empacotar.mjs`
   apaga os arquivos deles e as linhas `// prototipo` do `main.js`.
 
@@ -77,7 +81,8 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
 - `src/jogo/`: `soltar.js` (motor dos jogos de soltar: 1 ou 2 jogadores, fila, reforços,
   fusões, resgate nos 3 primeiros minutos, bot), `pote.js` (mira, preso, perigo, combo,
   chacoalhar, alargar), `goo.js` (bicos e massas de goo que se juntam), `niveis.js`, `cores.js`
-  (40 cores com nome), `fases-molde.js`, `missoes.js`, `skins.js` (skins por nível: paleta,
+  (40 cores com nome), `fases-molde.js`, `missoes.js` (metas da partida em cadeia, no meio do sem
+  fim; vai para a build), `skins.js` (skins por nível: paleta,
   codec da pixel art, catálogo `SKINS` com as 26 escolhidas, `aparencia`), `modos/*.js`. Contrato do modo: `criarModo({ semente, salvo, toque })` →
   `{ mundo, janela, campoJanela, eventos, passo, apontar, tecla, poder, bot, hud, visual,
   reiniciar, reviver, salvar }`.
@@ -103,7 +108,7 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
 ## Comandos
 | Comando | O que faz |
 |---|---|
-| `npm test` | Física, cor, wrapper Poki, fronteiras, perfil, os modos com o bot, borda, míssil, pote estreito, telemetria de nível, qualidade adaptativa, áudio, sons, música e skins (133 testes, ~35 s) |
+| `npm test` | Física, cor, wrapper Poki, fronteiras, perfil, os modos com o bot, borda, míssil, pote estreito, telemetria de nível e do resgate, qualidade adaptativa, metas da partida, áudio, sons, música e skins (138 testes, ~35 s) |
 | `npm run menu` | Fluxo da build no Chrome headless: sequência, gotas no fim, dobrar, loja, missões, troca de modo, Loja › Skins e o editor (pintar, salvar, Esc). Prints em `.tmp/menu/`. `-- --tam=640x360` |
 | `npm run empacotar` | Build da Poki em `dist/` e zip em `dist-poki/` (sem protótipos; < 500 KB gzip); `-- --thumb` confere e anexa `marketing/thumb/slime-merge-1256.png` |
 | `npm run thumb` | Opções de thumb da Poki (`tools/thumb.html`: física e render do jogo) em `marketing/thumb/`, com tiles e a régua (#83FFE7, tarja, opaca); `-- --final` grava a escolhida (`ESCOLHIDA` em `tools/thumb.mjs`) em `slime-merge-{1256,628}` |
@@ -128,7 +133,8 @@ sliders do material), `?semente=`, `?passos=N` (física antes do 1º desenho), `
 `?filme=N&cada=K`, `?vitrine=1..5` (níveis altos no pote, para ver as texturas; 5 = o 13),
 `?bot=borda` (o `?auto` solta em cima da borda), `?poder=<id>`, `?expr=choro`, `?demoReforcos`
 (botões em todos os estados), `?sons=cat:variante`, `?skins=todas` (uma skin em cada nível),
-`?qualidade=0|1|2` (fixa o render e desliga a adaptativa). A prévia de `modelos/escolhas.html` passa a
+`?qualidade=0..3` (alta, média, baixa, mínima; fixa o render e desliga a adaptativa; sem ele, o celular
+começa na média), `?revelar=N` (cartão de slime novo parado, para prints). A prévia de `modelos/escolhas.html` passa a
 vitrine por `slime.escolha`. Fora do localhost o modelo vem de `window.__slimeModelo` (páginas `jogo-N.html`).
 
 ## Avaliação

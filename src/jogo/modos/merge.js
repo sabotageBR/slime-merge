@@ -291,8 +291,9 @@ export function criarModo(o = {}) {
     }
     const p = o.vitrine > 1 ? null : criar(S, J, { nivel: 3, prisma: true }, 0.3, 11.5, false);
     if (p) { p.dados.pote = 0; p.dados.solto = -10; }
-    // a barra mostra a escada inteira no print
+    // a barra mostra a escada inteira no print, e a meta da vez segue o maior nivel do pote
     visto = MAX_NIVEL;
+    J.maxNivel = Math.max(...lista.map((l) => l[0]));
   }
   return jogo;
 }

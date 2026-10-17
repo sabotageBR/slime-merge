@@ -5,7 +5,7 @@
 
 import { hexDaMistura } from '../cor/km.js';
 import { PALETA } from '../jogo/skins.js';
-import { svgIcone } from './icones.js';
+import { svgIcone, ICONE_MISSAO } from './icones.js';
 
 /** Premios de marco (o 5o espaco): placa dourada. */
 const PREMIOS = ['calor', 'gelo', 'tesoura', 'tinta'];
@@ -281,10 +281,13 @@ export function criarHud(doc, T) {
         if (k !== ultimo.evol) {
           ultimo.evol = k;
           evol = h.evolucao;
-          // a meta da vez: a pilula com a bolinha do nivel e o alvo pulsando na barra
-          const pilula = ob
-            ? `<div class="objetivo${ob.cresce ? ' cresce' : ''}">${bola(ob.nivel)}<span>${texto(ob.cresce ? 'objetivoCresce' : 'objetivoProximo', { n: ob.nivel })}${ob.premio ? ` · +${ob.premio} 💧` : ''}</span></div>`
-            : '';
+          // a meta da vez: a pilula com a bolinha do nivel e o alvo pulsando na barra. No meio da
+          // partida ela alterna com uma meta curta (missao do dia ou meta da partida) e o progresso
+          const mi = ob && ob.missao;
+          const pilula = !ob ? ''
+            : mi
+              ? `<div class="objetivo missao"><b aria-hidden="true">${ICONE_MISSAO[mi.tipo] || '•'}</b><span>${texto('missao.' + mi.tipo, { n: mi.meta })} · ${mi.prog}/${mi.meta} · +${mi.premio} 💧</span></div>`
+              : `<div class="objetivo${ob.cresce ? ' cresce' : ''}">${bola(ob.nivel)}<span>${texto(ob.cresce ? 'objetivoCresce' : 'objetivoProximo', { n: ob.nivel })}${ob.premio ? ` · +${ob.premio} 💧` : ''}</span></div>`;
           el.meta.innerHTML = pilula + '<div class="evolucao">' + h.evolucao.map((e) => {
             const tam = (1.05 + e.k * 0.07).toFixed(2);
             const alvo = ob && ob.nivel === e.k + 1 ? ' alvo' : '';
@@ -349,8 +352,9 @@ export function criarHud(doc, T) {
     /**
      * Slime novo descoberto: cartao com a bolinha do nivel por 2,6 s (nao bloqueia o toque).
      * @param {number} k nivel @param {string} sub linha de baixo (nivel e gotas)
+     * @param {boolean} [fixo] fica parado na tela, sem animacao (prints do ?revelar)
      */
-    revelar(k, sub) {
+    revelar(k, sub, fixo = false) {
       const e = evol[k - 1];
       // atributo inteiro: o fundo da skin de pixel traz o image-rendering junto
       el.revelacao.querySelector('.bola')?.setAttribute('style', e ? 'background:' + (fundoSkin(k) || fundoTextura(e.cor, e.textura)) : '');
@@ -358,9 +362,10 @@ export function criarHud(doc, T) {
       /** @type {HTMLElement} */ (el.revelacao.querySelector('small')).textContent = sub;
       el.revelacao.hidden = false;
       el.revelacao.classList.remove('entra');
+      clearTimeout(revelaId);
+      if (fixo) return;
       void el.revelacao.offsetWidth;
       el.revelacao.classList.add('entra');
-      clearTimeout(revelaId);
       revelaId = /** @type {any} */ (setTimeout(() => { el.revelacao.hidden = true; }, 2600));
     },
     /** Dica do reforco: o botao pulsa e a mao toca nele ('' tira). @param {string} id */

@@ -232,6 +232,8 @@ export function criarSoltar(R, o = {}) {
       J.resgatou = true;
       tirarTopo(J, 3);
       eventos.push({ tipo: 'texto', x: J.pote.cx, y: 9, texto: 'ufa', cor: '#ffd23a', escala: 1.4 });
+      // telemetria: quantos resgates e em que minuto (o main.js mede)
+      if (J.idx === 0) eventos.push({ tipo: 'resgate' });
       return;
     }
     terminar(J);
