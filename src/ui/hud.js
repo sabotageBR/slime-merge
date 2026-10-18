@@ -327,10 +327,13 @@ export function criarHud(doc, T) {
               ? `<i class="${alvo.trim()}" style="width:${tam}em;height:${tam}em;background:${fundoSkin(e.k + 1) || fundoTextura(e.cor, e.textura)}">${e.icone || ''}</i>`
               : `<i class="desconhecido${alvo}" style="width:${tam}em;height:${tam}em">?</i>`;
           }).join('') + '</div>';
+          // a #meta com a barra tem altura fixa na paisagem (estilo.css)
+          el.meta.classList.add('barra');
         }
       } else if (h.metaHtml !== undefined && h.metaHtml !== ultimo.evol) {
         ultimo.evol = h.metaHtml;
         el.meta.innerHTML = h.metaHtml;
+        el.meta.classList.remove('barra');
       }
       if (h.colecao) this.colecao(h.colecao);
       if (dicaId) posicionarDica();

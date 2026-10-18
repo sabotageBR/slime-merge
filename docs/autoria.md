@@ -326,3 +326,15 @@ Pedidos com prints anotados do Merge Lab (plano em
   por cima do maior (o `soltar.js` só atualizava o recorde no fim, que o sem fim não tem).
 - **Build: versão 2.0.5** (`dist-poki/slime-merge-2.0.5.zip`, com a thumb), pedida pelo usuário depois de
   testar ("pode gerar a build da poki"): 136,2 KB de áudio, 462 KB gzip.
+
+## 2026-10-18 (noite): o pote parou de mudar de tamanho
+- Pedido, com dois prints da paisagem (889x496): "a tela fica variando de tamanho, não quero isso".
+- **Causa:** a câmera enquadra a `#area` do HUD. Do nível 9 em diante a pílula da meta alterna a cada 8 s
+  com uma missão; na paisagem a missão longa ("Faça um combo ×12 · 7/12 · +20 💧") não cabia ao lado da
+  barra, a barra descia para uma segunda linha e o pote encolhia ~8% (escala 26,25 → 24,17 em 889x496). No
+  retrato, os emojis das missões e dos eventos mudavam a altura da pílula (1 a 5 px).
+- **Correção:** a pílula tem altura fixa e, na paisagem, a `#meta.barra` tem a altura da barra: a pílula que
+  não cabe ao lado sobe para a grama logo abaixo do pote, sem empurrar a barra. Conferido em 8 tamanhos
+  (a `#area` igual com todas as pílulas) e numa partida de ~225 s com o bot (escala constante).
+- **Build: versão 2.0.6** (`dist-poki/slime-merge-2.0.6.zip`, com a thumb), pedida pelo usuário ("gere a
+  nova versao da poki"): 136,2 KB de áudio, 462 KB gzip.

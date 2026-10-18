@@ -126,6 +126,9 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
   esperando; o `main.js` chama `sons.passo()` a cada quadro) e o arquivo toca mais agudo nos slimes
   pequenos e grave nos grandes (`taxaDoNivel`). Arquivos: `node tools/sons.mjs converter` (Voiceover Pack,
   as duas vozes); a build leva só as de slime (~136 KB de áudio; o limite do empacotar subiu para 150 KB).
+- **Versão 2.0.6 (2026-10-18, depois da 2.0.5):** o pote não muda mais de tamanho quando a pílula da meta
+  troca (a missão longa jogava a barra para uma segunda linha na paisagem e a câmera encolhia o pote ~8%);
+  ver a convenção da `#area` abaixo.
 - Protótipos (Croma, Loja, Molde, lab) só por `?modelo=` ou pelo hub; o `tools/empacotar.mjs`
   apaga os arquivos deles e as linhas `// prototipo` do `main.js`.
 
@@ -205,6 +208,10 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
   vírgula, JSDoc.
 - Um relógio só (`performance.now()` no laço); o rAF sai antes de desenhar; nada desenha em
   canvas 0×0; sem `roundRect` (Safari antigo).
+- A câmera enquadra a `#area` do HUD: o que muda durante a partida não pode mudar a altura da
+  `#meta`, do `#topo` nem da `#base`, senão o pote cresce e encolhe. A pílula da meta tem altura
+  fixa, e na paisagem a `#meta.barra` tem a altura da barra (a pílula que não cabe ao lado sobe por
+  cima do pé da área).
 - Fronteiras vigiadas por `test/estilo.test.js`: `src/jogo/`, `src/fisica/` e `src/cor/` sem
   `Math.random`, `document`/`window`, `Date.now`/`performance.now` nem `setTimeout` (sorteio
   por `core/rng.js` com semente); `src/fisica/` também sem `Math.sin/cos/pow/exp...` nem `**`

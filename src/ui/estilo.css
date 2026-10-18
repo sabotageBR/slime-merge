@@ -210,10 +210,15 @@ body.semMusica #bMusica { opacity: 0.7; }
 @keyframes pulsaDica { 50% { transform: scale(1.14); box-shadow: 0 0.2em 0 var(--tinta), 0 0 0 0.3em var(--laranja); } }
 
 /* ---- meta da vez acima da barra de evolucao (ao lado dela na paisagem) e o alvo pulsando */
+/* A camera enquadra a #area: se a #meta muda de altura, o pote cresce e encolhe quando a pilula troca
+   (print de 2026-10-18). Por isso a pilula tem altura fixa (o emoji da missao e do evento esticava a
+   linha) e, na paisagem, a #meta tem a altura da barra (~2,25em): a pilula que nao cabe ao lado sobe
+   por cima do pe da area (align-content: flex-end) em vez de empurrar a barra para uma linha nova. */
 #meta { flex-direction: column; align-items: center; gap: 0.35em; }
 body[data-orient="paisagem"] #meta { flex-direction: row; justify-content: center; flex-wrap: wrap; }
+body[data-orient="paisagem"] #meta.barra { height: 2.3em; align-content: flex-end; row-gap: 0.12em; }
 .objetivo { display: inline-flex; align-items: center; gap: 0.4em; padding: 0.2em 0.75em 0.2em 0.3em; border-radius: 1em; background: #fff;
-  border: 0.15em solid var(--tinta); box-shadow: 0 0.14em 0 var(--tinta); font-size: 0.82em; white-space: nowrap; }
+  border: 0.15em solid var(--tinta); box-shadow: 0 0.14em 0 var(--tinta); font-size: 0.82em; white-space: nowrap; height: 2.2em; }
 .objetivo.cresce { background: #e4faf7; }
 .objetivo.missao { background: #fff4d1; }
 .objetivo.super { background: linear-gradient(90deg, #fff4c2, #ffe08a); }
