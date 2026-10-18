@@ -1,7 +1,8 @@
-// Prints dos botoes de reforco (colados no pote, layout B escolhido em 2026-10-15) com os botoes
-// em todos os estados (?demoReforcos), em retrato e paisagem, o Duelo em paisagem e a folha de
-// icones (tools/icones.html). Saida em docs/visuais/reforcos-<LxA>.png, reforcos-duelo.png e
-// icones.png (os mosaicos reforcos-comparar-* da escolha ficam como registro).
+// Prints dos botoes de reforco (colados no pote, layout B escolhido em 2026-10-15; bolhas de gel com
+// o nome, escolhidas em 2026-10-18) com os botoes em todos os estados (?demoReforcos), em retrato e
+// paisagem, o Duelo em paisagem e a folha de icones (tools/icones.html). Saida em
+// docs/visuais/reforcos-<LxA>.png, reforcos-duelo.png e icones.png (os mosaicos reforcos-comparar-*
+// e botoes-comparar-* das escolhas ficam como registro).
 // Uso: node tools/prints-reforcos.mjs
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';

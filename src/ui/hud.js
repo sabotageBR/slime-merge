@@ -45,6 +45,11 @@ function fundoTextura(cor, t) {
  */
 export function criarHud(doc, T) {
   const icone = (id) => svgIcone(id) || ICONES_PROTOTIPOS[id] || '';
+  /** etiqueta com o nome do reforco embaixo do botao (pedido do usuario em 2026-10-18); os prototipos nao tem nome */
+  const nomeCurto = (id) => {
+    const n = T['poder.' + id + '.curto'] || T['poder.' + id];
+    return n ? `<i class="nome" aria-hidden="true">${n}</i>` : '';
+  };
   const $ = (id) => /** @type {HTMLElement} */ (doc.getElementById(id));
   let encosto = '';
   /** @type {Array<any>|null} skins da partida (indice = nivel), para a barra e o proximo */
@@ -212,7 +217,8 @@ export function criarHud(doc, T) {
         const b = doc.createElement('button');
         b.className = 'btn poder' + (PREMIOS.includes(p.id) ? ' premio' : '');
         const selo = svgIcone('video');
-        b.innerHTML = icone(p.id) + `<i class="conta"></i><i class="selo" aria-hidden="true" hidden>${selo}</i>`;
+        b.dataset.poder = p.id;
+        b.innerHTML = icone(p.id) + `<i class="conta"></i><i class="selo" aria-hidden="true" hidden>${selo}</i>` + nomeCurto(p.id);
         b.setAttribute('aria-label', T['poder.' + p.id] || p.id);
         b.title = T['poder.' + p.id] || '';
         b.addEventListener('click', () => cb.poder(p.id));
@@ -226,7 +232,8 @@ export function criarHud(doc, T) {
         v.className = 'btn poder vago';
         v.tabIndex = -1;
         v.setAttribute('aria-label', T['poder.vago'] || '');
-        v.innerHTML = icone('vago');
+        v.dataset.poder = 'vago';
+        v.innerHTML = icone('vago') + nomeCurto('vago');
         el.base.appendChild(v);
         poderes.set('_vago', v);
       }

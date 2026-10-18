@@ -90,6 +90,8 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
   - **loading em camadas**: uma gota de cada nível cai e vira uma camada daquela cor;
   - **HUD no retrato**: o placar sai do canto do botão da Poki (58 px à esquerda; abaixo de 380 px de
     largura, desce para baixo dele) e mostra só o número dos pontos.
+- **Botões de reforço (2026-10-18, depois da 2.0.2):** bolhas de gel com uma cor por reforço, o número no
+  canto e o nome numa etiqueta embaixo (opção 1 de 5; registro em `docs/visuais/botoes-comparar-*`).
 - Protótipos (Croma, Loja, Molde, lab) só por `?modelo=` ou pelo hub; o `tools/empacotar.mjs`
   apaga os arquivos deles e as linhas `// prototipo` do `main.js`.
 

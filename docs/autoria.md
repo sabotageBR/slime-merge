@@ -238,3 +238,16 @@ Pedidos com prints anotados do Merge Lab (plano em
   `docs/visuais/nivel14-comparar.jpg`; as outras três saíram do código), as skins **Troféus** e **Coroas**,
   os olhos (`humor-480x600.jpg`), o loading (`carregando*`), o 14 comemorando (`fusao-super-*`) e o HUD
   (`hud-poki-retrato.png`). Build: **versão 2.0.2**.
+
+## 2026-10-18: botões de reforço com nome
+- Pedido: "Quero mudar totalmente o layout desses botões [print da coluna de reforços], me dê 5 opções de
+  escolha" e, no meio, "Coloque nome nos botões". Cinco opções, todas com o nome, no jogo de verdade
+  (`docs/visuais/botoes-comparar-{1031x580,390x844,640x360}.jpg` e a folha com os estados,
+  `botoes-folha.png`): 1 bolhas de gel, 2 gotas de slime, 3 frascos do laboratório, 4 pílulas com nome,
+  5 bandeja escura.
+- **Escolha: 1, bolhas de gel** (a recomendada). Botão redondo e brilhante com **uma cor por reforço**
+  (trocar azul, chacoalhar rosa, alargar verde, míssil vermelho; o prêmio continua dourado, o acabado com
+  vídeo lilás e o vazio cinza), o número no canto de cima e o **nome numa etiqueta branca embaixo**. Sem a
+  placa listrada e torta de antes. Nomes curtos onde não cabia: "Tinta" (gota de tinta) e "Prêmio" (o
+  espaço do prêmio). A posição continua a da escolha de 2026-10-15 (colada no pote); na paisagem baixa
+  (até 460 px de altura) a coluna vira duas. As outras quatro e o `?botoes` saíram do código.
