@@ -11,7 +11,7 @@ import { criarSoltar, PREMIOS, TEXTO_COMBO, COR_COMBO } from '../soltar.js';
 import { MAX_NIVEL, particulasNivel, pontosNivel, diametroNivel } from '../niveis.js';
 import { aparencias as tabelaAparencias } from '../skins.js';
 import { iniciarFrente, pintar } from '../../cor/difusao.js';
-import { PESOS, PESOS_ESCADA, ESCADA, pisoPara, AGENDA, CICLO, EVENTOS, criarAgenda, avancarAgenda, encerrarEvento, nivelGigante, alvoPedido } from '../pressao.js';
+import { PESOS, PESOS_ESCADA, ESCADA, pisoPara, AGENDA, CICLO, EVENTOS, NIVEL_FIM, FIM_CORINGA, criarAgenda, avancarAgenda, encerrarEvento, nivelGigante, alvoPedido } from '../pressao.js';
 
 const PRISMA = { pig: [0.06, 0.04, 0.08, 0], textura: 6 };
 /** Eventos com contagem na pilula (os outros acabam quando o que cai, cai). */
@@ -108,12 +108,14 @@ export function ligarAparencias(jogo, AP, pular = () => false) {
 /**
  * @param {{ semente?: number, salvo?: any, toque?: boolean, visto?: number, regra?: { id: string, meta: number }|null,
  *   vitrine?: number, cesto?: string, aparencias?: Array<any>, inicio?: Partial<typeof INICIO>, pressao?: boolean,
- *   escada?: Partial<typeof ESCADA> & { pesos?: number[] } }} [o]
+ *   escada?: Partial<typeof ESCADA> & { pesos?: number[] }, abertura?: boolean }} [o]
  *   regra: desafio do dia (src/jogo/perfil.js REGRAS); visto: maior nivel ja descoberto (perfil);
  *   aparencias: skin de cada nivel (src/jogo/skins.js `aparencias`; sem ela, as padrao);
  *   inicio: troca o comeco do sem fim (testes e a simulacao de ritmo);
  *   pressao: false desliga a escada, os eventos e o resgate permanente (a 1.2.0, para comparar);
- *   escada: troca a escada (testes e a simulacao de ritmo); `pesos` vale quando o piso passa de 1
+ *   escada: troca a escada (testes e a simulacao de ritmo); `pesos` vale quando o piso passa de 1;
+ *   abertura: a partida nova nasce com uma gotinha no fundo e a primeira gota da mao igual (o
+ *   main.js liga no sem fim; a gota cai sozinha em 1 s sem toque: a fusao de abertura)
  */
 export function criarModo(o = {}) {
   const salvo = o.salvo || {};
@@ -249,7 +251,7 @@ export function criarModo(o = {}) {
     if (S.extra.evoluir) { const k = S.extra.evoluir; S.extra.evoluir = 0; evoluir(S, J, k); }
     // partida de antes da agenda (save da 1.2.0): o primeiro evento vem 30 s depois de voltar
     const A = S.extra.agenda || (S.extra.agenda = criarAgenda({ prox: Math.max(AGENDA.primeiro, S.tempo + 30) }));
-    const mud = avancarAgenda(A, S.tempo, dt);
+    const mud = avancarAgenda(A, S.tempo, dt, J.maxNivel >= NIVEL_FIM);
     if (mud === 'aviso') anunciar(S, J, A.ev);
     else if (mud === 'start') comecar(S, J, A.ev);
     else if (mud === 'fim') fecharEvento(S, J, A);
@@ -289,6 +291,22 @@ export function criarModo(o = {}) {
     campoJanela: [-7.6, -1.4, 7.6, 15.2],
     premios: true,
     largura: comInicio ? ini.largura : 1,
+    // fusao de abertura (2.0.3): 21,6% do desktop nao fazia a primeira fusao no Player Fit Test da
+    // 2.0.2. Uma gotinha no fundo, no meio, e a gota da mao tambem do nivel 1: o main.js solta
+    // sozinho em cima dela se ninguem tocar em 1 s (S.extra.abertura guarda onde)
+    abrir(S) {
+      if (!comInicio || !o.abertura) return;
+      const J = S.jogadores[0];
+      J.fila[0] = { nivel: 1 };
+      const r = diametroNivel(1) / 2;
+      const [x, y] = J.pote.lugar(r, J.pote.cx, r);
+      const s = criar(S, J, { nivel: 1 }, x, y, false);
+      if (!s) return;
+      s.dados.pote = 0;
+      s.dados.solto = -10;
+      s.dados.pousou = true;
+      S.extra.abertura = { x };
+    },
     sortear(S) {
       // evento dos coringas: os prismas que faltam saem antes de tudo
       if (S.extra.coringas > 0) { S.extra.coringas--; return { nivel: 2, prisma: true }; }
@@ -548,6 +566,9 @@ export function criarModo(o = {}) {
     const A = S.extra.agenda || (S.extra.agenda = criarAgenda());
     A.ev = null;
     A.i = CICLO.indexOf(id);
+    // no fim de jogo o coringa tem a vez dele: a contagem do fim cai na vez certa para `id`
+    if (id === 'coringas') A.f = Math.ceil(A.f / FIM_CORINGA) * FIM_CORINGA;
+    else if (A.f % FIM_CORINGA === 0) A.f++;
     A.prox = S.tempo + AGENDA.aviso;
   };
   if (regra === 'semPoderes') {

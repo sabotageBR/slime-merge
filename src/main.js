@@ -66,7 +66,9 @@ const J = {
   premiado: false, // desafio do dia: premio de hoje ja pago
   editor: false, // editor de pixel da Minha aberto (por cima do menu, jogo pausado)
   ocioso: 0, // s sem nenhum gesto (mouse, toque, tecla): a demonstracao espera por ele
-  demos: 0, // gotas soltas pela demonstracao (quem nao toca no comeco)
+  demos: 0, // gotas soltas pela demonstracao (quem nao toca no comeco), com a da abertura
+  demoMedida: false, // a dica/demo/show ja foi (a abertura tem a dela)
+  seguindo: /** @type {{ cat: string, oque: string, t: number }[]} */ ([]), // completes que esperam o tempo de jogo
   usouPoder: false, // algum reforco usado nesta sessao (a dica do reforco so vem sem isso)
   dica: /** @type {{ id: string, t: number }|null} */ (null),
   fpsQ: 0, // quadros e tempo real do minuto de jogo (telemetria do fps)
@@ -77,6 +79,7 @@ const J = {
   faixa1: '', // faixa de fps do minuto 1, repetida depois: a permanencia por faixa de fps
   saiu: false, // a primeira vez que a aba sumiu ja foi medida
   ultimoAnuncio: 0, // tempo de jogo (s) do ultimo intervalo comercial (o espaco entre eles)
+  videoEspera: 0, // tempo de jogo (s) ate quando o video premiado nao e pedido de novo (o ultimo falhou)
   metas: /** @type {ReturnType<typeof criarMissoes>|null} */ (null), // metas da partida (meio do sem fim)
 };
 /** Minutos de jogo em que o fps medio vai para a telemetria (poucos, para nao inflar). */
@@ -93,6 +96,13 @@ const TROCA_META = 8;
 const TIPOS_META = ['fusao', 'combo', 'poder'];
 /** s de jogo ativo entre dois intervalos nas pausas naturais do sem fim (o fim de um evento). */
 const ESPACO_ANUNCIO = 150;
+/** s de jogo sem pedir outro video premiado depois de um que falhou (61 falhas em 8 partidas na 2.0.2) */
+const ESPERA_VIDEO = 30;
+/** demonstracao para quem nao toca: s parado antes de cada gota e quantas (com a da abertura) */
+const DEMO_OCIOSO = 2;
+const DEMOS = 3;
+/** s de jogo depois do intervalo comercial ou do "Ufa!" que contam como "ficou" (o complete) */
+const SEGUIU = 20;
 /** Dicas que o aparelho ja viu (uma vez cada). */
 const dicasVistas = armazem.ler('dicas', {}) || {};
 // qualidade do render: desce sozinha quando o aparelho nao segura o fps (?qualidade= fixa).
@@ -432,8 +442,9 @@ function configModo(chave, nova = false) {
   }
   const salvo = comVisto(dep.semente ? {} : armazem.ler(chaveSalvo(chave), {}) || {});
   if (chave === 'duelo' || chave === 'duelo2') return { ...base, salvo, liga: perfil.liga.nivel, doisJogadores: chave === 'duelo2' };
-  // partida salva continua no pote em que comecou
-  return { ...base, salvo, cesto: salvo.partida && salvo.cesto ? salvo.cesto : vis.cesto };
+  // partida salva continua no pote em que comecou; a nova do sem fim nasce com a fusao de abertura
+  // (fora das ferramentas: ?semente sem ?abertura=1, ?auto e ?filme)
+  return { ...base, salvo, cesto: salvo.partida && salvo.cesto ? salvo.cesto : vis.cesto, abertura: chave === 'semfim' && dep.abertura && !dep.auto && !dep.filme };
 }
 
 /** @param {string} chave @param {boolean} [nova] */
@@ -561,7 +572,10 @@ function tratarEventos() {
         break;
       case 'resgate':
         // "Ufa!": o pote transbordou e o topo estourou (no sem fim, a partida inteira)
-        if (J.chave === 'semfim') poki.measure('partida', 'ufa', 'm' + J.minutos);
+        if (J.chave === 'semfim') {
+          poki.measure('partida', 'ufa', 'm' + J.minutos);
+          acompanhar('ufa', 'resgate');
+        }
         break;
       case 'escada':
         // o piso das gotas subiu (do nivel 9 em diante) e os pequenos evoluiram
@@ -591,7 +605,8 @@ function tratarEventos() {
         // o intervalo comercial pode vir aqui, com ESPACO_ANUNCIO s de jogo desde o anterior
         if (e.origem === 'evento' && (!J.tocou || J.estado !== 'jogando' || J.tempoJogo - J.ultimoAnuncio < ESPACO_ANUNCIO)) break;
         if (!dep.semAnuncio && poki.sdkPronto) {
-          if (e.origem) poki.measure('intervalo', e.origem, 'show');
+          // progresso (era intervalo/<origem>/show): o complete so com SEGUIU s de jogo depois
+          if (e.origem) acompanhar('intervalo', e.origem);
           poki.gameplayStop();
           anuncio('commercial').then(() => { if (J.tocou && J.estado === 'jogando') poki.gameplayStart(); });
         }
@@ -636,6 +651,17 @@ function registrar(chave, valor) {
   if (nivelNovo || missao) gravarPerfil();
 }
 
+/**
+ * Saidas (2.0.3): o intervalo comercial e o "Ufa!" viram eventos de progresso. O start vai na hora
+ * e o complete com SEGUIU s de jogo depois (o tempo de jogo para durante o anuncio): o Completed e o
+ * Left do painel da Poki dizem quantos saem no anuncio ou logo depois do resgate.
+ * @param {string} cat @param {string} oque
+ */
+function acompanhar(cat, oque) {
+  poki.measure(cat, oque, 'start');
+  J.seguindo.push({ cat, oque, t: J.tempoJogo + SEGUIU });
+}
+
 /** Reforco usado: telemetria, fim da dica (se era ela) e a dica nao volta nesta sessao. */
 function usouPoder(id) {
   poki.measure('poder', id || '-', 'use');
@@ -664,12 +690,30 @@ function fecharDica() {
 }
 
 /**
- * Demonstracao para quem nao toca (25% do desktop no Player Fit Test): parado ha 4 s, a peca
- * segue a mao do onboarding e cai sozinha no toque dela, duas vezes. Nao conta como jogada (a
- * mao continua ate a primeira gota de verdade) e nao abre o gameplay da Poki.
+ * Fusao de abertura (2.0.3; 21,6% do desktop nao fazia a primeira fusao no Player Fit Test da
+ * 2.0.2): sem toque, aos 0,6 s de partida a gota da mao vai para cima da gotinha do fundo e no 1 s
+ * cai sozinha; as duas se fundem. E a 1a gota da demonstracao, mesmo com o mouse andando.
+ */
+function abrirSozinho() {
+  const S = J.modo.S;
+  if (!S || S.tempo < 0.6) return;
+  const P = S.jogadores[0].pote;
+  P.apontar(S.extra.abertura.x);
+  if (S.tempo < 1 || !P.soltar()) return;
+  S.extra.abertura = null;
+  poki.measure('dica', 'abertura', 'show');
+  J.demos++;
+  J.ocioso = 0;
+}
+
+/**
+ * Demonstracao para quem nao toca (25% do desktop no Player Fit Test da 1.0.0): parado ha
+ * DEMO_OCIOSO s, a peca segue a mao do onboarding e cai sozinha no toque dela, ate DEMOS gotas
+ * (a abertura conta). Nao conta como jogada (a mao continua ate a primeira gota de verdade) e nao
+ * abre o gameplay da Poki.
  */
 function demonstrar() {
-  if (J.ocioso < 4 || !J.modo.S) return;
+  if (J.ocioso < DEMO_OCIOSO || !J.modo.S) return;
   const vis = J.modo.visual();
   if (!vis.mao) return;
   const P = J.modo.S.jogadores[0].pote;
@@ -677,7 +721,7 @@ function demonstrar() {
   P.apontar(m.x);
   // o toque da mao acabou de acontecer neste passo
   if (m.ciclo >= TOQUE_MAO && m.ciclo - PASSO < TOQUE_MAO && P.soltar()) {
-    if (!J.demos) poki.measure('dica', 'demo', 'show');
+    if (!J.demoMedida) { J.demoMedida = true; poki.measure('dica', 'demo', 'show'); }
     J.demos++;
     J.ocioso = 0;
   }
@@ -704,8 +748,11 @@ function quaseLa(e) {
 async function pedirVideo(id) {
   if (J.estado !== 'jogando' || document.body.classList.contains('sem-anuncio')) return;
   if (!poki.sdkPronto && !dep.local) return;
+  // o ultimo falhou (sem anuncio ou fechado antes do fim): o botao fica apagado por um tempo
+  if (J.tempoJogo < J.videoEspera) { hud.aviso(T.semVideo); return; }
   const ok = await anuncio('rewarded');
   poki.measure('video', 'poder-' + id, ok ? 'ok' : 'fail');
+  if (!ok) J.videoEspera = J.tempoJogo + ESPERA_VIDEO;
   if (ok && J.modo && J.modo.darPoder) J.modo.darPoder(id);
   if (J.tocou && J.estado === 'jogando') poki.gameplayStart();
 }
@@ -871,7 +918,10 @@ function passoJogo(dt) {
   }
   J.ocioso += dt;
   // (o ?auto dos prints joga sem tocar: a demonstracao nao se mete)
-  if (!J.tocou && J.demos < 2 && J.chave === 'semfim' && !dep.auto) demonstrar();
+  if (!J.tocou && J.demos < DEMOS && J.chave === 'semfim' && !dep.auto) {
+    if (J.demos === 0 && J.modo.S && J.modo.S.extra.abertura) abrirSozinho();
+    else demonstrar();
+  }
   J.modo.passo(dt);
   cena.passo(dt);
   tratarEventos();
@@ -903,7 +953,13 @@ function passoJogo(dt) {
     }
     if (!J.usouPoder && !J.dica && !dicasVistas.poder && J.chave === 'semfim' && J.tempoJogo >= 60) abrirDica();
     if (J.dica && (J.dica.t += dt) > 8) fecharDica();
+    // quem ficou SEGUIU s depois do anuncio ou do resgate
+    if (J.seguindo.length && J.seguindo[0].t <= J.tempoJogo) {
+      for (const q of J.seguindo.filter((q) => q.t <= J.tempoJogo)) poki.measure(q.cat, q.oque, 'complete');
+      J.seguindo = J.seguindo.filter((q) => q.t > J.tempoJogo);
+    }
   }
+  hud.videoEspera(J.tempoJogo < J.videoEspera);
   // o progresso das missoes vai para o armazenamento de tempos em tempos (nao a cada fusao)
   tGravar += dt;
   if (tGravar > 5 && perfilSujo) { tGravar = 0; gravarPerfil(); }

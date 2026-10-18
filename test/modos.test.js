@@ -241,6 +241,29 @@ test('a mao do onboarding fica ate a primeira gota (mesmo parado) e some depois'
   assert.equal(criarModo({ semente: 3, salvo: { visto: 4 }, toque: true }).visual().mao, null);
 });
 
+test('fusao de abertura: a partida nova do sem fim nasce com uma gotinha e a gota da mao igual; soltar no meio funde', async () => {
+  const { criarModo } = await import(MODOS.merge);
+  const modo = criarModo({ semente: 3, salvo: {}, toque: false, abertura: true });
+  const S = modo.S;
+  const J = S.jogadores[0];
+  const soltos = S.mundo.vivos().filter((s) => !s.preso);
+  assert.deepEqual(soltos.map((s) => s.nivel), [1], 'o pote nao nasceu com a gotinha');
+  assert.ok(J.pote.contem(soltos[0].cx, soltos[0].cy));
+  assert.equal(J.pote.preso.nivel, 1, 'a gota da mao nao e a igual');
+  assert.ok(S.extra.abertura && Math.abs(S.extra.abertura.x - soltos[0].cx) < 0.5);
+  // o main.js aponta para cima dela e solta: as duas viram um nivel 2
+  for (let k = 0; k < 60; k++) { J.pote.apontar(S.extra.abertura.x); modo.passo(1 / 60); }
+  assert.ok(J.pote.soltar());
+  const ev = [];
+  for (let k = 0; k < 4 * 60; k++) { modo.passo(1 / 60); ev.push(...modo.eventos.splice(0)); }
+  assert.ok(ev.some((e) => e.tipo === 'nivel' && e.n === 2 && e.acao === 'complete'), 'a abertura nao fundiu');
+  // sem a opcao (testes, desafio, prints) e na partida restaurada, o pote nasce vazio
+  assert.equal(criarModo({ semente: 3, salvo: {}, toque: true }).S.mundo.vivos().filter((s) => !s.preso).length, 0);
+  const salvo = JSON.parse(JSON.stringify(modo.salvar()));
+  const volta = criarModo({ semente: 3, salvo, toque: true, abertura: true });
+  assert.equal(volta.S.extra.abertura, undefined);
+});
+
 test('o slime solto em cima da borda escorrega de volta para dentro (8 cestos)', async () => {
   const { criarModo } = await import(MODOS.merge);
   const { CESTOS } = await import('../src/jogo/cestos.js');

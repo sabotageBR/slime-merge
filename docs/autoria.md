@@ -251,3 +251,28 @@ Pedidos com prints anotados do Merge Lab (plano em
   placa listrada e torta de antes. Nomes curtos onde não cabia: "Tinta" (gota de tinta) e "Prêmio" (o
   espaço do prêmio). A posição continua a da escolha de 2026-10-15 (colada no pote); na paisagem baixa
   (até 460 px de altura) a coluna vira duas. As outras quatro e o `?botoes` saíram do código.
+
+## 2026-10-18 (tarde): Player Fit Test da 2.0.2 e o pacote da 2.0.3
+- Pedidos: "faça somente uma análise do player fit test" (link do Game Events da 2.0.2), depois "Quais os
+  planos de melhoria ?" e "pacote aprovado pode implementar". A análise está em `docs/producao.md`.
+- **Pacote aprovado (os 6 planos, todos na opção recomendada):**
+  1. **combo-4 repetida** (bug): depois do combo 4 a meta sobe (5, 6, 7...); fusão e reforço continuam
+     repetindo o último degrau;
+  2. **vídeo que falha:** "Sem vídeo agora" e 30 s de espera, com os botões do vídeo apagados;
+  3. **física do celular no fim de jogo:** a recomendada era **(a) partículas mais espaçadas nos níveis
+     10 a 14**, "com o número medido na bancada antes". A bancada do fim de jogo mostrou que o custo está
+     na montagem dos pares (40%), nos contatos (26%) e nas paredes (15%), não no shape matching (1%).
+     Feito primeiro: **otimizações que não mudam a simulação** (mesmo hash do mundo em 2 sementes × 6
+     min), −30% no fim de jogo. As partículas maiores (mudam a maciez dos slimes grandes e pedem prints)
+     ficaram como a próxima alavanca, se a telemetria `custo/*` da 2.0.3 ainda pedir;
+  4. **coringa no fim de jogo:** com o 13 feito, **um coringa a cada 3 eventos** (~3 min; era a cada 6);
+  5. **entrada no desktop:** **fusão de abertura** (o pote nasce com uma gotinha no fundo e a gota da mão
+     é igual; sem toque, aos 1 s ela cai sozinha em cima) e a demonstração com **2 s parado e 3 gotas**
+     (eram 4 s e 2);
+  6. **telemetria das saídas:** o intervalo comercial e o "Ufa!" viram eventos de progresso (start e o
+     complete com 20 s de jogo depois).
+- **Correção da análise:** a faixa `custo/fisica-16` é **8 a 16 ms** (`faixaMs`), não "acima de 16 ms". No
+  celular, no minuto 5, a física passa de 8 ms em 33% e de 16 ms em 5%. A meta do celular passou a ser a
+  física acima de 8 ms (faixas `16` e `16+`) no minuto 5 em ≤ 15%.
+- **Metas do próximo teste (dois PFTs):** média limitada a 30 min ≥ 7:15 (a 2.0.2 teve 6:53; a média
+  crua, 7:41, subia com duas sessões de 1 h 33 e 3 h); 5m+ ≥ 46%; 1–2m ≤ 14%; `tempo/15` ≥ 16%.

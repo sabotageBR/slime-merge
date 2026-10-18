@@ -48,6 +48,14 @@ export const AGENDA = Object.freeze({ primeiro: 90, intervalo: 60, folga: 12, av
 export const CICLO = Object.freeze(['coringas', 'pedido', 'terremoto', 'gigante', 'calor', 'gelo']);
 
 /**
+ * Fim de jogo: com o 13 ja feito na partida, um coringa a cada FIM_CORINGA eventos (~3 min), os
+ * outros na ordem do ciclo. No Player Fit Test da 2.0.2 os super slimes so chegavam nos minutos
+ * dos coringas (13, 19, 25...): depois do 13, esperava-se 6 min pelo proximo (pacote da 2.0.3).
+ */
+export const NIVEL_FIM = 13;
+export const FIM_CORINGA = 3;
+
+/**
  * Cada evento: duracao maxima ativo (s) e o tipo (cor da pilula e som do aviso).
  * @type {Readonly<Record<string, { dur: number, tipo: 'alivio'|'aperto'|'meta'|'caos' }>>}
  */
@@ -66,23 +74,25 @@ export const GOTAS_PEDIDO = 15;
 /**
  * @typedef {{ id: string, fase: 'aviso'|'ativo', t: number, dur: number, n: number, inicio: number,
  *   alvo?: number, feito?: boolean }} Evento
- * @typedef {{ n: number, i: number, prox: number, ev: Evento|null }} Agenda
- *   n: eventos ja comecados (o intervalo comercial conta por ele); i: posicao no CICLO
+ * @typedef {{ n: number, i: number, f: number, prox: number, ev: Evento|null }} Agenda
+ *   n: eventos ja comecados (o intervalo comercial conta por ele); i: posicao no CICLO;
+ *   f: eventos ja comecados no fim de jogo (o coringa vem no 1o, no 4o, no 7o...)
  */
 
 /** @param {Partial<Agenda>|null} [salva] @returns {Agenda} */
 export function criarAgenda(salva) {
   const s = salva || {};
-  return { n: s.n || 0, i: s.i || 0, prox: typeof s.prox === 'number' ? s.prox : AGENDA.primeiro, ev: s.ev ? { ...s.ev } : null };
+  return { n: s.n || 0, i: s.i || 0, f: s.f || 0, prox: typeof s.prox === 'number' ? s.prox : AGENDA.primeiro, ev: s.ev ? { ...s.ev } : null };
 }
 
 /**
  * Avanca a agenda um passo. Devolve a mudanca deste passo: 'aviso' (a faixa entra), 'start' (o
  * evento comeca), 'fim' (acabou o tempo ou o modo marcou `feito`; quem chama encerra) ou ''.
  * @param {Agenda} A @param {number} tempo s de partida @param {number} dt
+ * @param {boolean} [fim] o 13 ja saiu na partida (o coringa vem a cada FIM_CORINGA eventos)
  * @returns {''|'aviso'|'start'|'fim'}
  */
-export function avancarAgenda(A, tempo, dt) {
+export function avancarAgenda(A, tempo, dt, fim = false) {
   const ev = A.ev;
   if (ev) {
     ev.t += dt;
@@ -95,8 +105,13 @@ export function avancarAgenda(A, tempo, dt) {
     return ev.feito || ev.t >= ev.dur ? 'fim' : '';
   }
   if (tempo < A.prox - AGENDA.aviso) return '';
-  const id = CICLO[A.i % CICLO.length];
-  A.i++;
+  let id = '';
+  if (fim && A.f++ % FIM_CORINGA === 0) id = 'coringas';
+  else {
+    id = CICLO[A.i++ % CICLO.length];
+    // no fim de jogo o coringa ja tem a vez dele: o ciclo segue com o proximo
+    if (fim && id === 'coringas') id = CICLO[A.i++ % CICLO.length];
+  }
   A.n++;
   A.ev = { id, fase: 'aviso', t: 0, dur: EVENTOS[id].dur, n: A.n, inicio: A.prox };
   return 'aviso';

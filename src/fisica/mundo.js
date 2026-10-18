@@ -143,10 +143,40 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
   const ncx = Math.ceil((gx1 - gx0) / CEL);
   const ncy = Math.ceil((gy1 - gy0) / CEL);
   const celIni = new Int32Array(ncx * ncy + 1);
+  const celCur = new Int32Array(ncx * ncy);
   const celDe = new Int32Array(cap);
   const ordem = new Int32Array(cap);
+  // copias na ordem das celulas: as vizinhas que o laco dos pares le ficam juntas na memoria
+  const xo = new Float64Array(cap);
+  const yo = new Float64Array(cap);
+  const ro = new Float64Array(cap);
+  const so = new Int32Array(cap);
+  const fo = new Uint8Array(cap); // bit 1: parada; bit 2: preso
   let pares = new Int32Array(cap * 16);
+  let rijP = new Float64Array(cap * 8);
   let nPares = 0;
+  // por particula, marcados no comeco de cada construirPares (e no despertar dentro dos contatos):
+  // os lacos dos pares e das paredes nao consultam o objeto do slime a cada vizinho
+  const pp = new Uint8Array(cap); // parada (slime dormindo ou preso)
+  const pw = new Float64Array(cap); // peso do contato sem a altura: 0 se parada, senao inv
+  const pl = new Uint8Array(cap); // slime preso
+
+  // paredes: baldes grossos para achar so as particulas perto de cada parede (antes, cada uma
+  // das 14 paredes do pote percorria todas as particulas, 9 vezes por quadro: 15% da fisica)
+  const PCEL = 1;
+  const pncx = Math.ceil((gx1 - gx0) / PCEL);
+  const pncy = Math.ceil((gy1 - gy0) / PCEL);
+  const pIni = new Int32Array(pncx * pncy + 1);
+  const pCur = new Int32Array(pncx * pncy);
+  const pCa = new Int32Array(cap); // balde de (x, y) no comeco da chamada
+  const pCb = new Int32Array(cap); // balde de (px, py), -1 se e o mesmo
+  const pLista = new Int32Array(cap * 2);
+  const pVisto = new Int32Array(cap); // carimbo da parede da vez: cada particula uma vez por parede
+  let pCarimbo = 0;
+  const pMov = new Int32Array(cap); // carimbo da chamada: a particula ja andou por uma parede
+  let pMovCarimbo = 0;
+  const movidas = new Int32Array(cap);
+  let nMovidas = 0;
 
   // centroides por subpasso (fronteira entre slimes)
   const cxS = new Float64Array(MAX_SLIMES);
@@ -911,8 +941,32 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
     }
   }
 
+  /** Marca parada, peso e preso de cada particula (o estado dos slimes neste momento). */
+  function marcarParadas() {
+    for (let i = 0; i < n; i++) {
+      const s = slimes[sl[i]];
+      const p = s.dormindo || s.preso;
+      pp[i] = p ? 1 : 0;
+      pw[i] = p ? 0 : inv[i];
+      pl[i] = s.preso ? 1 : 0;
+    }
+  }
+
+  /** O slime acordou no meio do subpasso: as marcas das particulas dele seguem. @param {Slime} s */
+  function remarcar(s) {
+    const p = s.dormindo || s.preso;
+    for (let a = iniSl[s.idx]; a < iniSl[s.idx + 1]; a++) {
+      const i = membros[a];
+      pp[i] = p ? 1 : 0;
+      pw[i] = p ? 0 : inv[i];
+    }
+  }
+
   /** @param {boolean} [registrar] conta a proximidade entre slimes (so no subpasso) */
   function construirPares(registrar = false) {
+    marcarParadas();
+    const memb = cfg.membrana;
+    const nc = ncx * ncy;
     celIni.fill(0);
     for (let i = 0; i < n; i++) {
       let cx = ((x[i] - gx0) / CEL) | 0;
@@ -923,45 +977,68 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
       celDe[i] = c;
       celIni[c + 1]++;
     }
-    for (let c = 0; c < ncx * ncy; c++) celIni[c + 1] += celIni[c];
-    const cur = celIni.slice(0, ncx * ncy);
-    for (let i = 0; i < n; i++) ordem[cur[celDe[i]]++] = i;
+    for (let c = 0; c < nc; c++) celIni[c + 1] += celIni[c];
+    celCur.set(celIni.subarray(0, nc));
+    for (let i = 0; i < n; i++) {
+      const a = celCur[celDe[i]]++;
+      ordem[a] = i;
+      xo[a] = x[i];
+      yo[a] = y[i];
+      ro[a] = rad[i];
+      so[a] = sl[i];
+      fo[a] = pp[i] | (pl[i] << 1);
+    }
+    // celCur vira o ponteiro de cada celula: a primeira particula dela com indice maior que o i
+    // da vez (os indices crescem dentro da celula e o i so cresce: o ponteiro so anda para a
+    // frente). Mesmos pares, na mesma ordem, sem reler os j <= i a cada vizinho.
+    celCur.set(celIni.subarray(0, nc));
     nPares = 0;
     for (let i = 0; i < n; i++) {
       const c = celDe[i];
       const cy = (c / ncx) | 0;
       const cx = c - cy * ncx;
-      const pi = parada(i);
+      const pi = pp[i] === 1;
       const xi = x[i];
       const yi = y[i];
       const ri = rad[i];
       const si = sl[i];
-      const livreI = registrar && !slimes[si].preso;
+      const livreI = registrar && pl[i] === 0;
       for (let oy2 = cy - 1; oy2 <= cy + 1; oy2++) {
         if (oy2 < 0 || oy2 >= ncy) continue;
         for (let ox2 = cx - 1; ox2 <= cx + 1; ox2++) {
           if (ox2 < 0 || ox2 >= ncx) continue;
           const cc = oy2 * ncx + ox2;
-          for (let a = celIni[cc]; a < celIni[cc + 1]; a++) {
+          const fim = celIni[cc + 1];
+          let a0 = celCur[cc];
+          while (a0 < fim && ordem[a0] <= i) a0++;
+          celCur[cc] = a0;
+          for (let a = a0; a < fim; a++) {
             const j = ordem[a];
-            if (j <= i) continue;
-            const dx = xi - x[j];
-            const dy = yi - y[j];
-            const sj = sl[j];
-            if (livreI && sj !== si && !slimes[sj].preso) {
-              const rp = (ri + rad[j]) * PERTO;
-              if (dx * dx + dy * dy < rp * rp) registrarPerto(si, sj);
+            const dx = xi - xo[a];
+            const dy = yi - yo[a];
+            const d2 = dx * dx + dy * dy;
+            const sj = so[a];
+            const rj = ro[a];
+            const fj = fo[a];
+            if (livreI && sj !== si && (fj & 2) === 0) {
+              const rp = (ri + rj) * PERTO;
+              if (d2 < rp * rp) registrarPerto(si, sj);
             }
-            if (pi && parada(j)) continue;
-            const r = (ri + rad[j]) * ALCANCE;
-            if (dx * dx + dy * dy < r * r) {
+            if (pi && (fj & 1) === 1) continue;
+            const r = (ri + rj) * ALCANCE;
+            if (d2 < r * r) {
               if (nPares * 2 + 2 > pares.length) {
                 const maior = new Int32Array(pares.length * 2);
                 maior.set(pares);
                 pares = maior;
+                const maiorR = new Float64Array(pares.length >> 1);
+                maiorR.set(rijP);
+                rijP = maiorR;
               }
               pares[2 * nPares] = i;
               pares[2 * nPares + 1] = j;
+              // distancia de contato do par (a membrana so entre slimes diferentes)
+              rijP[nPares] = si === sj ? ri + rj : (ri + rj) * memb;
               nPares++;
             }
           }
@@ -970,20 +1047,14 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
     }
   }
 
-  /** @param {number} i */
-  function wEf(i) {
-    if (parada(i)) return 0;
-    const h = y[i] - mundo.chaoY;
-    return inv[i] * (1 + (h > 0 ? cfg.kAltura * h : 0));
-  }
-
   /**
    * Contato entre todas as particulas (a coesao fica em viscosidadeECoesao).
    * @param {boolean} completo  false = pre-estabilizacao (so separa, sem atrito nem registro)
    */
   function contatosPares(completo) {
     const ida = (passoN & 1) === 0;
-    const memb = cfg.membrana;
+    const chao = mundo.chaoY;
+    const kAlt = cfg.kAltura;
     for (let t = 0; t < nPares; t++) {
       const p = ida ? t : nPares - 1 - t;
       const i = pares[2 * p];
@@ -991,13 +1062,16 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
       const dx = x[i] - x[j];
       const dy = y[i] - y[j];
       const d2 = dx * dx + dy * dy;
-      const si = sl[i];
-      const sj = sl[j];
-      const rij = si === sj ? rad[i] + rad[j] : (rad[i] + rad[j]) * memb;
+      const rij = rijP[p];
       if (d2 < rij * rij) {
         if (d2 < 1e-14) continue;
-        const wi = wEf(i);
-        const wj = wEf(j);
+        const si = sl[i];
+        const sj = sl[j];
+        // peso efetivo: 0 parada; senao 1/massa, escalado pela altura (shock propagation)
+        const hi = y[i] - chao;
+        const hj = y[j] - chao;
+        const wi = pw[i] * (1 + (hi > 0 ? kAlt * hi : 0));
+        const wj = pw[j] * (1 + (hj > 0 ? kAlt * hj : 0));
         const ws = wi + wj;
         if (ws === 0) continue;
         const d = Math.sqrt(d2);
@@ -1049,107 +1123,177 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
           tocadosAgora[nAgora++] = key;
         }
         if (pn > PEN_ACORDA) {
-          if (A.dormindo && !B.dormindo && !B.preso) { A.dormindo = false; A.tParado = 0; }
-          if (B.dormindo && !A.dormindo && !A.preso) { B.dormindo = false; B.tParado = 0; }
+          if (A.dormindo && !B.dormindo && !B.preso) { A.dormindo = false; A.tParado = 0; remarcar(A); }
+          if (B.dormindo && !A.dormindo && !A.preso) { B.dormindo = false; B.tParado = 0; remarcar(B); }
         }
       }
     }
   }
 
+  // parede da vez (contatosParedes -> paredeEm)
+  /** @type {any} */
+  let wp = null;
+  let wax = 0, way = 0, wex = 0, wey = 0, wl2 = 0, wel = 1, wxmin = 0, wxmax = 0, wymin = 0, wymax = 0;
+  let pAtrito = true;
+  let pSoTravessia = false;
+
+  /** Balde grosso de um ponto (fora da grade, o da borda). @param {number} xx @param {number} yy */
+  function baldeP(xx, yy) {
+    let cx = ((xx - gx0) / PCEL) | 0;
+    let cy = ((yy - gy0) / PCEL) | 0;
+    if (cx < 0) cx = 0; else if (cx >= pncx) cx = pncx - 1;
+    if (cy < 0) cy = 0; else if (cy >= pncy) cy = pncy - 1;
+    return cy * pncx + cx;
+  }
+
+  /** A particula andou por uma parede: as seguintes da mesma chamada a testam pela posicao nova. @param {number} i */
+  function andou(i) {
+    if (pMov[i] === pMovCarimbo) return;
+    pMov[i] = pMovCarimbo;
+    movidas[nMovidas++] = i;
+  }
+
   /**
+   * Contato com as paredes (capsulas). Cada parede so ve as particulas cuja posicao agora ou do
+   * comeco do subpasso cai na caixa dela: os baldes (pela posicao do comeco da chamada e por px)
+   * mais as que ja andaram por outra parede nesta chamada. Cada particula so depende dela mesma e
+   * da parede, entao a ordem dentro de uma parede nao muda o resultado.
    * @param {boolean} [atrito] false = so separa (pre-estabilizacao: a posicao de partida e a do quadro)
    * @param {boolean} [soTravessia] true = so desfaz quem cruzou o eixo (o empurrao normal fica para o subpasso)
    */
   function contatosParedes(atrito = true, soTravessia = false) {
-    const dt = DT;
+    if (!paredes.length) return;
+    pAtrito = atrito;
+    pSoTravessia = soTravessia;
+    // baldes por (x, y) e por (px, py)
+    const nc = pncx * pncy;
+    pIni.fill(0);
+    for (let i = 0; i < n; i++) {
+      const a = baldeP(x[i], y[i]);
+      const b = baldeP(px[i], py[i]);
+      pCa[i] = a;
+      pCb[i] = b === a ? -1 : b;
+      pIni[a + 1]++;
+      if (b !== a) pIni[b + 1]++;
+    }
+    for (let c = 0; c < nc; c++) pIni[c + 1] += pIni[c];
+    pCur.set(pIni.subarray(0, nc));
+    for (let i = 0; i < n; i++) {
+      pLista[pCur[pCa[i]]++] = i;
+      if (pCb[i] >= 0) pLista[pCur[pCb[i]]++] = i;
+    }
+    pMovCarimbo++;
+    nMovidas = 0;
     for (let k = 0; k < paredes.length; k++) {
-      const p = paredes[k];
+      wp = paredes[k];
       // base + tremor (sem tremor, tx = ty = 0 e a conta e a de sempre)
-      const ax = p.ax + p.tx;
-      const ay = p.ay + p.ty;
-      const bx = p.bx + p.tx;
-      const by = p.by + p.ty;
-      const ex = bx - ax;
-      const ey = by - ay;
-      const l2 = ex * ex + ey * ey;
-      const margem = p.r + R_PART * (1 + POLI);
-      const xmin = (ax < bx ? ax : bx) - margem;
-      const xmax = (ax > bx ? ax : bx) + margem;
-      const ymin = (ay < by ? ay : by) - margem;
-      const ymax = (ay > by ? ay : by) + margem;
-      const el = Math.sqrt(l2) || 1;
-      for (let i = 0; i < n; i++) {
-        const xi = x[i];
-        const yi = y[i];
-        const x0 = px[i];
-        const y0 = py[i];
-        // fora da caixa agora e no comeco do subpasso: longe desta parede
-        if ((xi < xmin || xi > xmax || yi < ymin || yi > ymax) && (x0 < xmin || x0 > xmax || y0 < ymin || y0 > ymax)) continue;
-        if (parada(i)) continue;
-        const lim = rad[i] + p.r;
-        // travessia (print do iPhone, 2026-10-18): um empurrao de contato maior que a parede leva a
-        // particula para o outro lado do eixo, e a capsula de dois lados a deixava la. Se o caminho
-        // do subpasso cruzou o eixo, ela volta encostada no lado de onde veio.
-        const c0 = ex * (y0 - ay) - ey * (x0 - ax);
-        const c1 = ex * (yi - ay) - ey * (xi - ax);
-        if ((c0 > 0 && c1 < 0) || (c0 < 0 && c1 > 0)) {
-          const u = c0 / (c0 - c1);
-          const qx0 = x0 + u * (xi - x0);
-          const qy0 = y0 + u * (yi - y0);
-          const tq = l2 > 0 ? ((qx0 - ax) * ex + (qy0 - ay) * ey) / l2 : 0;
-          const tol = lim / el;
-          if (tq >= -tol && tq <= 1 + tol) {
-            let tc = l2 > 0 ? ((xi - ax) * ex + (yi - ay) * ey) / l2 : 0;
-            if (tc < 0) tc = 0; else if (tc > 1) tc = 1;
-            const lado = c0 > 0 ? 1 : -1;
-            x[i] = ax + tc * ex - (ey / el) * lado * lim;
-            y[i] = ay + tc * ey + (ex / el) * lado * lim;
-            continue;
-          }
-        }
-        if (soTravessia) continue;
-        let t = l2 > 0 ? ((xi - ax) * ex + (yi - ay) * ey) / l2 : 0;
-        if (t < 0) t = 0; else if (t > 1) t = 1;
-        const cx = ax + t * ex;
-        const cy = ay + t * ey;
-        let dx = xi - cx;
-        let dy = yi - cy;
-        const d2 = dx * dx + dy * dy;
-        if (d2 >= lim * lim) continue;
-        const d = Math.sqrt(d2);
-        let pn;
-        if (d < 1e-9) {
-          // em cima do eixo: empurra pela normal do segmento
-          dx = -ey / el;
-          dy = ex / el;
-          pn = lim;
-        } else {
-          dx /= d;
-          dy /= d;
-          pn = lim - d;
-        }
-        x[i] += dx * pn;
-        y[i] += dy * pn;
-        if (!atrito) continue;
-        // atrito contra a parede (que pode estar andando)
-        const s = slimes[sl[i]];
-        const wvx = p.vax + t * (p.vbx - p.vax) + p.svx;
-        const wvy = p.vay + t * (p.vby - p.vay) + p.svy;
-        const rx = x[i] - px[i] - wvx * dt;
-        const ry = y[i] - py[i] - wvy * dt;
-        const rn = rx * dx + ry * dy;
-        let tx = rx - rn * dx;
-        let ty = ry - rn * dy;
-        const tl = Math.sqrt(tx * tx + ty * ty);
-        if (tl > 1e-12) {
-          if (tl >= s.mat.atritoS * pn) {
-            const f = s.mat.atritoK * pn / tl;
-            if (f < 1) { tx *= f; ty *= f; }
-          }
-          x[i] -= tx;
-          y[i] -= ty;
+      wax = wp.ax + wp.tx;
+      way = wp.ay + wp.ty;
+      const bx = wp.bx + wp.tx;
+      const by = wp.by + wp.ty;
+      wex = bx - wax;
+      wey = by - way;
+      wl2 = wex * wex + wey * wey;
+      const margem = wp.r + R_PART * (1 + POLI);
+      wxmin = (wax < bx ? wax : bx) - margem;
+      wxmax = (wax > bx ? wax : bx) + margem;
+      wymin = (way < by ? way : by) - margem;
+      wymax = (way > by ? way : by) + margem;
+      wel = Math.sqrt(wl2) || 1;
+      pCarimbo++;
+      const c0 = baldeP(wxmin, wymin);
+      const c1 = baldeP(wxmax, wymax);
+      const cy0 = (c0 / pncx) | 0;
+      const cx0 = c0 - cy0 * pncx;
+      const cy1 = (c1 / pncx) | 0;
+      const cx1 = c1 - cy1 * pncx;
+      for (let cy = cy0; cy <= cy1; cy++) {
+        for (let cx = cx0; cx <= cx1; cx++) {
+          const c = cy * pncx + cx;
+          for (let a = pIni[c]; a < pIni[c + 1]; a++) paredeEm(pLista[a]);
         }
       }
+      // as que andaram por uma parede anterior podem ter entrado na caixa desta
+      const nm = nMovidas;
+      for (let a = 0; a < nm; a++) paredeEm(movidas[a]);
+    }
+  }
+
+  /** Uma particula contra a parede da vez. @param {number} i */
+  function paredeEm(i) {
+    if (pVisto[i] === pCarimbo) return;
+    pVisto[i] = pCarimbo;
+    const xi = x[i];
+    const yi = y[i];
+    const x0 = px[i];
+    const y0 = py[i];
+    // fora da caixa agora e no comeco do subpasso: longe desta parede
+    if ((xi < wxmin || xi > wxmax || yi < wymin || yi > wymax) && (x0 < wxmin || x0 > wxmax || y0 < wymin || y0 > wymax)) return;
+    if (parada(i)) return;
+    const lim = rad[i] + wp.r;
+    // travessia (print do iPhone, 2026-10-18): um empurrao de contato maior que a parede leva a
+    // particula para o outro lado do eixo, e a capsula de dois lados a deixava la. Se o caminho
+    // do subpasso cruzou o eixo, ela volta encostada no lado de onde veio.
+    const c0 = wex * (y0 - way) - wey * (x0 - wax);
+    const c1 = wex * (yi - way) - wey * (xi - wax);
+    if ((c0 > 0 && c1 < 0) || (c0 < 0 && c1 > 0)) {
+      const u = c0 / (c0 - c1);
+      const qx0 = x0 + u * (xi - x0);
+      const qy0 = y0 + u * (yi - y0);
+      const tq = wl2 > 0 ? ((qx0 - wax) * wex + (qy0 - way) * wey) / wl2 : 0;
+      const tol = lim / wel;
+      if (tq >= -tol && tq <= 1 + tol) {
+        let tc = wl2 > 0 ? ((xi - wax) * wex + (yi - way) * wey) / wl2 : 0;
+        if (tc < 0) tc = 0; else if (tc > 1) tc = 1;
+        const lado = c0 > 0 ? 1 : -1;
+        x[i] = wax + tc * wex - (wey / wel) * lado * lim;
+        y[i] = way + tc * wey + (wex / wel) * lado * lim;
+        andou(i);
+        return;
+      }
+    }
+    if (pSoTravessia) return;
+    let t = wl2 > 0 ? ((xi - wax) * wex + (yi - way) * wey) / wl2 : 0;
+    if (t < 0) t = 0; else if (t > 1) t = 1;
+    const cx = wax + t * wex;
+    const cy = way + t * wey;
+    let dx = xi - cx;
+    let dy = yi - cy;
+    const d2 = dx * dx + dy * dy;
+    if (d2 >= lim * lim) return;
+    const d = Math.sqrt(d2);
+    let pn;
+    if (d < 1e-9) {
+      // em cima do eixo: empurra pela normal do segmento
+      dx = -wey / wel;
+      dy = wex / wel;
+      pn = lim;
+    } else {
+      dx /= d;
+      dy /= d;
+      pn = lim - d;
+    }
+    x[i] += dx * pn;
+    y[i] += dy * pn;
+    andou(i);
+    if (!pAtrito) return;
+    // atrito contra a parede (que pode estar andando)
+    const s = slimes[sl[i]];
+    const wvx = wp.vax + t * (wp.vbx - wp.vax) + wp.svx;
+    const wvy = wp.vay + t * (wp.vby - wp.vay) + wp.svy;
+    const rx = x[i] - px[i] - wvx * DT;
+    const ry = y[i] - py[i] - wvy * DT;
+    const rn = rx * dx + ry * dy;
+    let tx = rx - rn * dx;
+    let ty = ry - rn * dy;
+    const tl = Math.sqrt(tx * tx + ty * ty);
+    if (tl > 1e-12) {
+      if (tl >= s.mat.atritoS * pn) {
+        const f = s.mat.atritoK * pn / tl;
+        if (f < 1) { tx *= f; ty *= f; }
+      }
+      x[i] -= tx;
+      y[i] -= ty;
     }
   }
 

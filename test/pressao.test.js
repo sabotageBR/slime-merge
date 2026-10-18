@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   PESOS, pisoPara, ESCADA, AGENDA, CICLO, EVENTOS, criarAgenda, avancarAgenda, encerrarEvento,
-  nivelGigante, alvoPedido, GIGANTE_MAX,
+  nivelGigante, alvoPedido, GIGANTE_MAX, FIM_CORINGA, NIVEL_FIM,
 } from '../src/jogo/pressao.js';
 import { criarModo } from '../src/jogo/modos/merge.js';
 import { MAX_NIVEL } from '../src/jogo/niveis.js';
@@ -64,6 +64,41 @@ test('agenda: o 1o evento aos 90 s (aviso 2 s antes), um a cada ~60 s, na ordem 
   // a agenda salva continua de onde estava
   const B = criarAgenda(JSON.parse(JSON.stringify(A)));
   assert.deepEqual(B, A);
+});
+
+test('agenda no fim de jogo: com o 13 feito, um coringa a cada 3 eventos e os outros na ordem do ciclo', () => {
+  const A = criarAgenda();
+  const dt = 1 / 60;
+  const ids = [];
+  let t = 0;
+  // 4 eventos antes do 13 (ciclo normal), depois o fim de jogo
+  for (let f = 0; f < 60 * 1500; f++) {
+    t += dt;
+    const m = avancarAgenda(A, t, dt, ids.length >= 4);
+    if (m === 'start') ids.push(A.ev.id);
+    if (m === 'fim') encerrarEvento(A, t);
+  }
+  assert.deepEqual(ids.slice(0, 4), CICLO.slice(0, 4));
+  const fim = ids.slice(4);
+  assert.ok(fim.length >= 12, `${fim.length} eventos no fim de jogo`);
+  fim.forEach((id, k) => assert.equal(id === 'coringas', k % FIM_CORINGA === 0, `evento ${k}: ${id}`));
+  // os outros seguem o ciclo de onde parou (calor, gelo, pedido, terremoto, gigante...), sem o coringa
+  const outros = fim.filter((id) => id !== 'coringas');
+  const resto = [...CICLO.slice(4), ...CICLO, ...CICLO, ...CICLO, ...CICLO].filter((id) => id !== 'coringas');
+  assert.deepEqual(outros, resto.slice(0, outros.length));
+  // o save guarda a contagem do fim de jogo
+  assert.deepEqual(criarAgenda(JSON.parse(JSON.stringify(A))), A);
+});
+
+test('no sem fim, o 13 feito liga o fim de jogo da agenda', () => {
+  const modo = criarModo({ semente: 4, salvo: {}, toque: true });
+  const S = modo.S;
+  S.jogadores[0].maxNivel = NIVEL_FIM;
+  S.extra.agenda = criarAgenda({ i: 2, prox: S.tempo + 3 });
+  const ev = quadros(modo, 60 * 4);
+  assert.ok(ev.some((e) => e.tipo === 'evento' && e.id === 'coringas' && e.acao === 'start'), 'o coringa vem primeiro no fim de jogo');
+  assert.equal(S.extra.agenda.f, 1);
+  assert.equal(S.extra.agenda.i, 2, 'o ciclo normal nao andou');
 });
 
 test('gigante e pedido: niveis dentro da janela; a chuva de gosma saiu da agenda', () => {

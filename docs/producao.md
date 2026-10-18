@@ -204,7 +204,8 @@ Test").
     (16 · 14 · 15 · 14% do 1 ao 5) e `fps/0/m5` no celular ≤ 10% (**23%**);
   - ritmo (mediana do minuto do nível novo): 9 m2 · 10 m4 · 11 m5 · 12 m7 · **13 m8**; depois do 13 não há
     novidade (`tempo` 189 no m8 → 110 no m13 → 39 no m20);
-  - celular: do minuto 10 ao 20 perde 80% (88 → 18; o desktop, 68%); no minuto 5, física ≥ 16 ms em 34% e
+  - celular: do minuto 10 ao 20 perde 80% (88 → 18; o desktop, 68%); no minuto 5, física ≥ 8 ms em 34% (a faixa `16` é 8–16 ms; leitura
+    corrigida em 2026-10-18) e
     fps < 30 em 23%; 76% caem para a qualidade baixa ou mínima no minuto 0;
   - "Ufa!": em cada minuto do 11 ao 16, 35–49% de quem joga leva um (o pote enche de novo e de novo);
   - eventos: coringas começam em 71%, pedido em 60% (91% cumpridos), terremoto 51%, gigante 44%, calor
@@ -244,7 +245,61 @@ Test").
     caçada e os prints (`prints-humor`, `prints-carregando`, `prints-fusao --cenas=super`, `prints-skins`);
   - aprovado pelo usuário ("Tudo aprovado"); `dist-poki/slime-merge-2.0.2.zip` (371 KB; 359 KB gzip) com a
     thumb `slime-merge-2.0.2-thumb.png`; `sdkcheck` também na build (`dist/`) e a build aberta no Chrome sem
-    erro. Fica para o próximo teste a física do celular (34% acima de 16 ms no minuto 5);
+    erro. Fica para o próximo teste a física do celular (34% acima de 8 ms no minuto 5);
   - **metas do próximo teste:** média ≥ 7:30; 5m+ ≥ 50%; 1–2m ≤ 13%; `tempo/10` ≥ 26%; `tempo/15` ≥ 16%
     (hoje 12%); `level/14` para ≥ 12%; `super/1` em ≥ 8%; `rede/volta` em ≤ 2% das partidas; `fps/0/m5` no
     celular ≤ 15%.
+- **Player Fit Test da 2.0.2** (18/10 03:49, 500 gameplays): **7m41s** (2.0.1: 6m55s). Histograma 74 · 87 ·
+  49 · 42 · 45 · 203 (3m+ 58%, 5m+ 40,6%; a 2.0.1 teve 45,6%). A média crua subiu com a cauda: duas sessões de
+  93 min e 3 h; sem a maior, 7m20s; **limitada a 30 min, 6m53s** (2.0.1: 6m37s); sem 1% de cada ponta,
+  6m57s (6m32s). 20 min+: 42 (24 na 2.0.1); 5–10 min: 80 (110); mediana 3m55s (4m11s). As 39 saídas antes
+  de 30 s estão no histórico (31 a 39; a 2.0.1, com 23, foi a exceção). Game Events (688 gameplays: 362
+  celular, 250 desktop, 76 tablet):
+  - metas: média ≥ 7:30 ✓ (só a crua), `level/14` 13,7% ✓, `super/1` 14,4% ✓; 5m+ 40,6% ✗, 1–2m 17,4% ✗,
+    `tempo/10` 23,4% ✗, `tempo/15` 14,1% ✗ (12% na 2.0.1), `rede/volta` ~3–5% (estimado: o evento é por
+    minuto, 52 registros) ✗, `fps/0/m5` no celular 21% ✗;
+  - **os super slimes seguem o coringa:** `super/1` no minuto 13 em 29 partidas, `super/2` no 19 (13),
+    `super/3` no 25 (8), `super/4` no 31: os minutos dos coringas (90 s + 6 min × k). O coringa não funde
+    com o maior nível; depois do 1º 14 o maior é o 14 e cada coringa num 13 vira super slime. Ritmo
+    (mediana do minuto): 9 m3 · 10 m4 · 11 m6 · 12 m7 · **13 m10** (era m8) · 14 m13;
+  - **bug da meta combo-4:** 18.639 completes em 314 partidas (~59 por partida, +20 gotas em cada): o
+    último degrau se repetia e o combo ainda alto cumpria a meta nova na fusão seguinte;
+  - **entrada:** 16% das partidas nunca fundem (desktop 21,6%: 250 abrem, 240 carregam, 212 tocam, 196
+    fundem; celular 11,6%); perda por minuto do 1 ao 5: 19 · 13 · 12 · 18%;
+  - **celular:** física acima de 8 ms no minuto 5 em 33% (`custo/fisica-16` é 8–16 ms: 28%; ≥ 16 ms: 5%);
+    abaixo de 30 fps em 7% (min 1), 17% (3), 21% (5) e 37,5% (10). O fps do começo quase não decide quem
+    sai (dos que começam a 55+ fps, 50% chegam ao minuto 5; abaixo de 30, 44%). `tempo/15`: celular 11%,
+    desktop 18,4%;
+  - "Ufa!" de 32 a 46% de quem joga por minuto, do 10 ao 18 (igual à 2.0.1); eventos: coringas 65%,
+    pedido 56% (94% cumpridos), terremoto 48%, gigante 41%, calor 36%, gelo 32%; intervalo comercial 48%;
+    vídeo premiado 14%; o vídeo do míssil falhou 61 vezes em 8 partidas; menu ~9%, 36 compras, nenhuma skin.
+- **Versão 2.0.3, depois do PFT da 2.0.2** (2026-10-18, pacote aprovado pelo usuário; escolhas em
+  `docs/autoria.md`):
+  - **combo-4** (`src/jogo/missoes.js`): depois do último degrau, o combo sobe um (5, 6, 7...); fusão e
+    reforço repetem o último (somas);
+  - **vídeo que falha** (`main.js`): "Sem vídeo agora" e 30 s sem pedir outro (`ESPERA_VIDEO`), com os
+    botões do vídeo apagados (`hud.videoEspera`, `.espera-video`);
+  - **física** (`src/fisica/mundo.js`), sem mudar a simulação (mesmo `hash()` do mundo nas sementes 11 e 12,
+    6 min cada, 24 pontos): parada, peso e preso marcados por partícula no começo de cada `construirPares`
+    (e remarcados quando um slime acorda no meio dos contatos); cópias de posição, raio, slime e marcas na
+    ordem das células; um ponteiro por célula que só anda para a frente no lugar de reler os `j <= i`; a
+    distância de contato de cada par guardada na montagem (`rijP`); e as paredes por baldes de 1 u (cada
+    parede só vê as partículas cuja posição de agora ou do começo do subpasso cai na caixa dela, mais as
+    que já andaram por outra parede na mesma chamada). Fim de jogo (`node tools/bancada.mjs --fim`, ~1.250
+    partículas): 3,6 → 2,5 ms por quadro (−30%). As partículas maiores nos níveis 10 a 14 ficaram como a
+    próxima alavanca;
+  - **coringa no fim de jogo** (`pressao.js`: `NIVEL_FIM`, `FIM_CORINGA`, `Agenda.f`): com o 13 feito, um
+    coringa a cada 3 eventos e os outros na ordem do ciclo; `forcarEvento` respeita a vez;
+  - **fusão de abertura** (`merge.js` `abrir`, gancho novo do `soltar.js`; `main.js` `abrirSozinho`): a
+    partida nova do sem fim nasce com uma gotinha no fundo e a gota da mão do nível 1; sem toque, aos 0,6 s
+    ela vai para cima e no 1 s cai (as duas viram o nível 2). Conta como a 1ª gota da demonstração, que
+    agora espera 2 s parado e solta até 3 (`DEMO_OCIOSO`, `DEMOS`). Com `?semente` só com `?abertura=1`;
+  - **telemetria:** `intervalo/<origem>/start` (era `show`) e `ufa/resgate/start`, com o `complete` depois
+    de 20 s de jogo (`SEGUIU`; o tempo de jogo para no anúncio): o Completed e o Left do painel dizem quem
+    sai no anúncio ou logo depois do resgate; `dica/abertura/show`;
+  - verificado com `npm test` (180), `npm run menu`, `jogar 1 5`, `sdkcheck`, `telas` e os prints da
+    abertura (`docs/visuais/abertura-390x844.jpg`, `?semente=5&abertura=1`);
+  - **metas do próximo teste (dois PFTs):** média limitada a 30 min ≥ 7:15; 5m+ ≥ 46%; 1–2m ≤ 14%;
+    `tempo/15` ≥ 16%; `meta/combo-*` uma vez por partida; desktop `level/2` ≥ 85% de quem abre (78%);
+    `super/2` ≥ 6%; `tempo/20` ≥ 10% (8,1%); física acima de 8 ms no minuto 5 do celular ≤ 15% (33%);
+    `intervalo` e `ufa` com o Completed medido.

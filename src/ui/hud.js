@@ -376,6 +376,10 @@ export function criarHud(doc, T) {
         caixa.classList.add('pulo');
       }
     },
+    /** O video premiado falhou ha pouco: os botoes com o selo do video ficam apagados. @param {boolean} v */
+    videoEspera(v) {
+      el.base.classList.toggle('espera-video', v);
+    },
     /** Aviso curto no alto da tela (missao cumprida, nivel novo, sequencia). @param {string} texto */
     aviso(texto) {
       avisos.push(texto);

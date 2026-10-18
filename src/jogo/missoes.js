@@ -3,13 +3,16 @@
 // em diante, quando cada slime novo demora minutos e as missoes do dia ja acabaram): a pilula da
 // meta alterna com a mais perto de acabar. Vale so durante a partida (nao e gravada). Logica pura.
 // Tipos: fusao (soma), combo (maior combo), poder (soma).
+// Depois do ultimo degrau: a soma se repete (mais 50 fusoes, mais 3 reforcos); o combo sobe um a
+// cada vez (5, 6, 7...). Repetir o combo 4 fazia a meta nova se cumprir na fusao seguinte com o
+// combo ainda alto: ~59 vezes por partida no Player Fit Test da 2.0.2, +20 gotas em cada.
 
 import { criarRng } from '../core/rng.js';
 
 const MOLDES = [
-  { tipo: 'fusao', metas: [10, 20, 35, 50], premio: [10, 15, 20, 25] },
-  { tipo: 'combo', metas: [2, 3, 4], premio: [10, 15, 20] },
-  { tipo: 'poder', metas: [1, 2, 3], premio: [10, 15, 20] },
+  { tipo: 'fusao', metas: [10, 20, 35, 50], premio: [10, 15, 20, 25], alem: 0 },
+  { tipo: 'combo', metas: [2, 3, 4], premio: [10, 15, 20], alem: 1 },
+  { tipo: 'poder', metas: [1, 2, 3], premio: [10, 15, 20], alem: 0 },
 ];
 
 /** @param {number} semente */
@@ -19,8 +22,11 @@ export function criarMissoes(semente) {
 
   function nova(tipo) {
     const molde = MOLDES.find((m) => m.tipo === tipo) || MOLDES[0];
-    const k = Math.min(molde.metas.length - 1, degrau[molde.tipo]++);
-    return { tipo: molde.tipo, meta: molde.metas[k], premio: molde.premio[k], prog: 0, feita: false };
+    const ultimo = molde.metas.length - 1;
+    const d = degrau[molde.tipo]++;
+    const k = Math.min(ultimo, d);
+    const meta = molde.metas[k] + (d > ultimo ? (d - ultimo) * molde.alem : 0);
+    return { tipo: molde.tipo, meta, premio: molde.premio[k], prog: 0, feita: false };
   }
   const tipos = MOLDES.map((m) => m.tipo);
   for (let i = tipos.length - 1; i > 0; i--) {

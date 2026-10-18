@@ -1,11 +1,38 @@
 // Bancada da fisica (so Node, sem render): ms por quadro (4 subpassos) com o pote cheio, na
 // pilha acordada e na pilha assentada. Meta do plano: ~2-4 ms num Android medio; no desktop,
 // bem menos. Uso: node tools/bancada.mjs [particulas]
+//   --fim[=min]  o sem fim com o bot (uma gota a cada 0,9 s) por `min` minutos (padrao 9): ms do
+//                passo do modo (fisica + jogo) e particulas por minuto. Os slimes pequenos da
+//                bancada de sempre escondiam o custo do fim de jogo (12 e 13 no pote, ~1.250 particulas)
 import { criarMundo } from '../src/fisica/mundo.js';
 import { poteTrapezio } from '../src/fisica/paredes.js';
 import { criarRng } from '../src/core/rng.js';
 import { difundir } from '../src/cor/difusao.js';
 import { criarCampo } from '../src/render/campo.js';
+import { criarModo } from '../src/jogo/modos/merge.js';
+
+const fim = process.argv.find((a) => a.startsWith('--fim'));
+if (fim) {
+  const MIN = Number(fim.split('=')[1]) || 9;
+  const modo = criarModo({ semente: 11, salvo: {}, toque: true });
+  let t = 0;
+  for (let m = 0; m < MIN; m++) {
+    let ms = 0;
+    let part = 0;
+    for (let f = 0; f < 3600; f++) {
+      t += 1 / 60;
+      if (t >= 0.9) { t = 0; modo.bot(); }
+      const a = performance.now();
+      modo.passo(1 / 60);
+      ms += performance.now() - a;
+      part += modo.S.mundo.n;
+      modo.eventos.length = 0;
+    }
+    const maior = Math.max(0, ...modo.S.mundo.vivos().map((s) => s.nivel || 0));
+    process.stdout.write(`min ${String(m).padStart(2)}  ${(ms / 3600).toFixed(2)} ms/quadro  particulas ${(part / 3600).toFixed(0)}  maior nivel ${maior}\n`);
+  }
+  process.exit(0);
+}
 
 const alvo = Number(process.argv[2]) || 1600;
 const m = criarMundo({ semente: 3 });

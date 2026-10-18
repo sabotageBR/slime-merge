@@ -103,6 +103,8 @@ body[data-orient="paisagem"] .proximo { width: 5.2em; height: 5.2em; }
 .poder.premio { --cor: #ffd23a; --cor2: #f0a51a; --claro: #fff3c2; }
 /* acabado com video (rewarded): lilas, nunca verde */
 .poder.video { --cor: #b1a8e4; --cor2: #8378c9; --claro: #e6e2f8; }
+/* o video falhou ha pouco (sem anuncio): espera 30 s antes de pedir outro */
+.espera-video .poder.video { opacity: 0.5; filter: grayscale(0.7); }
 .poder.vazio { --cor: #b4b4ba; --cor2: #8c8c94; --claro: #e4e4e8; }
 .poder::before {
   content: ''; position: absolute; inset: 0; z-index: -1; border-radius: 50%; border: 0.17em solid var(--tinta);

@@ -34,3 +34,18 @@ test('cumprir paga o premio e sobe um degrau do mesmo tipo; o ultimo degrau se r
   m.registrar('poder', 3);
   assert.equal(m.lista().find((x) => x.tipo === 'poder').meta, 3, 'o ultimo degrau se repete');
 });
+
+test('depois do combo 4 a meta sobe; o combo alto nao cumpre a mesma meta a cada fusao', () => {
+  const m = criarMissoes(2);
+  const combo = () => m.lista().find((x) => x.tipo === 'combo');
+  assert.deepEqual(m.registrar('combo', 4).map((x) => x.meta), [2]);
+  assert.deepEqual(m.registrar('combo', 4).map((x) => x.meta), [3]);
+  assert.deepEqual(m.registrar('combo', 4).map((x) => [x.meta, x.premio]), [[4, 20]]);
+  assert.deepEqual([combo().meta, combo().premio], [5, 20]);
+  // o combo segue em 4 por varias fusoes (o caso da 2.0.2): nada mais se cumpre
+  let pagas = 0;
+  for (let k = 0; k < 30; k++) pagas += m.registrar('combo', 4).length;
+  assert.equal(pagas, 0);
+  assert.deepEqual(m.registrar('combo', 5).map((x) => x.meta), [5]);
+  assert.equal(combo().meta, 6);
+});

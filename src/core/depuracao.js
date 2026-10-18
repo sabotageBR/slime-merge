@@ -28,6 +28,8 @@
 //   ?revelar=7         cartao de slime novo do nivel 7 parado na tela (prints)
 //   ?pressao=0         sem fim sem a pressao da 2.0.0 (escada, eventos e o "Ufa!" permanente), para comparar
 //   ?evento=gosma      o primeiro evento da agenda e esse, ja (coringas, gosma, pedido, terremoto, gigante, calor, gelo)
+//   ?abertura=1        fusao de abertura do sem fim (a gotinha no fundo que a 1a gota acerta sozinha em 1 s).
+//                      Ligada por padrao; com ?semente (prints, fluxos e GIFs das ferramentas) so com ?abertura=1
 //
 // Fora disso, so o banco de testes de tools/sdkcheck.html liga os ganchos
 // (window.__slimeTeste = { modelo }); "local" continua falso, para o jogo se comportar
@@ -37,7 +39,7 @@ export function lerDepuracao() {
   const base = {
     local: false, ganchos: false, modelo: '', debug: false, semente: 0, passos: 0, auto: 0,
     semAnuncio: false, lang: '', semHud: false, render: '', material: '', raio: 0, limiar: 0, zoom: null,
-    filme: 0, cada: 4, vitrine: 0, cesto: '', cenario: '', objeto: '', bot: '', poder: '', expr: '', demoReforcos: false, skins: '', qualidade: -1, revelar: 0, pressao: true, evento: '', sons: /** @type {Record<string, string>} */ ({}),
+    filme: 0, cada: 4, vitrine: 0, cesto: '', cenario: '', objeto: '', bot: '', poder: '', expr: '', demoReforcos: false, skins: '', qualidade: -1, revelar: 0, pressao: true, evento: '', abertura: true, sons: /** @type {Record<string, string>} */ ({}),
   };
   let local = false;
   try {
@@ -84,6 +86,7 @@ export function lerDepuracao() {
     revelar: Math.max(0, Math.min(14, num('revelar', 7) | 0)),
     pressao: q.get('pressao') !== '0',
     evento: q.get('evento') || '',
+    abertura: q.has('abertura') ? q.get('abertura') !== '0' : !q.has('semente'),
     sons: Object.fromEntries((q.get('sons') || '').split(',').filter((p) => p.includes(':')).map((p) => p.split(':'))),
   });
 }

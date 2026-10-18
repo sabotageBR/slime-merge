@@ -64,6 +64,7 @@ export const FUSAO = Object.freeze({
  * @property {(S: any) => boolean} [semReforcos]  true = sem reforcos (Duelo de 2 jogadores: so o 1 teria)
  * @property {(S: any) => boolean} [resgatarSempre]  true = o "Ufa!" vale a partida inteira (sem fim, sem derrota)
  * @property {(S: any) => any} [salvar]
+ * @property {(S: any) => void} [abrir]   partida nova (sem save): o pote pode nascer com algo dentro
  * @property {(S: any, p: any) => void} [restaurar]
  */
 
@@ -105,6 +106,7 @@ export function criarSoltar(R, o = {}) {
     });
     for (const J of S.jogadores) J.fila = [R.sortear(S, J), R.sortear(S, J)];
     if (partida && R.restaurar) R.restaurar(S, partida);
+    else if (!partida && R.abrir) R.abrir(S);
     for (const J of S.jogadores) prepararPreso(J);
   }
 

@@ -92,6 +92,19 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
     largura, desce para baixo dele) e mostra só o número dos pontos.
 - **Botões de reforço (2026-10-18, depois da 2.0.2):** bolhas de gel com uma cor por reforço, o número no
   canto e o nome numa etiqueta embaixo (opção 1 de 5; registro em `docs/visuais/botoes-comparar-*`).
+- **Versão 2.0.3 (depois do Player Fit Test da 2.0.2: 7m41s, 6m53s limitando a 30 min; pacote aprovado em
+  2026-10-18; análise em `docs/producao.md`, escolhas em `docs/autoria.md`):**
+  - **meta combo:** depois do combo 4 ela sobe (5, 6, 7...); antes a combo-4 se cumpria ~59 vezes por partida;
+  - **vídeo que falha:** "Sem vídeo agora" e 30 s de espera (`ESPERA_VIDEO`), botões do vídeo apagados;
+  - **física −30% no fim de jogo sem mudar a simulação** (mesmo `hash()`): marcas por partícula, cópias na
+    ordem das células, ponteiro por célula, `rijP` e paredes por baldes (`mundo.js`). Ao mexer nesses laços,
+    conferir o hash antes/depois e medir com `node tools/bancada.mjs --fim`;
+  - **coringa no fim de jogo:** com o 13 feito, um a cada 3 eventos (`NIVEL_FIM`, `FIM_CORINGA`, `Agenda.f`);
+  - **fusão de abertura:** a partida nova do sem fim nasce com uma gotinha no fundo e a gota da mão igual,
+    que cai sozinha em 1 s sem toque (gancho `abrir` do `soltar.js`, opção `abertura` do `merge.js`,
+    `abrirSozinho` no `main.js`); a demonstração espera 2 s e solta até 3 gotas;
+  - **telemetria:** `intervalo/<origem>/start|complete` e `ufa/resgate/start|complete` (complete com 20 s de
+    jogo depois), `dica/abertura/show`. A faixa `custo/fisica-16` é **8–16 ms** (`faixaMs`).
 - Protótipos (Croma, Loja, Molde, lab) só por `?modelo=` ou pelo hub; o `tools/empacotar.mjs`
   apaga os arquivos deles e as linhas `// prototipo` do `main.js`.
 
@@ -181,7 +194,7 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
 ## Comandos
 | Comando | O que faz |
 |---|---|
-| `npm test` | Física, cor, wrapper Poki, fronteiras, perfil, os modos com o bot, borda, míssil, pote estreito, telemetria de nível e do resgate, qualidade adaptativa, metas da partida, pressão do sem fim (`test/pressao.test.js`), fusão animada e tremor (`test/fusao.test.js`), humor (`test/humor.test.js`), parede (`test/parede.test.js`), áudio, sons, música e skins (176 testes, ~95 s) |
+| `npm test` | Física, cor, wrapper Poki, fronteiras, perfil, os modos com o bot, borda, míssil, pote estreito, telemetria de nível e do resgate, qualidade adaptativa, metas da partida, pressão do sem fim (`test/pressao.test.js`), fusão animada e tremor (`test/fusao.test.js`), humor (`test/humor.test.js`), parede (`test/parede.test.js`), áudio, sons, música e skins (180 testes, ~95 s) |
 | `node --test test/fisica.test.js` | Um arquivo só (`node:test`, sem dependências); `--test-name-pattern="Croma"` filtra pelo nome do teste |
 | `npm run menu` | Fluxo da build no Chrome headless: sequência, gotas no fim, dobrar, loja, missões, troca de modo, Loja › Skins e o editor (pintar, salvar, Esc). Prints em `.tmp/menu/`. `-- --tam=640x360` |
 | `npm run empacotar` | Build da Poki em `dist/` e zip em `dist-poki/` (sem protótipos; só os sons do `PADRAO`; recusa import quebrado, URL externa, `console.log`, `.map`, > 500 KB gzip e áudio > 120 KB); `-- --thumb` confere e anexa `marketing/thumb/slime-merge-1256.png` (sem ele é ensaio) |
@@ -190,7 +203,7 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
 | `npm run jogar` | Joga os modelos em tempo real (Chrome headless pelo DevTools Protocol, `tools/cdp.mjs`): gestos, pausa, mudo, reforço, fim, revive, jogar de novo. `-- 1 4 --tam=1031x580` |
 | `npm run sdkcheck` | Banco do SDK da Poki em 5 cenários (`tools/sdkcheck.html`, ganchos `window.__slimeTeste`) |
 | `npm run telas` | Iframe com altura/largura 0, escondido e girado |
-| `npm run bancada` | ms de física, cor e campo com ~1.600 partículas |
+| `npm run bancada` | ms de física, cor e campo com ~1.600 partículas; `-- --fim[=min]`: o sem fim com o bot, ms por quadro e partículas por minuto (o custo do fim de jogo) |
 | `npm run gifs` | GIFs e capas dos modelos em `docs/modelos/` (filme determinístico `?filme=N&cada=K`) |
 | `npm run visuais -- [cestos\|cenarios\|objetos]` | Prints das alternativas de visual em `docs/visuais/` (mesma partida para comparar) |
 | `node tools/prints-reforcos.mjs` | Botões de reforço (colados no pote) em 3 tamanhos, no Duelo e a folha de ícones (`tools/icones.html`) em `docs/visuais/` |
@@ -215,7 +228,7 @@ sliders do material), `?semente=` (também ignora a partida salva), `?passos=N` 
 (botões em todos os estados), `?sons=cat:variante`, `?skins=todas` (uma skin em cada nível),
 `?qualidade=0..3` (alta, média, baixa, mínima; fixa o render e desliga a adaptativa; sem ele, o celular
 começa na média), `?revelar=N` (cartão de slime novo parado, para prints), `?pressao=0` (sem fim da 1.2.0, que acaba), `?evento=<id>` (esse evento da
-pressão começa depois dos `?passos`). A prévia de `modelos/escolhas.html` passa a
+pressão começa depois dos `?passos`), `?abertura=1` (a fusão de abertura com `?semente`; sem `?semente` ela já vem). A prévia de `modelos/escolhas.html` passa a
 vitrine por `slime.escolha`. Fora do localhost o modelo vem de `window.__slimeModelo` (páginas `jogo-N.html`).
 
 ## Avaliação
