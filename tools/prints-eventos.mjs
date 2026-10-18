@@ -18,9 +18,7 @@ mkdirSync(destino, { recursive: true });
 
 /** [nome do quadro, evento, passos depois do forcar] (o aviso dura 120 passos) */
 const CENAS = [
-  ['a-aviso-gosma', 'gosma', 30],
-  ['b-gosma', 'gosma', 200],
-  ['c-gosma-cor', 'gosma', 520],
+  ['a-aviso-coringas', 'coringas', 30],
   ['d-coringas', 'coringas', 140],
   ['e-pedido', 'pedido', 150],
   ['f-terremoto', 'terremoto', 150],

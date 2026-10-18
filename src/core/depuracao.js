@@ -19,7 +19,8 @@
 //                      para tools/gif-modelos.mjs (deterministico, sem depender do rAF)
 //   ?bot=borda         o ?auto solta sempre em cima da borda, alternando os lados
 //   ?poder=alargar     usa o reforco depois do ?passos (prints do Alargar, da mira armada...)
-//   ?expr=choro        forca a expressao de todos os rostos (prints dos personagens)
+//   ?expr=choro        forca a expressao de todos os rostos (prints dos personagens; tambem contente,
+//                      amassado, chorinho, apatico, furioso, feliz, medo, tonto, bravo)
 //   ?demoReforcos      os botoes em todos os estados (prints): acabado com video, 2, premio
 //   ?skins=todas       uma skin pronta equipada em cada nivel (medir o shader no celular), so na partida
 //   ?sons=fusao:bolha,musica:lofi   variantes do Estudio de sons (src/som/catalogo.js)

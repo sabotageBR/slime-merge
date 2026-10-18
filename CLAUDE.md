@@ -47,14 +47,27 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
   `src/jogo/pressao.js` (puro):
   - **escada:** do nível 9 em diante cada nível novo sobe o piso das gotas (`pisoPara`, teto 4: caem
     4 a 8, com `PESOS_ESCADA`); os slimes abaixo do piso evoluem ("Evolução!");
-  - **agenda:** um evento a cada 60 s a partir dos 90 s (coringas, gosma cinza, pedido, terremoto,
-    gigante, calor, gelo), com aviso no pote e a pílula da meta com contagem;
+  - **agenda:** um evento a cada 60 s a partir dos 90 s (coringas, pedido, terremoto, gigante, calor,
+    gelo; a chuva de gosma cinza saiu em 2026-10-17), com aviso no pote e a pílula da meta com contagem;
+    o terremoto treme o pote inteiro (`pote.tremer`: as paredes andam, o cesto e a tela tremem junto);
   - **sem derrota:** o "Ufa!" vale a partida inteira (`resgatarSempre`) e zera o combo; o coringa não
     faz o próximo recorde;
   - **intervalo comercial:** no fim de um evento, do 3º em diante, com 150 s de jogo desde o anterior
     (`ESPACO_ANUNCIO`);
-  - a gosma cinza é `src/jogo/cinza.js` (a do Duelo também).
+  - a gosma cinza (`src/jogo/cinza.js`) ficou só no Duelo.
   `?pressao=0` volta ao sem fim da 1.2.0 (com fim de partida).
+- **Versão 2.0.1 (revisão do usuário em 2026-10-17, antes do envio; escolhas em `docs/autoria.md`):**
+  - **fusão animada** (`FUSAO` em `soltar.js`, Merge e Duelo): `atrai` (os iguais se abraçam; quem
+    encosta ou chega a 0,5 u entra no grupo), `funde` (um corpo só que encolhe aos poucos) e o estalo;
+    **3+ iguais juntos pulam um nível (k+2)**; acima do 13 nasce o **super slime**, que `segura` ~1 s
+    e estoura. Quem está fundindo (`dados.fundindo`) fica fora da mira, do bot, do "Ufa!", da evolução
+    e do perigo; o save guarda os membros de antes; a janela do combo para enquanto há fusão;
+  - **selo do combo** ao lado do pote (`guias.js`, a partir do ×2; o texto `x2` saiu);
+  - **humor de cada slime** (`src/jogo/humor.js`): contente, neutro, amassado, chorinho (aperto =
+    alongamento + vizinhos), apático (20 s parado) e furioso (pancada de quem cai); o passageiro passa
+    por cima;
+  - **gosma do míssil** do tamanho do slime, que escorre com massa e aderência (`render/gosma.js`);
+  - **tela de loading** (`#carregando` no `index.html`, só HTML e CSS; sai no 1º quadro).
 - Protótipos (Croma, Loja, Molde, lab) só por `?modelo=` ou pelo hub; o `tools/empacotar.mjs`
   apaga os arquivos deles e as linhas `// prototipo` do `main.js`.
 
@@ -74,16 +87,18 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
 ## Estrutura
 - `src/fisica/` (pura e **determinística**: só `+ - * /` e `sqrt`; ver Convenções): `mundo.js` (SoA, subpasso de 1/240 s, contato
   com escala de massa pela altura, shape matching + plasticidade + memória, coesão e XSPH em
-  velocidade, paredes-cápsula, sono, contatos persistentes, fundir/dividir/redimensionar),
+  velocidade, paredes-cápsula com tremor separado da base (`tremerParedes`), sono, contatos persistentes,
+  fundir (um ou vários)/dividir/redimensionar, e o da fusão animada: `atrair`, `aparar`, `amolecer`,
+  `pertoDe`, `refazerForma`, `escalarForma`, `rampaVel`),
   `forma.js` (disco em girassol, atribuição por anel e ângulo), `materiais.js`, `paredes.js`.
 - `src/cor/`: `pigmentos.js` (**gerado** por `node tools/pigmentos.mjs`), `km.js` (mistura KM,
   OKLab, ΔE, uniformes do shader), `difusao.js` (difusão que conserva pigmento e frente de
   transmutação Fisher-KPP).
 - `src/render/`: `campo.js` (P2G na CPU: densidade total + cor e dominância do slime dominante
   por célula), `composicao.js` (WebGL2, um passe: limiar, contorno, costura onde a dominância
-  cai, KM espectral por pixel, brilho), `fallback2d.js`, `fundo.js` (papel e pote), `rostos.js`,
+  cai, KM espectral por pixel, brilho), `fallback2d.js`, `fundo.js` (papel e pote), `rostos.js` (e os humores),
   `vfx.js` (respingos, textos, explosão), `guias.js` (mão e teclas do onboarding, retícula de
-  mira), `qualidade.js` (qualidade adaptativa pelo fps, pura), `missil.js` e `gosma.js` (míssil da mira e gosma que escorre no canvas `cTela`, por
+  mira, selo do combo e aura das fusões), `qualidade.js` (qualidade adaptativa pelo fps, pura), `missil.js` e `gosma.js` (míssil da mira e gosma que escorre no canvas `cTela`, por
   cima do HUD), `cena.js`, `camera.js`.
 - Visual escolhível (Estúdio de visuais, `modelos/visuais.html`): `src/jogo/cestos.js` (8 cestos:
   geometria da colisão, linha, limite da mira), `src/render/cestos.js` (desenho por estilo e
@@ -93,9 +108,10 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
   `?modelo=`/hub) ou o que o jogador equipou na loja (perfil). **Padrão escolhido pelo usuário
   (2026-10-14): béquer, jardim, clássico.** As paredes de Loja/Molde/lab seguem o estilo do cesto.
 - `src/jogo/`: `soltar.js` (motor dos jogos de soltar: 1 ou 2 jogadores, fila, reforços,
-  fusões, resgate nos 3 primeiros minutos ou sempre com `resgatarSempre`, bot), `pote.js` (mira, preso, perigo, combo,
-  chacoalhar, alargar), `niveis.js`, `perfil.js`, `missoes.js` (metas da partida em cadeia, no
-  meio do sem fim), `pressao.js` (escada e agenda de eventos do sem fim), `cinza.js` (gosma cinza), `skins.js` (skins por nível: paleta, codec da pixel art, catálogo `SKINS` com
+  fusões animadas e em grupo, resgate nos 3 primeiros minutos ou sempre com `resgatarSempre`, bot), `pote.js` (mira, preso, perigo, combo,
+  chacoalhar, alargar, tremor), `niveis.js`, `perfil.js`, `missoes.js` (metas da partida em cadeia, no
+  meio do sem fim), `pressao.js` (escada e agenda de eventos do sem fim), `humor.js` (o rosto de base de
+  cada slime), `cinza.js` (gosma cinza do Duelo), `skins.js` (skins por nível: paleta, codec da pixel art, catálogo `SKINS` com
   as 26 escolhidas, `aparencia`), `modos/*.js`. Só dos protótipos (saem da build; código da build
   não pode importá-los, o `empacotar` falha com import quebrado): `goo.js` (bicos e massas de
   goo), `cores.js` (40 cores com nome) e `fases-molde.js`.
@@ -103,7 +119,9 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
   regra, liga, doisJogadores })` (o `configModo` do `main.js` monta as opções a partir do perfil) →
   `{ mundo, janela, campoJanela, eventos, passo, apontar, tecla, poder, bot, hud, visual,
   reiniciar, reviver, salvar }`. Merge, Duelo e Croma são `criarSoltar(regras, o)` com ganchos
-  (`sortear`, `criar`, `fusao`, `fundir`, `passo`, `transbordou`...; typedef `Regras` no `soltar.js`).
+  (`sortear`, `criar`, `fusao`, `passo`, `transbordou`...; typedef `Regras` no `soltar.js`). Merge e
+  Duelo têm a fusão animada (`animar`, `particulas`, `agrupa`, `nivelGrupo`, `juntar`, `concluir`);
+  o Croma continua com o `fundir` na hora.
 - Fluxo de um quadro: `core/laco.js` chama `modo.passo(1/60)` (a física faz 4 subpassos) →
   o modo empurra eventos em `modo.eventos` (`som`, `pouso`, `fusao`, `texto`, `nivel`,
   `registro`, `pedirVideo`, `fim`...) → `tratarEventos()` do `main.js` drena e vira áudio, VFX,
@@ -139,7 +157,7 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
 ## Comandos
 | Comando | O que faz |
 |---|---|
-| `npm test` | Física, cor, wrapper Poki, fronteiras, perfil, os modos com o bot, borda, míssil, pote estreito, telemetria de nível e do resgate, qualidade adaptativa, metas da partida, pressão do sem fim (`test/pressao.test.js`), áudio, sons, música e skins (148 testes, ~80 s) |
+| `npm test` | Física, cor, wrapper Poki, fronteiras, perfil, os modos com o bot, borda, míssil, pote estreito, telemetria de nível e do resgate, qualidade adaptativa, metas da partida, pressão do sem fim (`test/pressao.test.js`), fusão animada e tremor (`test/fusao.test.js`), humor (`test/humor.test.js`), áudio, sons, música e skins (168 testes, ~90 s) |
 | `node --test test/fisica.test.js` | Um arquivo só (`node:test`, sem dependências); `--test-name-pattern="Croma"` filtra pelo nome do teste |
 | `npm run menu` | Fluxo da build no Chrome headless: sequência, gotas no fim, dobrar, loja, missões, troca de modo, Loja › Skins e o editor (pintar, salvar, Esc). Prints em `.tmp/menu/`. `-- --tam=640x360` |
 | `npm run empacotar` | Build da Poki em `dist/` e zip em `dist-poki/` (sem protótipos; só os sons do `PADRAO`; recusa import quebrado, URL externa, `console.log`, `.map`, > 500 KB gzip e áudio > 120 KB); `-- --thumb` confere e anexa `marketing/thumb/slime-merge-1256.png` (sem ele é ensaio) |
@@ -155,7 +173,10 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
 | `node tools/sons.mjs baixar\|listar\|converter\|medir` | Pacotes CC0 da Kenney para `src/som/arquivos/` (MP3 mono 56 kbps, loudnorm, atraso medido) e `LICENCAS.txt` |
 | `node tools/prints-skins.mjs` | Catálogo das skins e prints do editor em `docs/skins/` |
 | `node tools/prints-eventos.mjs [--tam=390x844]` | Folha dos eventos da pressão (aviso, ativos, "Evolução!") em `docs/visuais/eventos-<LxA>.jpg` (laço pausado, `__slime.avancar(n)`) |
-| `node tools/quadros.mjs [--tam=1031x580]` | Quadros e GIF do míssil da mira (laço pausado, `__slime.avancar(n)`) em `docs/visuais/missil-*` |
+| `node tools/quadros.mjs [--tam=1031x580] [--alvo=pequeno]` | Quadros e GIF do míssil da mira e da gosma na tela (laço pausado, `__slime.avancar(n)`) em `docs/visuais/missil-*` |
+| `node tools/prints-fusao.mjs [--tam=] [--cenas=par,trio,super,terremoto]` | GIFs e folha da fusão animada, do selo do combo, do super slime e do terremoto em `docs/visuais/fusao-*` |
+| `node tools/prints-humor.mjs` | Folha dos humores em cada estilo de personagem e um pote real em `docs/visuais/humor-*` |
+| `node tools/prints-carregando.mjs` | A tela de loading em 3 momentos, retrato e paisagem, em `docs/visuais/carregando.jpg` |
 | `npm run artifact` | Monta `.tmp/artifact/` (hub + `jogo-N.html` sem o SDK + `src/`) para publicar no claude.ai |
 | `node tools/shot.mjs "<query>" LxA saida.png [ms]` | Print no Chrome headless (WebGL2 funciona). Ex.: `"modelo=1&semente=3&auto=800&passos=1800"` |
 | `node tools/pigmentos.mjs` | Regera `src/cor/pigmentos.js` e imprime o relatório de misturas |
@@ -165,7 +186,7 @@ sliders do material), `?semente=` (também ignora a partida salva), `?passos=N` 
 1º desenho), `?auto=ms` (bot), `?semanuncio`, `?lang=en|pt|es`, `?semhud`, `?render=2d`,
 `?material=` (lab), `?raio=&limiar=` (núcleo do campo), `?zoom=x0,y0,x1,y1`, `?filme=N&cada=K`,
 `?vitrine=1..5` (níveis no pote, para ver as texturas; 5 = o 13), `?cesto=&cenario=&objeto=`,
-`?bot=borda` (o `?auto` solta em cima da borda), `?poder=<id>`, `?expr=choro`, `?demoReforcos`
+`?bot=borda` (o `?auto` solta em cima da borda), `?poder=<id>`, `?expr=choro` (ou contente, amassado, chorinho, apatico, furioso...), `?demoReforcos`
 (botões em todos os estados), `?sons=cat:variante`, `?skins=todas` (uma skin em cada nível),
 `?qualidade=0..3` (alta, média, baixa, mínima; fixa o render e desliga a adaptativa; sem ele, o celular
 começa na média), `?revelar=N` (cartão de slime novo parado, para prints), `?pressao=0` (sem fim da 1.2.0, que acaba), `?evento=<id>` (esse evento da

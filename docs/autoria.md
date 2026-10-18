@@ -194,3 +194,26 @@ Pedidos com prints anotados do Merge Lab (plano em
 - **Pendente:** aprovar o visual dos eventos pelas folhas `docs/visuais/eventos-390x844.jpg` e
   `eventos-1031x580.jpg` (aviso no pote, pílula com ícone e contagem, gosma cinza, "Evolução!"), antes de
   enviar a 2.0.0 e pedir dois Player Fit Tests.
+
+## 2026-10-17 (tarde): revisão da 2.0.0 antes do envio
+- Pedido (lista do usuário): "retirar a chuva de gosma"; "o terremoto tem que tremer mesmo... o tubo de
+  ensaio"; "3 peças podem se fundir, às vezes eu vejo somente 2 (1 peça grande | um espaço | 1 peça
+  grande, jogo 1 da mesma cor no espaço e ela se agrupa somente com 1)"; "quando as peças se fundem isso
+  acontece muito rápido, eu queria ver a combinação sendo feita e um marcador de combo"; "o míssil está
+  legal mas a gosma que vai na tela eu quero algo dinâmico com o tamanho dele e o escorrer tem que ter uma
+  física interessante, mas não demorada"; "os olhinhos têm que ser individuais de cada slime: se eles
+  estiverem bem apertados é uma cara de choro, se estão confortáveis, feliz, tem o apático, tem o
+  furioso"; "crie uma tela de loading com slime". Depois: "quando fundir a partícula final eu quero ver o
+  resultado antes de explodir tudo".
+- Escolhas (todas na opção recomendada):
+  - **3 iguais juntos → k+2** (pula um nível; 4 também; acima do 13, o super slime estoura);
+  - **furioso:** levou uma pancada (um slime de outro nível caiu nele com força), ~2 s;
+  - **apático:** mais de 20 s parado sem se fundir;
+  - **marcador de combo:** selo ao lado do pote, do lado oposto aos reforços, com o anel do tempo;
+  - padrões assumidos e ajustáveis pelos prints: folga de 0,5 u para entrar no grupo, pontos do grupo =
+    as 2 fusões que ele substitui, super slime = `pontosNivel(13)·2·n·combo`, um cartão e um prêmio só no
+    nível pulado (o funil fica completo), o texto flutuante `x2` saiu.
+- O que foi feito está em `docs/producao.md` ("Revisão da 2.0.0 pelo usuário").
+- **Pendente:** aprovar os prints (`docs/visuais/fusao-*`, `humor-*`, `missil-*`, `carregando.jpg`,
+  `eventos-*`). O usuário pediu a build em seguida: **versão 2.0.1** (`dist-poki/slime-merge-2.0.1.zip`),
+  a que vai para os dois Player Fit Tests.

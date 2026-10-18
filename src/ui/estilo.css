@@ -367,3 +367,50 @@ body[data-orient="paisagem"] .gradeLoja.skins { grid-template-columns: repeat(4,
 
 /* prints sem HUD (thumb, comparacoes): o layout fica, so some o desenho */
 body.sem-hud #hud > * { visibility: hidden; }
+
+/* ---- carregando: o bequer enchendo de slime ate o 1o quadro (index.html; o main.js tira) */
+#carregando {
+  position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2.4vmin; background: linear-gradient(#a6dcff, #e6f7ff 64%, #8fd36a 64%, #6cc04a); transition: opacity 0.3s ease-out;
+}
+#carregando.pronto { opacity: 0; pointer-events: none; }
+#carregando .logo {
+  font-size: clamp(30px, 9vmin, 66px); color: #7fe36b; letter-spacing: 0.02em; line-height: 1;
+  -webkit-text-stroke: 0.16em var(--tinta); paint-order: stroke fill; text-shadow: 0 0.08em 0 var(--tinta);
+  animation: logoCarga 1.6s ease-in-out infinite;
+}
+@keyframes logoCarga { 50% { transform: translateY(-0.06em) rotate(-1.5deg); } }
+#carregando .bequer { width: clamp(170px, 48vmin, 300px); height: auto; overflow: visible; transition: transform 0.3s ease-out; }
+#carregando.pronto .bequer { transform: scale(1.08); }
+.bequer .vidroFundo { fill: rgba(255, 255, 255, 0.6); }
+.bequer .vidro { fill: none; stroke: var(--tinta); stroke-width: 6; stroke-linejoin: round; stroke-linecap: round; }
+.bequer .brilho { fill: none; stroke: #fff; stroke-width: 7; stroke-linecap: round; opacity: 0.85; }
+.bequer .marcas { fill: none; stroke: var(--azulTexto); stroke-width: 3; stroke-linecap: round; }
+/* o nivel sobe depressa e vai desacelerando (o jogo costuma ficar pronto antes do fim) */
+.bequer .nivel { transform: translateY(200px); animation: encher 6s cubic-bezier(0.12, 0.7, 0.3, 1) forwards; }
+@keyframes encher { to { transform: translateY(68px); } }
+.bequer .onda { animation: onda 1.1s linear infinite; }
+@keyframes onda { to { transform: translateX(-60px); } }
+.bequer .onda path { fill: #7fe36b; stroke: var(--tinta); stroke-width: 5; stroke-linejoin: round; }
+.bequer .cara { animation: boia 1.1s ease-in-out infinite; }
+@keyframes boia { 50% { transform: translateY(4px); } }
+.bequer .olho { transform-box: fill-box; transform-origin: center; animation: piscaCarga 3.2s infinite; }
+.bequer .olho ellipse { fill: #fff; stroke: var(--tinta); stroke-width: 4; }
+.bequer .olho circle { fill: var(--tinta); }
+@keyframes piscaCarga { 0%, 90%, 100% { transform: scaleY(1); } 94% { transform: scaleY(0.1); } }
+.bequer .boca { fill: none; stroke: var(--tinta); stroke-width: 4; stroke-linecap: round; }
+.bequer .gota { fill: #7fe36b; stroke: var(--tinta); stroke-width: 3; stroke-linejoin: round; opacity: 0; animation: pinga 1.2s ease-in infinite; }
+.bequer .g2 { animation-delay: 0.4s; }
+.bequer .g3 { animation-delay: 0.8s; }
+@keyframes pinga { 0% { transform: translateY(0); opacity: 0; } 12%, 75% { opacity: 1; } 100% { transform: translateY(120px); opacity: 0; } }
+#carregando .pontinhos { display: flex; gap: 0.5em; }
+#carregando .pontinhos i {
+  width: 0.75em; height: 0.75em; border-radius: 50%; background: #fff; border: 0.18em solid var(--tinta);
+  animation: saltinho 0.9s ease-in-out infinite;
+}
+#carregando .pontinhos i:nth-child(2) { animation-delay: 0.15s; }
+#carregando .pontinhos i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes saltinho { 30% { transform: translateY(-0.45em); } 60% { transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  #carregando *, #carregando .bequer .nivel { animation-duration: 0.01s; animation-iteration-count: 1; }
+}

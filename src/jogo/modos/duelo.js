@@ -66,16 +66,26 @@ export function criarModo(o = {}) {
       if ((a.dados.pote || 0) !== (b.dados.pote || 0)) return 0;
       return a.nivel === b.nivel && a.nivel < NIVEIS.length ? a.nivel + 1 : 0;
     },
-    fundir(S, J, base, outro, k, px, py, combo) {
-      const m = S.mundo;
-      const saidas = m.fundir(base, outro, { px, py, nAlvo: particulasNivel(k) });
+    // fusao animada como a do Merge (soltar.js FUSAO): 3 iguais juntos pulam um nivel, ate o 13
+    animar: true,
+    particulas: particulasNivel,
+    nivelGrupo: (S, k, n) => Math.min(NIVEIS.length, n >= 3 ? k + 1 : k),
+    agrupa(S, F, c) {
+      return F.membros.every((s) => S.R.fusao(S, s, c) === F.k);
+    },
+    juntar(S, J, base, k, px, py) {
       base.nivel = k;
       base.dados.expr = 'feliz';
+      base.dados.exprT = 1.1;
+      transmutar(S.mundo, base, ap(k), px, py);
+    },
+    concluir(S, J, base, k, px, py, combo, info) {
+      base.dados.expr = 'feliz';
       base.dados.exprT = 0.6;
-      transmutar(m, base, ap(k), px, py);
-      J.pontos += pontosNivel(k) * combo;
+      J.pontos += (info.n >= 3 ? pontosNivel(k - 1) + pontosNivel(k) : pontosNivel(k)) * combo;
       if (k > J.maxNivel) J.maxNivel = k;
-      S.eventos.push({ tipo: 'fusao', x: px, y: py, cor: ap(k).hex, combo, brilhos: Math.min(8, saidas.length / 3) });
+      S.eventos.push({ tipo: 'fusao', x: px, y: py, cor: ap(k).hex, combo, brilhos: Math.min(8, info.saidas / 3), grupo: info.n,
+        texto: info.n >= 3 ? 'triplo' : '', corTexto: '#ff6fd8', escala: 1.4 });
       // ataque: gosma cinza para o rival
       const qtd = (k >= 3 ? Math.floor((k - 1) / 2) : 0) + (combo >= 3 ? 1 : 0);
       if (qtd > 0) {

@@ -11,12 +11,13 @@ import { criarSoltar, PREMIOS, TEXTO_COMBO, COR_COMBO } from '../soltar.js';
 import { MAX_NIVEL, particulasNivel, pontosNivel } from '../niveis.js';
 import { aparencias as tabelaAparencias } from '../skins.js';
 import { iniciarFrente, pintar } from '../../cor/difusao.js';
-import { PESOS, PESOS_ESCADA, ESCADA, pisoPara, AGENDA, CICLO, EVENTOS, criarAgenda, avancarAgenda, encerrarEvento, qtdGosma, nivelGigante, alvoPedido } from '../pressao.js';
-import { pintarCinza, taxaCinza, passoCinza } from '../cinza.js';
+import { PESOS, PESOS_ESCADA, ESCADA, pisoPara, AGENDA, CICLO, EVENTOS, criarAgenda, avancarAgenda, encerrarEvento, nivelGigante, alvoPedido } from '../pressao.js';
 
 const PRISMA = { pig: [0.06, 0.04, 0.08, 0], textura: 6 };
 /** Eventos com contagem na pilula (os outros acabam quando o que cai, cai). */
 const COM_RELOGIO = ['pedido', 'terremoto', 'calor', 'gelo'];
+/** Duracao de cada um dos 3 tremores do terremoto (s; um a cada 2,5 s). */
+const TREMOR_EVENTO = 1.8;
 /** Cor do texto do aviso de cada tipo de evento. */
 const COR_EVENTO = { alivio: '#7fe36b', aperto: '#ff8a5c', meta: '#ffd23a', caos: '#5fd9ff' };
 
@@ -118,7 +119,6 @@ export function criarModo(o = {}) {
   function criar(S, J, spec, x, y, preso) {
     const s = S.mundo.criarSlime({ x, y, n: particulasNivel(spec.nivel), material: 'gelatina', nivel: spec.nivel, preso });
     if (!s) return null;
-    if (spec.cinza) { pintarCinza(S.mundo, s); return s; }
     s.dados.prisma = !!spec.prisma;
     s.dados.hex = spec.prisma ? '#ffffff' : ap(spec.nivel).hex;
     colorir(S.mundo, s, spec.prisma ? PRISMA : ap(spec.nivel));
@@ -136,7 +136,7 @@ export function criarModo(o = {}) {
     const m = S.mundo;
     let n = 0;
     for (const s of m.vivos()) {
-      if (s.preso || s.dados.cinza || s.dados.prisma || s.dados.marcado || (s.dados.pote || 0) !== J.idx || s.nivel >= k) continue;
+      if (s.preso || s.dados.prisma || s.dados.marcado || s.dados.fundindo || (s.dados.pote || 0) !== J.idx || s.nivel >= k) continue;
       m.redimensionar(s, particulasNivel(k), s.cx, s.topo);
       s.nivel = k;
       s.dados.irmao = 0;
@@ -146,7 +146,7 @@ export function criarModo(o = {}) {
       S.eventos.push({ tipo: 'brilhos', x: s.cx, y: s.cy, cor: ap(k).hex });
       n++;
     }
-    J.fila = J.fila.map((f) => (f && !f.prisma && !f.cinza && f.nivel < k ? { ...f, nivel: k } : f));
+    J.fila = J.fila.map((f) => (f && !f.prisma && f.nivel < k ? { ...f, nivel: k } : f));
     const P = J.pote.preso;
     if (P && !P.dados.prisma && P.nivel < k) {
       m.remover(P);
@@ -162,7 +162,7 @@ export function criarModo(o = {}) {
   /** A faixa do evento entra (2 s antes): texto no pote, som e, no pedido, o alvo. */
   function anunciar(S, J, ev) {
     const tipo = EVENTOS[ev.id].tipo;
-    if (ev.id === 'pedido') ev.alvo = alvoPedido(S.mundo.vivos().filter((s) => !s.preso && !s.dados.cinza && !s.dados.prisma).map((s) => s.nivel), piso(S), MAX_NIVEL);
+    if (ev.id === 'pedido') ev.alvo = alvoPedido(S.mundo.vivos().filter((s) => !s.preso && !s.dados.prisma).map((s) => s.nivel), piso(S), MAX_NIVEL);
     S.eventos.push({ tipo: 'texto', x: J.pote.cx, y: J.pote.linha * 0.62, texto: 'ev.' + ev.id, cor: COR_EVENTO[tipo], escala: 1.35 });
     const ruim = tipo === 'aperto' || tipo === 'caos';
     S.eventos.push({ tipo: 'som', nome: ruim ? 'ataque' : 'yes' });
@@ -175,11 +175,9 @@ export function criarModo(o = {}) {
       // o "proximo" ja vira prisma; mais 2 vem no sorteio
       J.fila[1] = { nivel: 2, prisma: true };
       S.extra.coringas = 2;
-    } else if (ev.id === 'gosma') {
-      S.extra.lixo = qtdGosma(J.maxNivel);
-      S.extra.tLixo = 0;
     } else if (ev.id === 'terremoto') {
-      J.pote.sacudir();
+      // o pote inteiro treme (as paredes andam; o cesto, desenhado delas, treme junto)
+      J.pote.tremer(TREMOR_EVENTO);
       S.eventos.push({ tipo: 'som', nome: 'descartar' });
       S.extra.tremores = 1;
     } else if (ev.id === 'gigante') {
@@ -201,9 +199,8 @@ export function criarModo(o = {}) {
   function durante(S, J, ev) {
     if (ev.id === 'coringas') ev.feito = !(S.extra.coringas > 0) && !J.fila.some((f) => f && f.prisma);
     else if (ev.id === 'gigante') ev.feito = !J.fila.some((f) => f && f.gigante);
-    else if (ev.id === 'gosma') ev.feito = !(S.extra.lixo > 0) && ev.t > 1.5;
     else if (ev.id === 'terremoto' && S.extra.tremores < 3 && ev.t >= 2.5 * S.extra.tremores) {
-      J.pote.sacudir();
+      J.pote.tremer(TREMOR_EVENTO);
       S.eventos.push({ tipo: 'som', nome: 'descartar' });
       S.extra.tremores++;
     }
@@ -220,9 +217,8 @@ export function criarModo(o = {}) {
     encerrarEvento(A, S.tempo);
   }
 
-  /** Um quadro da pressao: escada pendente, agenda, chuva de gosma e a gosma que pega cor. */
+  /** Um quadro da pressao: escada pendente e agenda. */
   function pressionar(S, J, dt) {
-    const m = S.mundo;
     if (S.extra.evoluir) { const k = S.extra.evoluir; S.extra.evoluir = 0; evoluir(S, J, k); }
     // partida de antes da agenda (save da 1.2.0): o primeiro evento vem 30 s depois de voltar
     const A = S.extra.agenda || (S.extra.agenda = criarAgenda({ prox: Math.max(AGENDA.primeiro, S.tempo + 30) }));
@@ -231,22 +227,25 @@ export function criarModo(o = {}) {
     else if (mud === 'start') comecar(S, J, A.ev);
     else if (mud === 'fim') fecharEvento(S, J, A);
     if (A.ev && A.ev.fase === 'ativo') durante(S, J, A.ev);
-    // chuva de gosma: uma a cada 0,3 s, por cima do pote
-    if (S.extra.lixo > 0 && (S.extra.tLixo -= dt) <= 0) {
-      const larg = Math.max(1, J.pote.meiaLinha - 1);
-      const s = criar(S, J, { nivel: piso(S), cinza: true }, J.pote.cx + (S.rng() - 0.5) * 2 * larg, 12.5, false);
-      if (s) { s.dados.solto = m.tempo; s.dados.pote = J.idx; }
-      S.extra.lixo--;
-      S.extra.tLixo = 0.3;
+  }
+
+  /**
+   * Quem funde com quem: o nivel novo, ou 0.
+   * @param {any} S @param {any} a @param {any} b
+   */
+  function fusao(S, a, b) {
+    // as duas metades da tesoura nao se juntam de novo (cada uma funde com outro igual)
+    if (a.dados.irmao && a.dados.irmao === b.dados.irmao) return 0;
+    // com a pressao, o coringa ajuda ate o maior nivel da partida mas nao faz o proximo recorde:
+    // na chuva de coringas o bot subia do 9 ao 13 em 12 s soltando os prismas no maior
+    if (comPressao && (a.dados.prisma || b.dados.prisma) && !(a.dados.prisma && b.dados.prisma)) {
+      const outro = a.dados.prisma ? b : a;
+      if (outro.nivel >= S.jogadores[0].maxNivel) return 0;
     }
-    // gosma que pegou cor vira o slime do piso (o piso pode ter subido desde a chuva)
-    passoCinza(m, (s) => {
-      const k = Math.max(s.nivel, piso(S));
-      if (k > s.nivel) m.redimensionar(s, particulasNivel(k), s.cx, s.topo);
-      s.nivel = k;
-      transmutar(m, s, ap(k), s.cx, s.cy);
-      S.eventos.push({ tipo: 'som', nome: 'graduar' });
-    });
+    if (a.dados.prisma && b.dados.prisma) return Math.max(a.nivel, b.nivel) + 1;
+    if (a.dados.prisma) return b.nivel + 1;
+    if (b.dados.prisma) return a.nivel + 1;
+    return a.nivel === b.nivel ? a.nivel + 1 : 0;
   }
 
   /** O pote estreito do comeco cresce: som, texto e a marca para a telemetria (main.js). */
@@ -289,60 +288,70 @@ export function criarModo(o = {}) {
       if (S.extra.tChac >= 25) { S.extra.tChac = 0; S.jogadores[0].pote.sacudir(); S.eventos.push({ tipo: 'som', nome: 'descartar' }); }
     },
     criar,
-    // a gosma cinza da chuva troca pigmento com as vizinhas (sem gosma, nada muda)
-    difusao: comPressao ? { entreSlimes: taxaCinza(() => jogo.S.mundo) } : undefined,
     // sem derrota no sem fim (escolha do usuario em 2026-10-17): o "Ufa!" vale a partida inteira
     resgatarSempre: () => comPressao,
-    fusao(S, a, b) {
-      // a gosma cinza nao funde com nada (pega cor das vizinhas e vira slime)
-      if (a.dados.cinza || b.dados.cinza) return 0;
-      // as duas metades da tesoura nao se juntam de novo (cada uma funde com outro igual)
-      if (a.dados.irmao && a.dados.irmao === b.dados.irmao) return 0;
-      // com a pressao, o coringa ajuda ate o maior nivel da partida mas nao faz o proximo recorde:
-      // na chuva de coringas o bot subia do 9 ao 13 em 12 s soltando os prismas no maior
-      if (comPressao && (a.dados.prisma || b.dados.prisma) && !(a.dados.prisma && b.dados.prisma)) {
-        const outro = a.dados.prisma ? b : a;
-        if (outro.nivel >= S.jogadores[0].maxNivel) return 0;
-      }
-      if (a.dados.prisma && b.dados.prisma) return Math.max(a.nivel, b.nivel) + 1;
-      if (a.dados.prisma) return b.nivel + 1;
-      if (b.dados.prisma) return a.nivel + 1;
-      return a.nivel === b.nivel ? a.nivel + 1 : 0;
+    fusao,
+    // fusao animada (soltar.js FUSAO): 3 ou mais iguais juntos pulam um nivel (escolha do usuario
+    // em 2026-10-17); acima do 13 nasce o super slime, que segura um instante e estoura
+    animar: true,
+    particulas: (k) => (k > MAX_NIVEL ? 0 : particulasNivel(k)),
+    nivelGrupo: (S, k, n) => (n >= 3 ? k + 1 : k),
+    // o grupo e so de iguais comuns: o coringa, os irmaos da tesoura e niveis diferentes ficam no par
+    agrupa(S, F, c) {
+      if (c.dados.prisma) return false;
+      return F.membros.every((s) => !s.dados.prisma && fusao(S, s, c) === F.k);
     },
-    fundir(S, J, base, outro, k, px, py, combo) {
+    juntar(S, J, base, k, px, py) {
+      const m = S.mundo;
+      base.dados.prisma = false;
+      base.dados.irmao = 0;
+      if (k > MAX_NIVEL) {
+        // o super slime: lava, espantado, ate estourar
+        base.nivel = MAX_NIVEL;
+        base.dados.super = true;
+        base.dados.expr = 'medo';
+        base.dados.exprT = 0;
+        transmutar(m, base, ap(MAX_NIVEL), px, py);
+        S.eventos.push({ tipo: 'som', nome: 'alvo' });
+        return;
+      }
+      base.nivel = k;
+      base.dados.expr = 'feliz';
+      base.dados.exprT = 1.1;
+      // a cor nova nasce na costura e avanca pelo corpo enquanto ele escoa
+      transmutar(m, base, ap(k), px, py);
+    },
+    concluir(S, J, base, k, px, py, combo, info) {
       const m = S.mundo;
       if (k > MAX_NIVEL) {
-        // dois do ultimo nivel somem numa explosao de pontos
-        m.remover(outro);
+        // o super slime estoura numa explosao de pontos (dois do 13 valem os x4 de sempre)
         m.remover(base);
-        J.pontos += pontosNivel(MAX_NIVEL) * 4 * combo;
-        S.eventos.push({ tipo: 'estouro', x: px, y: py, cor: ap(MAX_NIVEL).hex });
+        J.pontos += pontosNivel(MAX_NIVEL) * 2 * info.n * combo;
+        // a gosma que voa na tela e a brasa de dentro (a crosta da lava e escura)
+        S.eventos.push({ tipo: 'estouro', x: px, y: py, cor: ap(MAX_NIVEL).hex, corTela: '#ff8a2a', grande: true });
         S.eventos.push({ tipo: 'texto', x: px, y: py + 1.5, texto: 'perfeito', cor: '#ffd23a', escala: 1.8 });
         // nenhum nivel novo nasceu (o soltar.js nao registra "nivel 14")
         return false;
       }
-      const saidas = m.fundir(base, outro, { px, py, nAlvo: particulasNivel(k) });
-      base.nivel = k;
-      base.dados.prisma = false;
-      base.dados.irmao = 0;
       base.dados.expr = 'feliz';
       base.dados.exprT = 0.7;
-      // a cor nova avanca pelo corpo; a textura do nivel aparece aos poucos
-      transmutar(m, base, ap(k), px, py);
-      const ganho = pontosNivel(k) * combo;
+      // o grupo de 3 vale as duas fusoes que ele pulou
+      const ganho = (info.n >= 3 ? pontosNivel(k - 1) + pontosNivel(k) : pontosNivel(k)) * combo;
       J.pontos += ganho;
       if (k > visto) visto = k;
       if (k > J.maxNivel) {
         const pisoAntes = piso(S);
+        // telemetria: ate que nivel a partida chegou (o funil da Poki por nivel, sem buraco no pulo)
+        for (let q = J.maxNivel + 1; q <= k; q++) S.eventos.push({ tipo: 'nivel', n: q, acao: 'complete' });
         J.maxNivel = k;
-        // telemetria: ate que nivel a partida chegou (o funil da Poki por nivel)
-        S.eventos.push({ tipo: 'nivel', n: k, acao: 'complete' });
         // marco: um premio fisico a cada nivel novo a partir do 5
         if (k >= 5 && !J.premio) J.premio = PREMIOS[Math.floor(S.rng() * PREMIOS.length)];
         if (J.pote.estreito && k >= ini.nivelCresce) crescer(S, J, 'nivel');
         // a escada subiu: a evolucao vem no proximo passo (fora do laco das fusoes)
         if (piso(S) > pisoAntes) S.extra.evoluir = piso(S);
       }
+      // nasceu abaixo de um piso que subiu enquanto ele fundia: evolui tambem
+      if (comPressao && k < piso(S) && !S.extra.evoluir) S.extra.evoluir = piso(S);
       // pedido cumprido: premio fisico (se o espaco estiver livre) e as gotas (main.js)
       const ev = S.extra.agenda && S.extra.agenda.ev;
       if (ev && ev.id === 'pedido' && ev.fase === 'ativo' && !ev.feito && k >= (ev.alvo || 99)) {
@@ -352,12 +361,13 @@ export function criarModo(o = {}) {
         S.eventos.push({ tipo: 'texto', x: px, y: py + 1.8, texto: 'pedidoOk', cor: '#ffd23a', escala: 1.5 });
         S.eventos.push({ tipo: 'som', nome: 'missao' });
       }
+      const triplo = info.n >= 3;
       S.eventos.push({
-        tipo: 'fusao', x: px, y: py, cor: ap(k).hex, combo, brilhos: Math.min(12, saidas.length / 3), nivel: k,
-        texto: combo >= 2 || k >= 5 ? TEXTO_COMBO[Math.min(3, combo - 1)] : '',
-        corTexto: COR_COMBO[Math.min(3, combo - 1)], escala: 1 + Math.min(0.6, (combo - 1) * 0.2),
+        tipo: 'fusao', x: px, y: py, cor: ap(k).hex, combo, brilhos: Math.min(12, info.saidas / 3 + (triplo ? 6 : 0)), nivel: k, grupo: info.n,
+        texto: triplo ? 'triplo' : combo >= 2 || k >= 5 ? TEXTO_COMBO[Math.min(3, combo - 1)] : '',
+        corTexto: triplo ? '#ff6fd8' : COR_COMBO[Math.min(3, combo - 1)], escala: triplo ? 1.5 : 1 + Math.min(0.6, (combo - 1) * 0.2),
       });
-      if (combo >= 2) S.eventos.push({ tipo: 'texto', x: px + 1.6, y: py + 0.4, texto: 'x' + combo, cor: '#ffffff', escala: 0.9, grupo: 'mult' });
+      // o "x2" virou o selo do combo ao lado do pote (render/guias.js)
       S.eventos.push({ tipo: 'texto', x: px, y: py - 0.2, texto: '+' + ganho, cor: '#ffffff', escala: 0.55, grupo: 'pts' });
       return true;
     },
@@ -412,7 +422,7 @@ export function criarModo(o = {}) {
       const ev = comPressao && S.extra.agenda ? S.extra.agenda.ev : null;
       const evento = ev ? {
         id: ev.id, tipo: EVENTOS[ev.id].tipo, aviso: ev.fase === 'aviso',
-        // a contagem so nos que acabam pelo relogio (coringas, gigante e gosma acabam quando caem)
+        // a contagem so nos que acabam pelo relogio (coringas e gigante acabam quando caem)
         resta: ev.fase === 'ativo' && COM_RELOGIO.includes(ev.id) ? Math.max(0, Math.ceil(ev.dur - ev.t)) : 0, alvo: ev.alvo || 0, ok: !!ev.ok,
       } : null;
       return {
@@ -424,14 +434,17 @@ export function criarModo(o = {}) {
     },
     salvar(S) {
       const J = S.jogadores[0];
+      const juntos = new Set(S.fusoes.filter((F) => F.fase !== 'atrai').map((F) => F.base));
       return {
         pontos: J.pontos, tempo: S.tempo, fila: J.fila, poderes: J.poderes, premio: J.premio, maxNivel: J.maxNivel,
         alargado: J.pote.alargado, estreito: J.pote.estreito,
-        // pressao: a agenda (com o evento em curso), os coringas e a gosma que ainda vai cair
-        agenda: S.extra.agenda || null, coringas: S.extra.coringas || 0, lixo: S.extra.lixo || 0,
-        // o alvo de um missil em voo ja esta perdido
-        slimes: S.mundo.vivos().filter((s) => !s.preso && !s.dados.marcado)
-          .map((s) => [s.nivel, +s.cx.toFixed(2), +s.cy.toFixed(2), s.dados.prisma ? 1 : 0, s.dados.cinza ? 1 : 0]),
+        // pressao: a agenda (com o evento em curso) e os coringas que ainda vao cair
+        agenda: S.extra.agenda || null, coringas: S.extra.coringas || 0,
+        // o alvo de um missil em voo ja esta perdido; uma fusao que ja juntou volta como os membros
+        // de antes (ao voltar, eles se encostam e a fusao se refaz: os pontos entram uma vez so)
+        slimes: S.mundo.vivos().filter((s) => !s.preso && !s.dados.marcado && !juntos.has(s))
+          .map((s) => [s.nivel, +s.cx.toFixed(2), +s.cy.toFixed(2), s.dados.prisma ? 1 : 0])
+          .concat(...S.fusoes.filter((F) => F.fase !== 'atrai').map((F) => F.origem)),
       };
     },
     salvarMeta: () => ({ visto }),
@@ -446,15 +459,16 @@ export function criarModo(o = {}) {
       // partida de antes do pote estreito (sem a marca) ou que ja cresceu: largura de sempre
       if (!p.estreito) J.pote.crescer(0);
       if (p.alargado) J.pote.alargar();
-      for (const [k, x, y, prisma, cinza] of (p.slimes || []).slice().sort((a, b) => a[2] - b[2])) {
-        const s = criar(S, J, { nivel: k, prisma, cinza }, x, y, false);
+      // (a gosma cinza da chuva saiu do sem fim: a de um save antigo volta como slime do nivel)
+      for (const [k, x, y, prisma] of (p.slimes || []).slice().sort((a, b) => a[2] - b[2])) {
+        const s = criar(S, J, { nivel: k, prisma }, x, y, false);
         if (s) { s.dados.pote = 0; s.dados.solto = -10; }
       }
       if (!comPressao) return;
       if (p.agenda) S.extra.agenda = criarAgenda(p.agenda);
+      // evento que nao existe mais (a chuva de gosma): a agenda segue para o proximo
+      if (S.extra.agenda && S.extra.agenda.ev && !EVENTOS[S.extra.agenda.ev.id]) encerrarEvento(S.extra.agenda, S.tempo);
       S.extra.coringas = p.coringas || 0;
-      S.extra.lixo = p.lixo || 0;
-      S.extra.tLixo = 0;
       // um evento de calor ou gelo em curso volta no pote todo
       const ev = S.extra.agenda && S.extra.agenda.ev;
       if (ev && ev.fase === 'ativo' && (ev.id === 'calor' || ev.id === 'gelo')) {
@@ -462,10 +476,10 @@ export function criarModo(o = {}) {
       }
       if (ev && ev.id === 'terremoto') S.extra.tremores = 3;
       // partida de antes da escada (1.2.0) com slimes abaixo do piso: evoluem ao voltar
-      if (piso(S) > 1 && (p.slimes || []).some((q) => !q[3] && !q[4] && q[0] < piso(S))) S.extra.evoluir = piso(S);
+      if (piso(S) > 1 && (p.slimes || []).some((q) => !q[3] && q[0] < piso(S))) S.extra.evoluir = piso(S);
     },
   }, o);
-  ligarAparencias(jogo, AP, (s) => !!s.dados.prisma || !!s.dados.cinza);
+  ligarAparencias(jogo, AP, (s) => !!s.dados.prisma);
   /** Depuracao (?evento=) e testes: o proximo evento da agenda e esse, comecando ja (com o aviso). */
   jogo.forcarEvento = (/** @type {string} */ id) => {
     if (!comPressao || !EVENTOS[id]) return;

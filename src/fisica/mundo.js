@@ -35,6 +35,8 @@ export const VMAX = (0.8 * R_PART) / DT;
 export const MAX_SLIMES = 128;
 export const N_IDS = 4;
 export const N_PIG = 4;
+/** Velocidade padrao da rampa da rigidez (1/s): 0,25 s de "gloop" depois de fundir, dividir ou mudar de tamanho. */
+export const RAMPA_VEL = 4;
 const POLI = 0.1;
 /** Espacamento do reticulado de repouso: a maior soma de raios (a forma de repouso nunca
  * pede sobreposicao, senao o shape matching briga com o contato e o slime treme). */
@@ -69,6 +71,7 @@ const PEN_ACORDA = 0.03; // u de penetracao que acorda um slime dormindo
  * @property {number} alvoX
  * @property {number} alvoY
  * @property {number} rampa     0..1: rigidez crescendo depois da fusao ("gloop")
+ * @property {number} rampaVel  quanto a rampa sobe por segundo (0 = segura mole: fusao em andamento)
  * @property {boolean} dormindo
  * @property {number} tParado
  * @property {number} nPlast    particulas escoando no ultimo subpasso
@@ -127,6 +130,7 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
   for (let k = 0; k < MAX_SLIMES; k++) slimes.push(/** @type {Slime} */ ({ idx: k, ativo: false }));
   const membros = new Int32Array(cap);
   const iniSl = new Int32Array(MAX_SLIMES + 1);
+  const marca = new Uint8Array(MAX_SLIMES);
   let sujo = true;
 
   // grade
@@ -161,7 +165,13 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
   let pertoAntes = new Int32Array(1024);
   let nPertoAntes = 0;
 
-  /** @type {{ ax: number, ay: number, bx: number, by: number, r: number, vax: number, vay: number, vbx: number, vby: number, t: number }[]} */
+  /**
+   * Paredes: a base (ax..by, andando com vax..vby por t s: Alargar, crescer) e o tremor (tx, ty)
+   * separado da base, que anda com (svx, svy) por st s ate (atx, aty) (terremoto). O contato usa
+   * base + tremor; quem le a geometria do pote (mira, pouso, HUD) le a base, que nao treme.
+   * @type {{ ax: number, ay: number, bx: number, by: number, r: number, vax: number, vay: number, vbx: number, vby: number, t: number,
+   *   tx: number, ty: number, svx: number, svy: number, st: number, atx: number, aty: number, oculta: boolean }[]}
+   */
   let paredes = [];
 
   const rng = criarRng(semente);
@@ -185,10 +195,17 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
     fundir,
     redimensionar,
     dividir,
+    atrair,
+    aparar,
+    refazerForma,
+    amolecer,
+    pertoDe,
+    escalarForma,
     soltar,
     moverPreso,
     definirParedes,
     moverParede,
+    tremerParedes,
     empurrar,
     puxar,
     acordarTodos,
@@ -257,6 +274,7 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
     s.alvoX = o.x;
     s.alvoY = o.y;
     s.rampa = o.rampa !== undefined ? o.rampa : 1;
+    s.rampaVel = RAMPA_VEL;
     s.dormindo = false;
     s.tParado = 0;
     s.nPlast = 0;
@@ -365,19 +383,26 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
   }
 
   /**
-   * Funde b em a. Sobram nAlvo particulas (as mais longe do ponto de contato saem e viram
-   * brilho). A nova forma de repouso e um disco hexagonal com as particulas atribuidas por
-   * anel e angulo, e a rigidez cresce de 0 a 1 ("gloop").
+   * Funde b (um ou varios) em a. Sobram nAlvo particulas (as mais longe do ponto de contato saem
+   * e viram brilho; sem nAlvo, ficam todas). A nova forma de repouso e um disco hexagonal com as
+   * particulas atribuidas por anel e angulo, e a rigidez cresce de `rampa` a 1 ("gloop").
    * @param {Slime} a
-   * @param {Slime} b
-   * @param {{ px: number, py: number, nAlvo?: number, rampa?: number, manterForma?: boolean }} o
+   * @param {Slime|Slime[]} b
+   * @param {{ px: number, py: number, nAlvo?: number, rampa?: number, rampaVel?: number, manterForma?: boolean }} o
    *   manterForma: a forma de repouso vira a forma atual (goo que se junta nao vira bola)
+   *   rampaVel: quanto a rigidez sobe por segundo (padrao RAMPA_VEL; 0 segura mole)
    * @returns {number[]} [x, y, slime, ...] das particulas que sairam
    */
   function fundir(a, b, o) {
-    for (let i = 0; i < n; i++) if (sl[i] === b.idx) sl[i] = a.idx;
-    b.ativo = false;
-    limparContatos(b.idx);
+    const outros = Array.isArray(b) ? b : [b];
+    for (const c of outros) if (c !== a) marca[c.idx] = 1;
+    for (let i = 0; i < n; i++) if (marca[sl[i]]) sl[i] = a.idx;
+    for (const c of outros) {
+      if (c === a) continue;
+      marca[c.idx] = 0;
+      c.ativo = false;
+      limparContatos(c.idx);
+    }
     limparContatos(a.idx);
     sujo = true;
     let membrosA = [];
@@ -399,6 +424,7 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
     if (o.manterForma) formaAtual(a, membrosA);
     else refazerRepouso(a, membrosA);
     a.rampa = o.rampa !== undefined ? o.rampa : 0;
+    a.rampaVel = o.rampaVel !== undefined ? o.rampaVel : RAMPA_VEL;
     a.estado = 'normal';
     a.tEstado = 0;
     acordarTodos();
@@ -453,9 +479,125 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
     for (let i = 0; i < n; i++) if (sl[i] === s.idx) lista.push(i);
     refazerRepouso(s, lista);
     s.rampa = 0.3;
+    s.rampaVel = RAMPA_VEL;
     sujo = true;
     acordarTodos();
     return saidas;
+  }
+
+  /** Indices das particulas do slime (na ordem dos indices). @param {Slime} s */
+  function particulasDe(s) {
+    const lista = [];
+    for (let i = 0; i < n; i++) if (sl[i] === s.idx) lista.push(i);
+    return lista;
+  }
+
+  /**
+   * Puxa o slime inteiro para (px, py): soma a mesma velocidade a todas as particulas, acel*dt por
+   * chamada, sem passar de vmax de aproximacao (fusao em andamento: os membros se abracam).
+   * @param {Slime} s @param {number} px0 @param {number} py0
+   * @param {number} acel u/s2 @param {number} vmax u/s @param {number} dt s
+   */
+  function atrair(s, px0, py0, acel, vmax, dt) {
+    if (!s.ativo || s.preso) return;
+    const dx = px0 - s.cx;
+    const dy = py0 - s.cy;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < 1e-6) return;
+    const ux = dx / d;
+    const uy = dy / d;
+    const vp = s.vx * ux + s.vy * uy;
+    if (vp >= vmax) return;
+    let dv = acel * dt;
+    if (dv > vmax - vp) dv = vmax - vp;
+    for (let i = 0; i < n; i++) {
+      if (sl[i] !== s.idx) continue;
+      vx[i] += dv * ux;
+      vy[i] += dv * uy;
+    }
+    s.dormindo = false;
+    s.tParado = 0;
+  }
+
+  /**
+   * Tira `qtd` particulas do slime, as mais longe do centroide (desempate pelo indice), sem
+   * refazer a forma de repouso nem mexer na rampa (a fusao encolhe aos poucos).
+   * @param {Slime} s @param {number} qtd
+   * @returns {number[]} [x, y, slime, ...] das que sairam
+   */
+  function aparar(s, qtd) {
+    const lista = particulasDe(s);
+    const q = Math.min(qtd, lista.length - 1);
+    if (q <= 0) return [];
+    let M = 0;
+    let cx = 0;
+    let cy = 0;
+    for (const i of lista) { M += mas[i]; cx += mas[i] * x[i]; cy += mas[i] * y[i]; }
+    cx /= M;
+    cy /= M;
+    const dist = lista.map((i) => [(x[i] - cx) * (x[i] - cx) + (y[i] - cy) * (y[i] - cy), i]);
+    dist.sort((p, r) => (r[0] - p[0]) || (p[1] - r[1]));
+    return removerParticulas(dist.slice(0, q).map((p) => p[1]));
+  }
+
+  /** Disco de repouso novo para as particulas atuais do slime (fim do aparar). @param {Slime} s */
+  function refazerForma(s) {
+    refazerRepouso(s, particulasDe(s));
+  }
+
+  /**
+   * A rigidez desce ate `rampa` (se estava acima) e passa a subir `vel` por segundo (0 segura).
+   * @param {Slime} s @param {number} rampa @param {number} vel
+   */
+  function amolecer(s, rampa, vel) {
+    if (s.rampa > rampa) s.rampa = rampa;
+    s.rampaVel = vel;
+    s.dormindo = false;
+    s.tParado = 0;
+  }
+
+  /**
+   * Alguma particula de a a menos de (ri + rj + folga) de uma de b? Pela caixa do ultimo medir,
+   * e so as particulas de cada um que estao perto da caixa do outro.
+   * @param {Slime} a @param {Slime} b @param {number} folga
+   */
+  function pertoDe(a, b, folga) {
+    const m = folga + 2 * R_PART * (1 + POLI);
+    if (a.esq - m > b.dir || b.esq - m > a.dir || a.base - m > b.topo || b.base - m > a.topo) return false;
+    const la = [];
+    const lb = [];
+    for (let i = 0; i < n; i++) {
+      const xi = x[i];
+      const yi = y[i];
+      if (sl[i] === a.idx) {
+        if (xi > b.esq - m && xi < b.dir + m && yi > b.base - m && yi < b.topo + m) la.push(i);
+      } else if (sl[i] === b.idx) {
+        if (xi > a.esq - m && xi < a.dir + m && yi > a.base - m && yi < a.topo + m) lb.push(i);
+      }
+    }
+    for (const i of la) {
+      for (const j of lb) {
+        const lim = rad[i] + rad[j] + folga;
+        const dx = x[i] - x[j];
+        const dy = y[i] - y[j];
+        if (dx * dx + dy * dy < lim * lim) return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Escala a forma de repouso (o super slime incha antes de estourar).
+   * @param {Slime} s @param {number} f
+   */
+  function escalarForma(s, f) {
+    for (let i = 0; i < n; i++) {
+      if (sl[i] !== s.idx) continue;
+      qx[i] *= f; qy[i] *= f; ox[i] *= f; oy[i] *= f;
+    }
+    s.raio0 = (s.raio0 - R_PART) * f + R_PART;
+    s.dormindo = false;
+    s.tParado = 0;
   }
 
   /**
@@ -538,6 +680,7 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
     refazerRepouso(novo, lado);
     s.rampa = 0.3;
     novo.rampa = 0.3;
+    s.rampaVel = RAMPA_VEL;
     sujo = true;
     acordarTodos();
     return [s, novo];
@@ -571,7 +714,7 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
    *   oculta: so colide, o render nao desenha (guia da borda); nao conta para o chao
    */
   function definirParedes(caps) {
-    paredes = caps.map((c) => ({ ax: c.ax, ay: c.ay, bx: c.bx, by: c.by, r: c.r, vax: 0, vay: 0, vbx: 0, vby: 0, t: 0, oculta: !!c.oculta }));
+    paredes = caps.map((c) => ({ ax: c.ax, ay: c.ay, bx: c.bx, by: c.by, r: c.r, vax: 0, vay: 0, vbx: 0, vby: 0, t: 0, tx: 0, ty: 0, svx: 0, svy: 0, st: 0, atx: 0, aty: 0, oculta: !!c.oculta }));
     let menor = Infinity;
     for (const p of paredes) if (!p.oculta) menor = Math.min(menor, p.ay, p.by);
     mundo.chaoY = menor === Infinity ? 0 : menor;
@@ -598,6 +741,32 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
       p.vbx = (c.bx - p.bx) / t;
       p.vby = (c.by - p.by) / t;
       p.t = t;
+    }
+    acordarTodos();
+  }
+
+  /**
+   * Tremor das paredes da lista (o pote inteiro junto): o deslocamento (tx, ty), separado da base,
+   * vai ate (dx, dy) em t s com velocidade constante e chega exatamente nele (0 = no lugar). O
+   * atrito leva a velocidade do tremor. Acorda todos: slime dormindo nao colide com parede.
+   * @param {number[]} lista indices das paredes
+   * @param {number} dx @param {number} dy @param {number} t
+   */
+  function tremerParedes(lista, dx, dy, t) {
+    for (const k of lista) {
+      const p = paredes[k];
+      if (!p) continue;
+      p.atx = dx;
+      p.aty = dy;
+      if (t <= 0) {
+        p.tx = dx; p.ty = dy;
+        p.svx = p.svy = 0;
+        p.st = 0;
+      } else {
+        p.svx = (dx - p.tx) / t;
+        p.svy = (dy - p.ty) / t;
+        p.st = t;
+      }
     }
     acordarTodos();
   }
@@ -822,23 +991,28 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
     const dt = DT;
     for (let k = 0; k < paredes.length; k++) {
       const p = paredes[k];
-      const ex = p.bx - p.ax;
-      const ey = p.by - p.ay;
+      // base + tremor (sem tremor, tx = ty = 0 e a conta e a de sempre)
+      const ax = p.ax + p.tx;
+      const ay = p.ay + p.ty;
+      const bx = p.bx + p.tx;
+      const by = p.by + p.ty;
+      const ex = bx - ax;
+      const ey = by - ay;
       const l2 = ex * ex + ey * ey;
       const margem = p.r + R_PART * (1 + POLI);
-      const xmin = (p.ax < p.bx ? p.ax : p.bx) - margem;
-      const xmax = (p.ax > p.bx ? p.ax : p.bx) + margem;
-      const ymin = (p.ay < p.by ? p.ay : p.by) - margem;
-      const ymax = (p.ay > p.by ? p.ay : p.by) + margem;
+      const xmin = (ax < bx ? ax : bx) - margem;
+      const xmax = (ax > bx ? ax : bx) + margem;
+      const ymin = (ay < by ? ay : by) - margem;
+      const ymax = (ay > by ? ay : by) + margem;
       for (let i = 0; i < n; i++) {
         const xi = x[i];
         const yi = y[i];
         if (xi < xmin || xi > xmax || yi < ymin || yi > ymax) continue;
         if (parada(i)) continue;
-        let t = l2 > 0 ? ((xi - p.ax) * ex + (yi - p.ay) * ey) / l2 : 0;
+        let t = l2 > 0 ? ((xi - ax) * ex + (yi - ay) * ey) / l2 : 0;
         if (t < 0) t = 0; else if (t > 1) t = 1;
-        const cx = p.ax + t * ex;
-        const cy = p.ay + t * ey;
+        const cx = ax + t * ex;
+        const cy = ay + t * ey;
         let dx = xi - cx;
         let dy = yi - cy;
         const lim = rad[i] + p.r;
@@ -861,8 +1035,8 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
         y[i] += dy * pn;
         // atrito contra a parede (que pode estar andando)
         const s = slimes[sl[i]];
-        const wvx = p.vax + t * (p.vbx - p.vax);
-        const wvy = p.vay + t * (p.vby - p.vay);
+        const wvx = p.vax + t * (p.vbx - p.vax) + p.svx;
+        const wvy = p.vay + t * (p.vby - p.vay) + p.svy;
         const rx = x[i] - px[i] - wvx * dt;
         const ry = y[i] - py[i] - wvy * dt;
         const rn = rx * dx + ry * dy;
@@ -1176,11 +1350,19 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
     for (let it = 0; it < cfg.iter; it++) contatosPares(it === 0);
     // 4. paredes (andam junto)
     for (const p of paredes) {
-      if (p.t <= 0) continue;
-      const h = p.t < dt ? p.t : dt;
-      p.ax += p.vax * h; p.ay += p.vay * h; p.bx += p.vbx * h; p.by += p.vby * h;
-      p.t -= h;
-      if (p.t <= 0) { p.vax = p.vay = p.vbx = p.vby = 0; p.t = 0; }
+      if (p.t > 0) {
+        const h = p.t < dt ? p.t : dt;
+        p.ax += p.vax * h; p.ay += p.vay * h; p.bx += p.vbx * h; p.by += p.vby * h;
+        p.t -= h;
+        if (p.t <= 0) { p.vax = p.vay = p.vbx = p.vby = 0; p.t = 0; }
+      }
+      // tremor: chega exatamente no alvo (sem deriva de arredondamento)
+      if (p.st > 0) {
+        const h = p.st < dt ? p.st : dt;
+        p.tx += p.svx * h; p.ty += p.svy * h;
+        p.st -= h;
+        if (p.st <= 1e-9) { p.st = 0; p.tx = p.atx; p.ty = p.aty; p.svx = p.svy = 0; }
+      }
     }
     contatosParedes();
     // 5. velocidade, viscosidade, amortecimento de corpo rigido
@@ -1203,7 +1385,7 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
       const s = slimes[k];
       if (!s.ativo || s.dormindo || s.preso) continue;
       amortecerRigido(s);
-      if (s.rampa < 1) s.rampa = s.rampa + dt * 4 > 1 ? 1 : s.rampa + dt * 4;
+      if (s.rampa < 1) s.rampa = s.rampa + dt * s.rampaVel > 1 ? 1 : s.rampa + dt * s.rampaVel;
       if (s.tEstado > 0) {
         s.tEstado -= dt;
         if (s.tEstado <= 0) { s.tEstado = 0; s.estado = 'normal'; }

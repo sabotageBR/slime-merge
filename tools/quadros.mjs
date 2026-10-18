@@ -2,7 +2,8 @@
 // __slime.avancar(n) andando quadro a quadro): reticulas, choro, voo, explosao e a gosma
 // escorrendo na tela. Grava a tira em docs/visuais/missil-<LxA>.jpg e o GIF em
 // docs/visuais/missil-<LxA>.gif.
-// Uso: node tools/quadros.mjs [--tam=1031x580] [--semente=3] [--objeto=classico]
+// Uso: node tools/quadros.mjs [--tam=1031x580] [--semente=3] [--objeto=classico] [--alvo=pequeno]
+// (--alvo=pequeno: o menor slime do pote; a gosma e do tamanho dele; grava missil-pequeno-<LxA>)
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -35,9 +36,9 @@ try {
   await quadro('a-reticulas');
   // alvo: o slime mais alto do pote (bem visivel)
   const alvo = await c.avaliar(`(() => {
-    const vivos = __slime.J.modo.S.mundo.vivos().filter((s) => !s.preso && s.raio0 > 0.9);
-    vivos.sort((a, b) => b.cy - a.cy);
-    const s = vivos[Math.min(1, vivos.length - 1)];
+    const vivos = __slime.J.modo.S.mundo.vivos().filter((s) => !s.preso && s.raio0 > ${opt.alvo === 'pequeno' ? 0.3 : 0.9});
+    vivos.sort((a, b) => ${opt.alvo === 'pequeno' ? 'a.raio0 - b.raio0' : 'b.cy - a.cy'});
+    const s = vivos[${opt.alvo === 'pequeno' ? 0 : 'Math.min(1, vivos.length - 1)'}];
     __slime.J.modo.apontar(s.cx, s.cy, 'baixo');
     return [s.cx, s.cy];
   })()`);
@@ -67,9 +68,10 @@ const entradas = nomes.flatMap((n) => ['-i', join(pasta, n + '.png')]);
 const filtro = nomes.map((_, k) => `[${k}]scale=${larg}:-1[q${k}]`).join(';') + ';'
   + nomes.map((_, k) => `[q${k}]`).join('') + `xstack=inputs=${nomes.length}:layout=`
   + nomes.map((_, k) => `${(k % 4) ? Array.from({ length: k % 4 }, () => 'w0').join('+') : '0'}_${k >= 4 ? 'h0' : '0'}`).join('|');
-const tira = join(destino, `missil-${tam}.jpg`);
+const sufixo = opt.alvo === 'pequeno' ? 'pequeno-' : '';
+const tira = join(destino, `missil-${sufixo}${tam}.jpg`);
 execFileSync('ffmpeg', ['-loglevel', 'error', '-y', ...entradas, '-filter_complex', filtro, '-q:v', '3', tira]);
-const saidaGif = join(destino, `missil-${tam}.gif`);
+const saidaGif = join(destino, `missil-${sufixo}${tam}.gif`);
 execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-framerate', '30', '-i', join(pasta, 'gif', '%04d.png'),
   '-vf', `scale=${Math.min(W, 640)}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer`, saidaGif]);
 console.log('quadros em', pasta);

@@ -11,6 +11,32 @@
 <script src="https://game-cdn.poki.com/scripts/v2/poki-sdk.js"></script>
 </head>
 <body data-orient="retrato">
+<!-- tela de carregamento: o bequer enchendo de slime (so HTML e CSS, aparece antes de qualquer modulo;
+     o main.js tira no 1o quadro, junto do gameLoadingFinished; nenhum toque e pedido) -->
+<div id="carregando" role="status" aria-label="Loading">
+  <div class="logo">Slime Merge</div>
+  <svg class="bequer" viewBox="0 -30 200 260" aria-hidden="true">
+    <defs><clipPath id="vidroCarga"><path d="M53 40 V196 Q53 215 72 215 H128 Q147 215 147 196 V40 Z"/></clipPath></defs>
+    <path class="gota g1" d="M100 -26 Q108 -12 100 -6 Q92 -12 100 -26 Z"/>
+    <path class="gota g2" d="M92 -26 Q100 -12 92 -6 Q84 -12 92 -26 Z"/>
+    <path class="gota g3" d="M108 -26 Q116 -12 108 -6 Q100 -12 108 -26 Z"/>
+    <path class="vidroFundo" d="M50 40 V196 Q50 218 72 218 H128 Q150 218 150 196 V40 Z"/>
+    <g clip-path="url(#vidroCarga)">
+      <g class="nivel">
+        <g class="onda"><path d="M-60 0 Q-45 -9 -30 0 T0 0 T30 0 T60 0 T90 0 T120 0 T150 0 T180 0 T210 0 T240 0 T270 0 V320 H-60 Z"/></g>
+        <g class="cara">
+          <g class="olho"><ellipse cx="83" cy="34" rx="11" ry="12.5"/><circle cx="85" cy="37" r="5.5"/></g>
+          <g class="olho"><ellipse cx="117" cy="34" rx="11" ry="12.5"/><circle cx="119" cy="37" r="5.5"/></g>
+          <path class="boca" d="M92 55 Q100 63 108 55"/>
+        </g>
+      </g>
+    </g>
+    <path class="brilho" d="M64 62 V168"/>
+    <path class="marcas" d="M150 82 H137 M150 110 H142 M150 138 H137 M150 166 H142"/>
+    <path class="vidro" d="M38 32 L50 40 V196 Q50 218 72 218 H128 Q150 218 150 196 V40 L162 32"/>
+  </svg>
+  <div class="pontinhos"><i></i><i></i><i></i></div>
+</div>
 <canvas id="cFundo" class="camada"></canvas>
 <canvas id="cSlime" class="camada"></canvas>
 <canvas id="cTopo" class="camada"></canvas>

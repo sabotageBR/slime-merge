@@ -141,9 +141,9 @@ Test").
     preso também. Com a pressão, o coringa não funde com o maior nível da partida: na chuva de
     coringas o bot subia do 9 ao 13 em 12 s;
   - **agenda:** um evento a cada 60 s a partir dos 90 s, avisado 2 s antes no pote e na pílula (contagem
-    nos que acabam pelo relógio): coringas (3 prismas), gosma cinza (3 + ⌊max/4⌋, do tamanho do piso;
-    `src/jogo/cinza.js`, a mesma do Duelo), pedido ("faça um nível X" em 45 s: prêmio físico e 15 gotas),
-    terremoto (3 chacoalhadas), gota gigante (até o 9), calor (5 s) e gelo (8 s). O estado vai no save;
+    nos que acabam pelo relógio): coringas (3 prismas), pedido ("faça um nível X" em 45 s: prêmio físico e
+    15 gotas), terremoto (3 tremores do pote inteiro), gota gigante (até o 9), calor (5 s) e gelo (8 s); a
+    gosma cinza saiu na revisão do usuário (abaixo). O estado vai no save;
     a partida da 1.2.0 ganha agenda 30 s depois de voltar e evolui o que ficou abaixo do piso;
   - **sem derrota:** o "Ufa!" vale a partida inteira (`resgatarSempre`) e zera o combo; o sem fim não tem
     mais tela de fim (o desafio e o Duelo têm); as gotas dos pontos (mesma conta do fim) entram em cada
@@ -167,3 +167,31 @@ Test").
   - **metas do próximo teste (2 PFTs):** média ≥ 7:00; 5m+ ≥ 45%; 3m+ ≥ 58%; 1–2m ≤ 14%; `tempo/10/min` ≥
     20%; perda por minuto do 1 ao 5 ≤ 14%; nível 10 na mediana ≤ 4 min; nível 13 para ≥ 20%; `fps/0/m5` no
     celular ≤ 10%.
+- **Revisão da 2.0.0 pelo usuário → versão 2.0.1** (2026-10-17, antes do envio; plano em
+  `~/.claude/plans/pasted-content-id-8745-retirar-cheeky-hopper.md`; escolhas em `docs/autoria.md`):
+  - **sem a chuva de gosma:** o evento `gosma` saiu da agenda (o ciclo tem 6); a gosma cinza ficou só no
+    Duelo. Save com o evento ou com gosma cinza no pote: o evento acaba e a gosma volta slime do nível;
+  - **terremoto de verdade:** as paredes do pote andam (tremor separado da base, `mundo.tremerParedes`,
+    0,38 u na lateral a 7,5 Hz e 0,12 u na vertical, 3 tremores de 1,8 s), o cesto e a tela tremem junto
+    (câmera deslocada até 8 px) e o celular vibra. Em 5 sementes com o pote cheio (870 a 1.370
+    partículas), nenhuma saiu; um "Ufa!" no pote mais cheio;
+  - **fusão visível e em grupo:** os iguais se abraçam (0,22 a 0,45 s), viram um corpo só que escoa e
+    encolhe (0,4 s) e estalam. No caso relatado (grande | vão | grande com a gota no meio), os 27 casos
+    simulados (níveis 3, 5 e 7; vão de 0,5 a 1 diâmetro; gota no centro e deslocada) juntam os três.
+    **3+ iguais → k+2**, com os pontos das 2 fusões e o funil `level/N/complete` sem buraco. O **super
+    slime** (2 do 13 ou 3 do 12) fica ~1 s inteiro (incha, treme, brilha) antes de estourar;
+  - **selo do combo** (a partir do ×2) ao lado do pote, com o anel da janela, que para durante a fusão;
+  - **humor de cada slime:** numa partida do bot (3 sementes, 5 min): neutro 43%, contente 18%,
+    amassado 12%, feliz 10%, furioso 9%, chorinho 7%. A pressão de contato não servia (abaixo de 0,01 em
+    99,9% do tempo): o aperto é o alongamento do corpo mais os vizinhos;
+  - **gosma do míssil:** do tamanho do slime (3 a 9 manchas), chega achatando e balança; os pingos têm
+    massa e aderência, escorrem em regime viscoso, deixam rastro e grudam; a gota pesada se solta. 1,1 a
+    1,6 s. O estouro do super slime também espirra (a brasa da lava);
+  - **tela de loading:** o béquer enchendo de slime com olhinhos (só HTML e CSS no `index.html`), que sai
+    no 1º quadro, junto do `gameLoadingFinished`; nenhum toque é pedido;
+  - verificado com `npm test` (168), `npm run menu`, `jogar 1 5`, `sdkcheck`, `telas`, `bancada` (física
+    3,5 ms com 1.624 partículas) e a build aberta no Chrome (sem erro; a tela de loading sai);
+    `dist-poki/slime-merge-2.0.1.zip` (361 KB; 350 KB gzip) com a thumb `slime-merge-2.0.1-thumb.png`;
+  - **pendente:** aprovar os prints em `docs/visuais/`: `fusao-*` (par com combo, trio, super slime,
+    terremoto), `humor-480x600.jpg` e `humor-pote-480x600.jpg`, `missil-*` (alvo grande e pequeno),
+    `carregando.jpg` e `eventos-*`.

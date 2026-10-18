@@ -41,8 +41,11 @@ export function pisoPara(maxNivel, e = ESCADA) {
  */
 export const AGENDA = Object.freeze({ primeiro: 90, intervalo: 60, folga: 12, aviso: 2, anuncioDesde: 3 });
 
-/** Ordem dos eventos (repete): alivio, aperto, meta, caos, aperto, alivio, aperto. */
-export const CICLO = Object.freeze(['coringas', 'gosma', 'pedido', 'terremoto', 'gigante', 'calor', 'gelo']);
+/**
+ * Ordem dos eventos (repete): alivio, meta, caos, aperto, alivio, aperto. A chuva de gosma cinza
+ * saiu em 2026-10-17 (pedido do usuario).
+ */
+export const CICLO = Object.freeze(['coringas', 'pedido', 'terremoto', 'gigante', 'calor', 'gelo']);
 
 /**
  * Cada evento: duracao maxima ativo (s) e o tipo (cor da pilula e som do aviso).
@@ -50,9 +53,8 @@ export const CICLO = Object.freeze(['coringas', 'gosma', 'pedido', 'terremoto', 
  */
 export const EVENTOS = Object.freeze({
   coringas: { dur: 20, tipo: 'alivio' }, // as 3 proximas gotas sao prismas
-  gosma: { dur: 4, tipo: 'aperto' }, // chuva de gosma cinza (nao funde; pega cor e vira slime)
   pedido: { dur: 45, tipo: 'meta' }, // faca um nivel X: premio fisico e gotas
-  terremoto: { dur: 7, tipo: 'caos' }, // tres chacoalhadas
+  terremoto: { dur: 7, tipo: 'caos' }, // tres tremores do pote inteiro
   gigante: { dur: 15, tipo: 'aperto' }, // a proxima gota e grande
   calor: { dur: 5, tipo: 'alivio' }, // o pote todo amolece e assenta
   gelo: { dur: 8, tipo: 'aperto' }, // o pote todo endurece
@@ -105,11 +107,6 @@ export function encerrarEvento(A, tempo) {
   const ev = A.ev;
   A.prox = Math.max((ev ? ev.inicio : tempo) + AGENDA.intervalo, tempo + AGENDA.folga);
   A.ev = null;
-}
-
-/** Quantas gosmas caem na chuva (cresce com o maior nivel). @param {number} maxNivel */
-export function qtdGosma(maxNivel) {
-  return 3 + Math.floor(maxNivel / 4);
 }
 
 /** Maior gota gigante (o 9 ja tem quase meio pote de largura). */

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   PESOS, pisoPara, ESCADA, AGENDA, CICLO, EVENTOS, criarAgenda, avancarAgenda, encerrarEvento,
-  qtdGosma, nivelGigante, alvoPedido, GIGANTE_MAX,
+  nivelGigante, alvoPedido, GIGANTE_MAX,
 } from '../src/jogo/pressao.js';
 import { criarModo } from '../src/jogo/modos/merge.js';
 import { MAX_NIVEL } from '../src/jogo/niveis.js';
@@ -66,9 +66,8 @@ test('agenda: o 1o evento aos 90 s (aviso 2 s antes), um a cada ~60 s, na ordem 
   assert.deepEqual(B, A);
 });
 
-test('gosma, gigante e pedido: quantidades e niveis dentro da janela', () => {
-  assert.equal(qtdGosma(1), 3);
-  assert.equal(qtdGosma(MAX_NIVEL), 6);
+test('gigante e pedido: niveis dentro da janela; a chuva de gosma saiu da agenda', () => {
+  assert.ok(!CICLO.includes('gosma') && !EVENTOS.gosma);
   for (let max = 6; max <= MAX_NIVEL; max++) {
     const p = pisoPara(max);
     const g = nivelGigante(p, max);
@@ -147,7 +146,7 @@ test('sem derrota no sem fim: o "Ufa!" vale depois dos 3 min e zera o combo; o d
   }
 });
 
-test('eventos no pote: coringas, gosma, gigante, terremoto, calor e gelo fazem o que dizem', () => {
+test('eventos no pote: coringas, gigante, terremoto, calor e gelo fazem o que dizem', () => {
   const comeca = (id, prep) => {
     const modo = criarModo({ semente: 6, salvo: {}, toque: true });
     if (prep) prep(modo);
@@ -164,26 +163,28 @@ test('eventos no pote: coringas, gosma, gigante, terremoto, calor e gelo fazem o
     const f = [S.R.sortear(S, J), S.R.sortear(S, J), S.R.sortear(S, J)];
     assert.deepEqual(f.map((x) => !!x.prisma).slice(0, 2), [true, true]);
   }
-  // gosma: caem gosmas cinzentas do tamanho do piso, que nao fundem com nada
-  {
-    const { modo, S, J } = comeca('gosma');
-    quadros(modo, 120);
-    const cinzas = S.mundo.vivos().filter((s) => s.dados.cinza);
-    assert.ok(cinzas.length >= 1, 'nenhuma gosma caiu');
-    assert.equal(S.R.fusao(S, cinzas[0], cinzas[0]), 0);
-    assert.equal(S.R.fusao(S, cinzas[0], por(modo, { nivel: cinzas[0].nivel }, 0, 9)), 0);
-    assert.ok(cinzas.length <= qtdGosma(J.maxNivel));
-  }
   // gigante: o proximo e grande (acima da janela) e o evento acaba quando ele cai
   {
     const { S, J } = comeca('gigante', (m) => { m.S.jogadores[0].maxNivel = 9; });
     assert.ok(J.fila[1].gigante && J.fila[1].nivel === nivelGigante(pisoPara(9), 9));
     void S;
   }
-  // terremoto: o pote sacode; calor e gelo: o pote todo muda de estado
+  // terremoto: o pote inteiro treme (as paredes andam e voltam ao lugar); calor e gelo: o pote todo muda de estado
   {
-    const { J } = comeca('terremoto');
-    assert.ok(J.pote.chacoalhar > 0 || J.pote.tChac > 0);
+    const { modo, S, J } = comeca('terremoto');
+    assert.ok(J.pote.tremorDur > 0, 'o pote nao tremeu');
+    const base = J.pote.idxParedes.map((k) => ({ ...S.mundo.paredes[k] }));
+    quadros(modo, 10);
+    assert.ok(J.pote.idxParedes.some((k) => S.mundo.paredes[k].tx !== 0), 'as paredes nao andaram');
+    assert.ok(modo.visual().tremor, 'sem o tremor no visual');
+    quadros(modo, Math.round(EVENTOS.terremoto.dur * 60) + 10);
+    J.pote.idxParedes.forEach((k, i) => {
+      const p = S.mundo.paredes[k];
+      assert.equal(p.tx, 0);
+      assert.equal(p.ty, 0);
+      assert.deepEqual([p.ax, p.ay, p.bx, p.by], [base[i].ax, base[i].ay, base[i].bx, base[i].by]);
+    });
+    assert.equal(modo.visual().tremor, null);
   }
   for (const id of ['calor', 'gelo']) {
     const { S } = comeca(id, (m) => { por(m, { nivel: 3 }, 0, 2); por(m, { nivel: 4 }, 2, 5); });
@@ -224,7 +225,7 @@ test('pedido: o alvo aparece na pilula; cumprido da premio e gotas (ok), senao f
   assert.ok(ev2.some((e) => e.tipo === 'intervalo' && e.origem === 'evento'), 'sem a pausa natural do 3o evento');
 });
 
-test('save no meio de um evento: a agenda, o pedido e a gosma voltam; a partida da 1.2.0 ganha agenda e evolui', () => {
+test('save no meio de um evento: a agenda e o pedido voltam; a chuva de gosma de um save antigo some; a partida da 1.2.0 ganha agenda e evolui', () => {
   const modo = criarModo({ semente: 6, salvo: {}, toque: true });
   modo.S.jogadores[0].maxNivel = 7;
   por(modo, { nivel: 4 }, -3, 1);
@@ -238,14 +239,15 @@ test('save no meio de um evento: a agenda, o pedido e a gosma voltam; a partida 
   assert.equal(b.ev.alvo, a.ev.alvo);
   assert.equal(b.ev.fase, 'ativo');
   assert.equal(b.n, a.n);
-  // gosma no pote volta cinza
-  const g = criarModo({ semente: 6, salvo: {}, toque: true });
-  g.forcarEvento('gosma');
-  quadros(g, 200);
-  const sg = JSON.parse(JSON.stringify(g.salvar()));
-  const n = g.S.mundo.vivos().filter((s) => s.dados.cinza && !s.preso).length;
+  // save de antes (chuva de gosma em curso, uma gosma cinza no pote): o evento acaba e a gosma volta slime
+  const sg = JSON.parse(JSON.stringify(modo.salvar()));
+  sg.partida.agenda.ev = { id: 'gosma', fase: 'ativo', t: 1, dur: 4, n: 2, inicio: 150 };
+  sg.partida.slimes.push([3, 2, 6, 0, 1]);
   const gv = criarModo({ semente: 6, salvo: sg, toque: true });
-  assert.equal(gv.S.mundo.vivos().filter((s) => s.dados.cinza).length, n);
+  assert.equal(gv.S.extra.agenda.ev, null);
+  assert.ok(gv.S.extra.agenda.prox > gv.S.tempo);
+  assert.ok(gv.S.mundo.vivos().every((s) => !s.dados.cinza && s.dados.hex !== '#8a8a90'));
+  quadros(gv, 30);
   // save da 1.2.0 (sem agenda) no nivel 10 com um nivel 1 no pote: agenda nova 30 s adiante e evolucao
   const velho = { pontos: 9000, tempo: 400, fila: [{ nivel: 1 }, { nivel: 2 }], poderes: { trocar: 1, chacoalhar: 1, alargar: 1, mira: 1 }, premio: '', maxNivel: 10, alargado: false, estreito: false, slimes: [[1, -2, 1, 0], [6, 1, 2, 0]] };
   const v = criarModo({ semente: 6, salvo: { partida: velho }, toque: true });

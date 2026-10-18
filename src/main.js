@@ -13,6 +13,7 @@ import { criarSons } from './som/sons.js';
 import { criarMusica } from './som/musica.js';
 import { criarLaco, PASSO } from './core/laco.js';
 import { criarEntrada } from './core/entrada.js';
+import { vibrar } from './core/haptico.js';
 import { criarCena, QUALIDADES } from './render/cena.js';
 import { criarHud } from './ui/hud.js';
 import { criarMenu } from './ui/menu.js';
@@ -482,6 +483,26 @@ function tratarEventos() {
       case 'estouro':
         sons.tocar('estouro');
         if (e.cor) cena.vfx.respingo(e.x, e.y, e.cor, 18, 8);
+        if (e.grande) {
+          // o super slime do 13 estoura: explosao, lava na tela e o celular treme
+          sons.tocar('splat');
+          cena.vfx.explosao(e.x, e.y, e.cor, 3);
+          cena.respingarTela(e.x, e.y, e.corTela || e.cor, 2.6);
+          vibrar(90);
+        }
+        break;
+      case 'junta':
+        // fusao animada: a costura some e os iguais viram um corpo so
+        sons.tocar('pouso', { forca: 0.8 });
+        if (e.cor) cena.vfx.respingo(e.x, e.y, e.cor, 5 + 2 * (e.n || 2), 3);
+        break;
+      case 'faiscas':
+        // as particulas que sobram da fusao saem como faiscas pelas pontas
+        for (let k = 0; k + 1 < e.pts.length; k += 2) cena.vfx.brilho(e.pts[k], e.pts[k + 1]);
+        break;
+      case 'tremor':
+        // terremoto: o pote inteiro treme (e o celular, onde da)
+        if (e.pote === 0) vibrar([40, 30, 40, 30, 60]);
         break;
       case 'brilhos':
         // um slime que evoluiu na escada
@@ -897,8 +918,21 @@ function desenharJogo(dt = 0) {
   if (!J.carregou) {
     J.carregou = true;
     poki.gameLoadingFinished();
+    esconderCarregando();
   }
   if (dep.debug) hud.depurar(laco.medidas, J.modo.mundo, cena, J.modo);
+}
+
+/**
+ * Tira a tela de carregamento (index.html): fade de 0,3 s; nos prints (sem HUD, ou com a fisica
+ * adiantada pelo ?passos, que atrasa o 1o quadro), na hora.
+ */
+function esconderCarregando() {
+  const el = $('carregando');
+  if (!el) return;
+  if (dep.semHud || dep.passos) { el.remove(); return; }
+  el.classList.add('pronto');
+  setTimeout(() => el.remove(), 350);
 }
 
 /**
@@ -1002,7 +1036,7 @@ async function iniciar() {
     J.modo.passo(PASSO);
     J.modo.eventos.length = 0;
   }
-  // prints dos eventos (?evento=gosma): depois dos ?passos (o pote ja montado), o aviso entra ja
+  // prints dos eventos (?evento=gigante): depois dos ?passos (o pote ja montado), o aviso entra ja
   if (dep.evento && J.modo.forcarEvento) J.modo.forcarEvento(dep.evento);
   if (dep.poder && J.modo.poder) J.modo.poder(dep.poder);
   if (dep.demoReforcos && J.modo.S) {
@@ -1017,7 +1051,7 @@ async function iniciar() {
   // prints do cartao de slime novo: depois do 1o desenho (a barra de evolucao ja tem as cores)
   if (dep.revelar) setTimeout(() => hud.revelar(dep.revelar, `${formatar(T.nivelN, { n: dep.revelar })} · +${PREMIO_DESCOBERTA} 💧`, true), 300);
   // reserva: se o rAF nao andar (aba em segundo plano, iframe escondido), o loading sai assim mesmo
-  setTimeout(() => { if (!J.carregou) { J.carregou = true; poki.gameLoadingFinished(); } }, 1500);
+  setTimeout(() => { if (!J.carregou) { J.carregou = true; poki.gameLoadingFinished(); esconderCarregando(); } }, 1500);
   if (dep.ganchos) {
     /** @type {any} */ (window).__slime = {
       J, cena, laco, poki, audio, sons, musica, hud, perfil, entrarModo, abrirMenu,

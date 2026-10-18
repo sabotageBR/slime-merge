@@ -5,14 +5,16 @@
 import { aplicar } from './camera.js';
 import { TINTA } from './fundo.js';
 
-/** Pontos do contorno de um pote (capsulas encadeadas). */
+/** Pontos do contorno de um pote (capsulas encadeadas), com o tremor do terremoto (tx, ty). */
 function contorno(paredes, idx) {
   const pts = [];
   idx.forEach((k, n) => {
     const p = paredes[k];
     if (!p) return;
-    if (n === 0) pts.push([p.ax, p.ay]);
-    pts.push([p.bx, p.by]);
+    const tx = p.tx || 0;
+    const ty = p.ty || 0;
+    if (n === 0) pts.push([p.ax + tx, p.ay + ty]);
+    pts.push([p.bx + tx, p.by + ty]);
   });
   return pts;
 }
@@ -323,9 +325,11 @@ export function desenharCestos(ctx, cam, dpr, paredes, o = {}) {
   let atual = null;
   paredes.forEach((p, k) => {
     if (usadas.has(k) || p.oculta) { atual = null; return; }
-    const emenda = atual && Math.abs(atual[atual.length - 1][0] - p.ax) < 1e-6 && Math.abs(atual[atual.length - 1][1] - p.ay) < 1e-6;
-    if (emenda) atual.push([p.bx, p.by]);
-    else { atual = [[p.ax, p.ay], [p.bx, p.by]]; grupos.push(atual); }
+    const tx = p.tx || 0;
+    const ty = p.ty || 0;
+    const emenda = atual && Math.abs(atual[atual.length - 1][0] - p.ax - tx) < 1e-6 && Math.abs(atual[atual.length - 1][1] - p.ay - ty) < 1e-6;
+    if (emenda) atual.push([p.bx + tx, p.by + ty]);
+    else { atual = [[p.ax + tx, p.ay + ty], [p.bx + tx, p.by + ty]]; grupos.push(atual); }
   });
   for (const g of grupos) estilo(ctx, g);
 }

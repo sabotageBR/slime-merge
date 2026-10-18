@@ -10,7 +10,7 @@ import { svgIcone, ICONE_MISSAO } from './icones.js';
 /** Premios de marco (o 5o espaco): placa dourada. */
 const PREMIOS = ['calor', 'gelo', 'tesoura', 'tinta'];
 /** Icone de cada evento da pressao do sem fim (src/jogo/pressao.js) na pilula da meta. */
-const ICONE_EVENTO = { coringas: '🌈', gosma: '☁️', pedido: '🎯', terremoto: '〰️', gigante: '⬇️', calor: '🔥', gelo: '❄️' };
+const ICONE_EVENTO = { coringas: '🌈', pedido: '🎯', terremoto: '〰️', gigante: '⬇️', calor: '🔥', gelo: '❄️' };
 
 /** Icones dos prototipos (Croma, Loja e Molde); os dos reforcos estao em src/ui/icones.js. */
 const ICONES_PROTOTIPOS = {

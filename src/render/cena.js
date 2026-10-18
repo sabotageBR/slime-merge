@@ -3,7 +3,7 @@
 // dentro da #area do HUD, qualidade adaptativa.
 // Nada desenha com canvas 0x0 (iframe zerado/escondido congelava o stringcut no iPad).
 
-import { enquadrar, paraMundo, paraTela, aplicar } from './camera.js';
+import { enquadrar, paraMundo, paraTela, aplicar, deslocada } from './camera.js';
 import { criarCampo } from './campo.js';
 import { criarComposicao } from './composicao.js';
 import { desenharSlimes2D, definirAparencias2D } from './fallback2d.js';
@@ -110,20 +110,23 @@ export function criarCena(el, o = {}) {
     if (!cam || W < 2 || H < 2) return;
     const m = modo.mundo;
     const vis = modo.visual ? modo.visual() : {};
+    // terremoto: a tela treme junto com o pote (a camera estavel fica para o toque e o HUD)
+    const tr = vis.tremor;
+    const cq = tr ? deslocada(cam, Math.max(-8, Math.min(8, tr.x * cam.s * 0.6)), Math.max(-5, Math.min(5, -tr.y * cam.s * 0.6))) : cam;
     // fundo: cenario (o chao fica logo abaixo do cesto), cesto e o que nasce atras do slime
     let chao = Infinity;
-    for (const p of m.paredes) if (!p.oculta) chao = Math.min(chao, p.ay - p.r, p.by - p.r);
+    for (const p of m.paredes) if (!p.oculta) chao = Math.min(chao, p.ay + (p.ty || 0) - p.r, p.by + (p.ty || 0) - p.r);
     if (chao === Infinity) chao = 0;
     const pes = (vis.potes || []).some((P) => P.cesto.detalhe === 'pes' || P.cesto.detalhe === 'xicara');
     chao -= pes ? 0.85 : 0.08;
-    desenharCenario(ctxFundo, cam, dpr, W, H, visual.cenario, t, chao);
-    desenharCestos(ctxFundo, cam, dpr, m.paredes, { potes: vis.potes, t, estiloSoltas: acharCesto(visual.cesto).estilo });
-    desenharAtras(ctxFundo, m, cam, dpr, visual.objeto);
+    desenharCenario(ctxFundo, cq, dpr, W, H, visual.cenario, t, chao);
+    desenharCestos(ctxFundo, cq, dpr, m.paredes, { potes: vis.potes, t, estiloSoltas: acharCesto(visual.cesto).estilo });
+    desenharAtras(ctxFundo, m, cq, dpr, visual.objeto);
     for (const l of [vis.linha, ...(vis.linhas || [])]) {
-      if (l) desenharLinha(ctxFundo, cam, dpr, l.y, l.x0, l.x1, l.alerta || 0);
+      if (l) desenharLinha(ctxFundo, cq, dpr, l.y, l.x0, l.x1, l.alerta || 0);
     }
     if (vis.guia) {
-      aplicar(ctxFundo, cam, dpr);
+      aplicar(ctxFundo, cq, dpr);
       ctxFundo.save();
       ctxFundo.setLineDash([0.22, 0.18]);
       ctxFundo.strokeStyle = 'rgba(23, 22, 28, 0.35)';
@@ -139,24 +142,27 @@ export function criarCena(el, o = {}) {
     if (comp && !comp.perdeu()) {
       const c = garantirCampo(modo.campoJanela || modo.janela);
       c.acumular(m);
-      comp.desenhar(c, cam, dprSlime, { tempo: t, brilho: q.brilho, limiar, traco: Math.max(1.6, Math.min(2.8, cam.s * 0.055)) });
+      comp.desenhar(c, cq, dprSlime, { tempo: t, brilho: q.brilho, limiar, traco: Math.max(1.6, Math.min(2.8, cq.s * 0.055)) });
     } else if (ctxSlime2d) {
       ctxSlime2d.setTransform(1, 0, 0, 1, 0, 0);
       ctxSlime2d.clearRect(0, 0, el.slime.width, el.slime.height);
-      desenharSlimes2D(ctxSlime2d, m, cam, dprSlime);
+      desenharSlimes2D(ctxSlime2d, m, cq, dprSlime);
     }
     // por cima
     ctxTopo.setTransform(1, 0, 0, 1, 0, 0);
     ctxTopo.clearRect(0, 0, el.topo.width, el.topo.height);
-    desenharRostos(ctxTopo, m, cam, dpr, t, { olhar: vis.olhar || null, estilo: visual.objeto, expr: o.expr || '' });
-    if (vis.potes) desenharReflexos(ctxTopo, cam, dpr, m.paredes, vis.potes);
-    vfx.desenhar(ctxTopo, cam, dpr);
-    desenharGuias(ctxTopo, cam, dpr, vis, t, m);
-    desenharTela(vis);
+    desenharRostos(ctxTopo, m, cq, dpr, t, { olhar: vis.olhar || null, estilo: visual.objeto, expr: o.expr || '' });
+    if (vis.potes) desenharReflexos(ctxTopo, cq, dpr, m.paredes, vis.potes);
+    vfx.desenhar(ctxTopo, cq, dpr);
+    desenharGuias(ctxTopo, cq, dpr, vis, t, m);
+    desenharTela(vis, cq);
   }
 
-  /** Missil e gosma: por cima do HUD (canvas proprio, so desenha quando ha o que mostrar). */
-  function desenharTela(vis) {
+  /**
+   * Missil e gosma: por cima do HUD (canvas proprio, so desenha quando ha o que mostrar).
+   * @param {any} vis @param {import('./camera.js').Camera} camD camera do quadro (com o tremor)
+   */
+  function desenharTela(vis, camD) {
     const ctx = ctxTela || ctxTopo;
     const d = ctxTela ? dprTela : dpr;
     const ativo = !!vis.missil || !gosma.vazio;
@@ -167,7 +173,7 @@ export function criarCena(el, o = {}) {
     }
     if (!ativo || !cam) return;
     if (vis.missil) {
-      const alvo = paraTela(cam, vis.missil.x, vis.missil.y);
+      const alvo = paraTela(camD, vis.missil.x, vis.missil.y);
       const origem = origemMissil() || [W / 2, H - 40];
       desenharMissil(ctx, d, origem, alvo, vis.missil, Math.max(34, Math.min(70, cam.s * 1.7)));
     }

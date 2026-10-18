@@ -41,3 +41,13 @@ export function paraMundo(c, px, py) {
 export function aplicar(ctx, c, dpr) {
   ctx.setTransform(c.s * dpr, 0, 0, -c.s * dpr, (c.sx - c.cx * c.s) * dpr, (c.sy + c.cy * c.s) * dpr);
 }
+
+/**
+ * A mesma camera deslocada (px CSS) na tela: o tremor do terremoto (o toque e o HUD seguem a
+ * camera parada).
+ * @param {Camera} c @param {number} dx @param {number} dy
+ * @returns {Camera}
+ */
+export function deslocada(c, dx, dy) {
+  return dx || dy ? { ...c, sx: c.sx + dx, sy: c.sy + dy } : c;
+}

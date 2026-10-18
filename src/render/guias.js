@@ -1,9 +1,14 @@
 // Onboarding sem texto: a mao que arrasta e toca (e as teclas desenhadas no desktop), e a
 // reticula de mira sobre cada slime quando um reforco espera o alvo (travada no alvo do missil).
+// Tambem o selo do combo ao lado do pote e a aura das fusoes em andamento.
 
 import { paraTela } from './camera.js';
 import { TINTA } from './fundo.js';
 import { desenharIcone } from '../ui/icones.js';
+import { COR_COMBO } from '../jogo/soltar.js';
+
+/** Selo do combo: o ultimo N (o pulo quando sobe) e quando sumiu (o fade de 0,4 s). */
+const selo = { n: 0, tPulo: -9, tFim: -9, /** @type {any} */ ultimo: null };
 
 /** Momento do ciclo da mao em que ela aperta (a demonstracao do main.js solta a peca nele). */
 export const TOQUE_MAO = 1.75;
@@ -30,6 +35,8 @@ export function maoEm(m, t) {
  */
 export function desenharGuias(ctx, cam, dpr, vis, t, mundo) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (vis.fusoes && vis.fusoes.length) auras(ctx, cam, vis.fusoes, t);
+  combo(ctx, cam, vis.combo || null, t, ctx.canvas.width / dpr, ctx.canvas.height / dpr);
   if (vis.mao) {
     const { x: wx, ida, apertando } = maoEm(vis.mao, t);
     const [sx, sy] = paraTela(cam, wx, vis.mao.y - 0.4);
@@ -45,7 +52,7 @@ export function desenharGuias(ctx, cam, dpr, vis, t, mundo) {
     const cor = COR_ALVO[vis.alvo.id] || COR_ALVO.mira;
     const pulso = 1 + 0.06 * Math.sin(t * 8);
     for (const s of mundo.slimes) {
-      if (!s.ativo || s.preso || s.dados.marcado || (s.dados.pote || 0) !== (vis.alvo.pote || 0)) continue;
+      if (!s.ativo || s.preso || s.dados.marcado || s.dados.fundindo || (s.dados.pote || 0) !== (vis.alvo.pote || 0)) continue;
       const [sx, sy] = paraTela(cam, s.cx, s.cy);
       const r = Math.max(16, s.raio0 * cam.s * 0.92 * pulso);
       reticula(ctx, sx, sy, r, t * 0.8 + s.idx, cor, 1);
@@ -62,6 +69,137 @@ export function desenharGuias(ctx, cam, dpr, vis, t, mundo) {
     const fecha = 1.7 - 0.5 * (1 - (1 - k) * (1 - k));
     reticula(ctx, sx, sy, Math.max(20, M.r * cam.s * 0.92 * fecha), 0, COR_ALVO.mira, 1.3, true);
   }
+}
+
+/**
+ * Selo do combo (a partir do x2): disco de papel com "COMBO", o "xN" na cor do degrau e o anel
+ * do tempo que esvazia; pula quando o N sobe, pulsa enquanto uma fusao anima (a janela parada) e
+ * some em 0,4 s. Ao lado do pote, do lado oposto aos reforcos; sem espaco (retrato), acima da
+ * borda esquerda.
+ * @param {CanvasRenderingContext2D} ctx @param {import('./camera.js').Camera} cam
+ * @param {{ n: number, resto: number, pausa: boolean, borda: number, linha: number }|null} c
+ * @param {number} t @param {number} W @param {number} H px CSS
+ */
+function combo(ctx, cam, c, t, W, H) {
+  if (c) {
+    if (c.n > selo.n) selo.tPulo = t;
+    selo.n = c.n;
+    selo.ultimo = c;
+    selo.tFim = -9;
+  } else if (selo.ultimo) {
+    if (selo.tFim < 0) selo.tFim = t;
+    if (t - selo.tFim > 0.4 || t < selo.tFim) { selo.ultimo = null; selo.n = 0; return; }
+  } else return;
+  const C = c || selo.ultimo;
+  const R = Math.max(28, Math.min(44, cam.s * 1.45));
+  let [sx, sy] = paraTela(cam, C.borda - 0.35, C.linha * 0.55);
+  sx -= R;
+  if (sx - R < 6) {
+    [sx, sy] = paraTela(cam, C.borda, C.linha + 4.6);
+    sx += R + 4;
+  }
+  sx = Math.max(R + 6, Math.min(W - R - 6, sx));
+  sy = Math.max(R + 6, Math.min(H - R - 6, sy));
+  const kp = (t - selo.tPulo) / 0.3;
+  const pulo = kp >= 0 && kp < 1 ? 1 + 0.32 * (1 - kp) * (1 - kp) : 1;
+  const cor = COR_COMBO[Math.max(0, Math.min(3, C.n - 2))];
+  ctx.save();
+  ctx.globalAlpha = c ? 1 : Math.max(0, 1 - (t - selo.tFim) / 0.4);
+  ctx.translate(sx, sy);
+  ctx.scale(pulo, pulo);
+  ctx.rotate(-0.08);
+  ctx.beginPath();
+  ctx.arc(0, 0, R, 0, Math.PI * 2);
+  ctx.fillStyle = '#fffdf6';
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = TINTA;
+  ctx.stroke();
+  // anel do tempo: o trilho e o que resta da janela (cheio e pulsando enquanto uma fusao anima)
+  const ra = R * 0.8;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = R * 0.15;
+  ctx.strokeStyle = 'rgba(23, 22, 28, 0.12)';
+  ctx.beginPath();
+  ctx.arc(0, 0, ra, 0, Math.PI * 2);
+  ctx.stroke();
+  const resto = c ? C.resto : 0;
+  if (resto > 0.01) {
+    ctx.lineWidth = R * 0.15 * (C.pausa ? 1 + 0.18 * Math.sin(t * 14) : 1);
+    ctx.strokeStyle = cor;
+    ctx.beginPath();
+    ctx.arc(0, 0, ra, -Math.PI / 2, -Math.PI / 2 + resto * Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  ctx.font = `700 ${R * 0.25}px Fredoka, system-ui, sans-serif`;
+  ctx.fillStyle = TINTA;
+  ctx.fillText('COMBO', 0, -R * 0.34);
+  ctx.font = `700 ${R * 0.7}px Fredoka, system-ui, sans-serif`;
+  ctx.lineWidth = R * 0.14;
+  ctx.strokeStyle = TINTA;
+  ctx.strokeText('×' + C.n, 0, R * 0.16);
+  ctx.fillStyle = cor;
+  ctx.fillText('×' + C.n, 0, R * 0.16);
+  ctx.restore();
+}
+
+/**
+ * Aura das fusoes em andamento: um halo em volta do grupo que cresce no abraco (com brilhinhos
+ * girando), um anel que abre quando os iguais viram um corpo so, e o vermelho-brasa pulsando do
+ * super slime que vai estourar.
+ * @param {CanvasRenderingContext2D} ctx @param {import('./camera.js').Camera} cam
+ * @param {{ x: number, y: number, r: number, fase: string, p: number }[]} lista
+ * @param {number} t
+ */
+function auras(ctx, cam, lista, t) {
+  for (const f of lista) {
+    const [sx, sy] = paraTela(cam, f.x, f.y);
+    const r = Math.max(10, f.r * cam.s);
+    const segura = f.fase === 'segura';
+    const rgb = segura ? '255, 120, 40' : '255, 248, 214';
+    const forca = f.fase === 'atrai' ? 0.35 + 0.5 * f.p : f.fase === 'funde' ? 0.85 * (1 - f.p) + 0.15 : 0.55 + 0.35 * f.p + 0.15 * Math.sin(t * 22);
+    const g = ctx.createRadialGradient(sx, sy, r * 0.72, sx, sy, r * 1.4);
+    g.addColorStop(0, `rgba(${rgb}, 0)`);
+    g.addColorStop(0.32, `rgba(${rgb}, ${(0.6 * forca).toFixed(3)})`);
+    g.addColorStop(1, `rgba(${rgb}, 0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(sx, sy, r * 1.4, 0, Math.PI * 2);
+    ctx.fill();
+    if (f.fase === 'atrai') {
+      // brilhinhos girando em volta do grupo
+      for (let k = 0; k < 4; k++) {
+        const a = t * 3 + (k * Math.PI) / 2;
+        estrela(ctx, sx + Math.cos(a) * r * 1.08, sy + Math.sin(a) * r * 1.08, Math.max(4, r * 0.09) * (0.7 + 0.5 * f.p));
+      }
+    } else if (f.fase === 'funde') {
+      // anel que abre a partir da costura
+      ctx.strokeStyle = `rgba(255, 255, 255, ${(0.9 * (1 - f.p)).toFixed(3)})`;
+      ctx.lineWidth = Math.max(2, r * 0.06);
+      ctx.beginPath();
+      ctx.arc(sx, sy, r * (0.85 + 0.55 * f.p), 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+}
+
+/** Estrelinha de 4 pontas (px). */
+function estrela(ctx, x, y, r) {
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = TINTA;
+  ctx.lineWidth = Math.max(1.2, r * 0.22);
+  ctx.beginPath();
+  ctx.moveTo(x, y - r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.quadraticCurveTo(x, y, x, y + r);
+  ctx.quadraticCurveTo(x, y, x - r, y);
+  ctx.quadraticCurveTo(x, y, x, y - r);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.fill();
 }
 
 /** Cor da reticula de cada reforco de alvo. */
