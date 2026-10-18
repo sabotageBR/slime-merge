@@ -85,7 +85,7 @@ export function criarModo(o = {}) {
       R.lixo = (R.lixo || 0) + 6;
       R.tLixo = 1.2;
       S.eventos.push({ tipo: 'texto', x: R.pote.cx, y: 13.6, texto: '+6 ☁', cor: '#b9b9c2', escala: 1 });
-      S.eventos.push({ tipo: 'som', nome: 'ataque' });
+      S.eventos.push({ tipo: 'som', nome: 'ataque', pote: J.idx, qtd: 6 });
     },
     agrupa(S, F, c) {
       return F.membros.every((s) => S.R.fusao(S, s, c) === F.k);
@@ -101,7 +101,7 @@ export function criarModo(o = {}) {
       base.dados.exprT = 0.6;
       J.pontos += (info.n >= 3 ? pontosNivel(k - 1) + pontosNivel(k) : pontosNivel(k)) * combo;
       if (k > J.maxNivel) J.maxNivel = k;
-      S.eventos.push({ tipo: 'fusao', x: px, y: py, cor: ap(k).hex, combo, brilhos: Math.min(8, info.saidas / 3), grupo: info.n,
+      S.eventos.push({ tipo: 'fusao', x: px, y: py, cor: ap(k).hex, combo, brilhos: Math.min(8, info.saidas / 3), grupo: info.n, pote: J.idx,
         texto: info.n >= 3 ? 'triplo' : '', corTexto: '#ff6fd8', escala: 1.4 });
       // ataque: gosma cinza para o rival
       const qtd = (k >= 3 ? Math.floor((k - 1) / 2) : 0) + (combo >= 3 ? 1 : 0);
@@ -110,7 +110,7 @@ export function criarModo(o = {}) {
         R.lixo = (R.lixo || 0) + qtd;
         R.tLixo = 1.2;
         S.eventos.push({ tipo: 'texto', x: R.pote.cx, y: 13.6, texto: '+' + qtd + ' ☁', cor: '#b9b9c2', escala: 1 });
-        S.eventos.push({ tipo: 'som', nome: 'ataque' });
+        S.eventos.push({ tipo: 'som', nome: 'ataque', pote: J.idx, qtd });
       }
     },
     // a gosma cinza puxa o pigmento das vizinhas coloridas

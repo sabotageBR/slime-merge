@@ -32,7 +32,8 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
 - Os modos emitem `registro` (fusao/nivel/combo/poder com o `id`/pontos, só o jogador 1), `nivel`
   (start na partida nova, complete em cada nível novo, fail no fim), `cresceu`, `pedirVideo`,
   `fim` (no Duelo com `venceu`/`vsCpu`; o sem fim não emite) e, no sem fim, `evento`
-  (start/fim/ok/falhou), `escada`, `resgate` e `intervalo` (`origem: 'evento'`).
+  (aviso com a `classe`/start/pressa/fim/ok/falhou), `escada`, `resgate`, `recorde` (passou o de antes
+  da partida, uma vez) e `intervalo` (`origem: 'evento'`). Os `som` de reforço e ataque levam o `pote`.
 - **Retenção (1.1.0, depois do Player Fit Test da 1.0.0; roteiro em `docs/producao.md`):** o pote
   do sem fim nasce estreito (`INICIO` em `merge.js`) e cresce no nível 6 ou aos 150 s; a meta da
   vez fica acima da barra; cartão de slime novo; dica do reforço aos 60 s; demonstração para quem
@@ -49,7 +50,8 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
     4 a 8, com `PESOS_ESCADA`); os slimes abaixo do piso evoluem ("Evolução!");
   - **agenda:** um evento a cada 60 s a partir dos 90 s (coringas, pedido, terremoto, gigante, calor,
     gelo; a chuva de gosma cinza saiu em 2026-10-17), com aviso no pote e a pílula da meta com contagem;
-    o terremoto treme o pote inteiro (`pote.tremer`: as paredes andam, o cesto e a tela tremem junto);
+    o terremoto treme o pote inteiro **uma vez** (`pote.tremer`, 1,8 s: as paredes andam, o cesto e a tela
+    tremem junto; eram 3 tremores até 2026-10-18);
   - **sem derrota:** o "Ufa!" vale a partida inteira (`resgatarSempre`) e zera o combo; o coringa não
     faz o próximo recorde;
   - **intervalo comercial:** no fim de um evento, do 3º em diante, com 150 s de jogo desde o anterior
@@ -64,7 +66,8 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
     para enquanto há fusão;
   - **selo do combo** ao lado do pote (`guias.js`, a partir do ×2; o texto `x2` saiu);
   - **humor de cada slime** (`src/jogo/humor.js`): contente, neutro, amassado, chorinho (aperto =
-    alongamento + vizinhos), apático (20 s parado) e furioso (pancada de quem cai); o passageiro passa
+    alongamento + vizinhos), apático (20 s parado) e a careta da pancada de quem cai (desde 2026-10-18,
+    5 em rodízio por slime, `PANCADA`: furioso, zonzo, susto, emburrado, xingando); o passageiro passa
     por cima;
   - **gosma do míssil** do tamanho do slime, que escorre com massa e aderência (`render/gosma.js`);
   - **tela de loading** (`#carregando` no `index.html`, só HTML e CSS; sai no 1º quadro).
@@ -105,6 +108,24 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
     `abrirSozinho` no `main.js`); a demonstração espera 2 s e solta até 3 gotas;
   - **telemetria:** `intervalo/<origem>/start|complete` e `ufa/resgate/start|complete` (complete com 20 s de
     jogo depois), `dica/abertura/show`. A faixa `custo/fisica-16` é **8–16 ms** (`faixaMs`).
+- **Versão 2.0.4 (revisão de 2026-10-18 à noite; escolhas em `docs/autoria.md`):** terremoto com **um tremor só**
+  (`EVENTOS.terremoto.dur` 2,5 s); **5 caretas da pancada** em rodízio (`PANCADA` e `careta()` no `humor.js`;
+  desenho em `sobrancelhasDaPancada`, `bocaDoHumor` e `extrasCareta` do `rostos.js`, sem balão nem "!"; folha
+  `docs/visuais/humor-pancada-1000x1000.jpg`); o **vídeo do míssil volta com a mira armada** (`darPoder`).
+- **Versão 2.0.5: falas do locutor de slime (2026-10-18, depois da 2.0.4; escolhas em `docs/autoria.md`):** "Ready?…
+  Go!" no começo de cada partida e de cada rodada do Duelo (fala e texto no meio de cada pote, `largada()`
+  no `main.js`, `LARGADA_VAI` 0,75 s; o texto fica em inglês nas 3 línguas); o **combo contado** do x3 ao
+  x10 ("Three!"…"Ten!", mais rápido a cada degrau); o aviso de evento pela classe ("Get down!" no
+  terremoto, "Power up!" no alívio, "Look out!" no resto); o pedido ("Hurry up!" nos 5 s finais,
+  "Objective achieved!", "Time over"); "Medic!" no "Ufa!"; "Target engaged"/"Target destroyed!" no míssil;
+  "Reloading!" no trocar; "New high score!" (e o aviso) quando o sem fim passa o recorde; "Congratulations!"
+  no recorde de super slimes e na sequência diária (o aviso dela agora vem no primeiro gesto, ou mudo aos
+  6 s); no Duelo "Fire in the hole!" (gosma de 2+), "You lose" contra a CPU e "You win!" no de 2 jogadores.
+  A CPU não fala (`minhaVoz`). O tocador (`sons.js`) fala **uma por vez** com fila de uma por
+  `PRIORIDADE` (marcos > missão/resgate > eventos e reforços > combo; cada uma vale `VALIDADE` s
+  esperando; o `main.js` chama `sons.passo()` a cada quadro) e o arquivo toca mais agudo nos slimes
+  pequenos e grave nos grandes (`taxaDoNivel`). Arquivos: `node tools/sons.mjs converter` (Voiceover Pack,
+  as duas vozes); a build leva só as de slime (~136 KB de áudio; o limite do empacotar subiu para 150 KB).
 - Protótipos (Croma, Loja, Molde, lab) só por `?modelo=` ou pelo hub; o `tools/empacotar.mjs`
   apaga os arquivos deles e as linhas `// prototipo` do `main.js`.
 
@@ -170,7 +191,8 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
   do 2048_cards), `audio.js` (barramentos sfx/voz/música, compressor, mudo do anúncio), `laco.js`,
   `entrada.js`. `src/som/`: `catalogo.js` (categorias × variantes; `PADRAO` = escolha do usuário
   de 2026-10-15, sem música e com o locutor de voz de slime; `LEGADO`),
-  `receitas.js` (síntese), `falas.js` (balbucio), `sons.js` (`tocar`/`falar`), `musica.js` e
+  `receitas.js` (síntese), `falas.js` (balbucio e a lista das falas do jogo), `sons.js` (`tocar`/`falar`,
+  a fila das falas e o `passo`), `musica.js` e
   `pecas.js` (música procedural), `arquivos/*.mp3` (CC0 Kenney; só os do `PADRAO` vão para a build).
   `src/render/palco.js` (um slime isolado no pipeline real: prévia e miniaturas das skins).
   `src/ui/`: `hud.js`, `menu.js`, `icones.js` (ícones dos reforços em SVG e Path2D),
@@ -194,10 +216,10 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
 ## Comandos
 | Comando | O que faz |
 |---|---|
-| `npm test` | Física, cor, wrapper Poki, fronteiras, perfil, os modos com o bot, borda, míssil, pote estreito, telemetria de nível e do resgate, qualidade adaptativa, metas da partida, pressão do sem fim (`test/pressao.test.js`), fusão animada e tremor (`test/fusao.test.js`), humor (`test/humor.test.js`), parede (`test/parede.test.js`), áudio, sons, música e skins (180 testes, ~95 s) |
+| `npm test` | Física, cor, wrapper Poki, fronteiras, perfil, os modos com o bot, borda, míssil, pote estreito, telemetria de nível e do resgate, qualidade adaptativa, metas da partida, pressão do sem fim (`test/pressao.test.js`), fusão animada e tremor (`test/fusao.test.js`), humor (`test/humor.test.js`), parede (`test/parede.test.js`), áudio, sons, música e skins (186 testes, ~95 s) |
 | `node --test test/fisica.test.js` | Um arquivo só (`node:test`, sem dependências); `--test-name-pattern="Croma"` filtra pelo nome do teste |
 | `npm run menu` | Fluxo da build no Chrome headless: sequência, gotas no fim, dobrar, loja, missões, troca de modo, Loja › Skins e o editor (pintar, salvar, Esc). Prints em `.tmp/menu/`. `-- --tam=640x360` |
-| `npm run empacotar` | Build da Poki em `dist/` e zip em `dist-poki/` (sem protótipos; só os sons do `PADRAO`; recusa import quebrado, URL externa, `console.log`, `.map`, > 500 KB gzip e áudio > 120 KB); `-- --thumb` confere e anexa `marketing/thumb/slime-merge-1256.png` (sem ele é ensaio) |
+| `npm run empacotar` | Build da Poki em `dist/` e zip em `dist-poki/` (sem protótipos; só os sons do `PADRAO`; recusa import quebrado, URL externa, `console.log`, `.map`, > 500 KB gzip e áudio > 150 KB); `-- --thumb` confere e anexa `marketing/thumb/slime-merge-1256.png` (sem ele é ensaio) |
 | `npm run thumb` | Opções de thumb da Poki (`tools/thumb.html`: física e render do jogo) em `marketing/thumb/`, com tiles e a régua (#83FFE7, tarja, opaca); `-- --final` grava a escolhida (`ESCOLHIDA` em `tools/thumb.mjs`) em `slime-merge-{1256,628}` |
 | `npm run servir` | `http://127.0.0.1:5370/` (jogo) e `/modelos/` (hub de avaliação); `-- --lan` mostra o endereço para o celular |
 | `npm run jogar` | Joga os modelos em tempo real (Chrome headless pelo DevTools Protocol, `tools/cdp.mjs`): gestos, pausa, mudo, reforço, fim, revive, jogar de novo. `-- 1 4 --tam=1031x580` |
@@ -224,7 +246,7 @@ sliders do material), `?semente=` (também ignora a partida salva), `?passos=N` 
 1º desenho), `?auto=ms` (bot), `?semanuncio`, `?lang=en|pt|es`, `?semhud`, `?render=2d`,
 `?material=` (lab), `?raio=&limiar=` (núcleo do campo), `?zoom=x0,y0,x1,y1`, `?filme=N&cada=K`,
 `?vitrine=1..6` (níveis no pote, para ver as texturas; 5 = o 13, 6 = o 14, parado), `?cesto=&cenario=&objeto=`,
-`?bot=borda` (o `?auto` solta em cima da borda), `?poder=<id>`, `?expr=choro` (ou contente, amassado, chorinho, apatico, furioso...), `?demoReforcos`
+`?bot=borda` (o `?auto` solta em cima da borda), `?poder=<id>`, `?expr=choro` (ou contente, amassado, chorinho, apatico, furioso, zonzo, susto, emburrado, xingando...), `?demoReforcos`
 (botões em todos os estados), `?sons=cat:variante`, `?skins=todas` (uma skin em cada nível),
 `?qualidade=0..3` (alta, média, baixa, mínima; fixa o render e desliga a adaptativa; sem ele, o celular
 começa na média), `?revelar=N` (cartão de slime novo parado, para prints), `?pressao=0` (sem fim da 1.2.0, que acaba), `?evento=<id>` (esse evento da

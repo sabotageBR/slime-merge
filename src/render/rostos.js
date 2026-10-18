@@ -4,6 +4,7 @@
 
 import { aplicar } from './camera.js';
 import { TINTA } from './fundo.js';
+import { PANCADA } from '../jogo/humor.js';
 
 /** Limita a deformacao do rosto (alongamento entre 0,75 e 1,3 por eixo). */
 function limitar(v, a, b) { return v < a ? a : v > b ? b : v; }
@@ -152,24 +153,28 @@ export function desenharRostos(ctx, m, cam, dpr, t, o = {}) {
     if (o.expr) s.dados.expr = o.expr;
     const expr = s.dados.expr || '';
     const choro = expr === 'choro';
-    const treme = choro || !!s.dados.treme || expr === 'furioso';
+    const bravo = expr === 'furioso' || expr === 'xingando';
+    const treme = choro || !!s.dados.treme || bravo || expr === 'susto';
     if (treme) {
-      // o rosto treme no berreiro, na raiva e no super slime prestes a estourar (so o desenho)
+      // o rosto treme no berreiro, na raiva, no susto e no super slime prestes a estourar (so o desenho)
       ctx.save();
-      const amp = choro ? 0.03 : expr === 'furioso' ? 0.012 : 0.02;
+      const amp = choro ? 0.03 : bravo ? 0.012 : expr === 'susto' ? 0.008 : 0.02;
       ctx.translate(Math.sin(t * 55 + s.idx) * amp * s.raio0, s.dados.treme ? Math.sin(t * 47) * 0.012 * s.raio0 : 0);
     }
-    // cada um olha para o seu: o furioso para quem caiu nele, o apatico para baixo, de lado
+    // cada um olha para o seu: as caretas da pancada para quem caiu (o emburrado vira a cara), o
+    // apatico para baixo, de lado
     let olhar = o.olhar || null;
-    if (expr === 'furioso' && s.dados.bravoDe !== undefined) {
-      const b = m.slimes[s.dados.bravoDe];
-      if (b && b.ativo) olhar = [b.cx, b.cy];
-    } else if (expr === 'apatico') olhar = [s.cx + (s.idx % 2 ? 1 : -1) * 2 * s.raio0, s.cy - 3 * s.raio0];
+    const b = PANCADA.includes(expr) && s.dados.bravoDe !== undefined ? m.slimes[s.dados.bravoDe] : null;
+    if (expr === 'emburrado') {
+      const lado = b && b.ativo ? (b.cx > s.cx ? -1 : 1) : s.idx % 2 ? 1 : -1;
+      olhar = [s.cx + lado * 3 * s.raio0, s.cy + 0.6 * s.raio0];
+    } else if (b && b.ativo && expr !== 'zonzo') olhar = [b.cx, b.cy];
+    else if (expr === 'apatico') olhar = [s.cx + (s.idx % 2 ? 1 : -1) * 2 * s.raio0, s.cy - 3 * s.raio0];
     // o rosto vermelho da raiva fica atras dos olhos
-    if (expr === 'furioso' && estilo !== 'docinho' && s.n >= 10) rubor(ctx, s);
+    if (bravo && estilo !== 'docinho' && s.n >= 10) rubor(ctx, s);
     rosto(ctx, s, t, olhar, cam.s, estilo);
     if (choro) lagrimas(ctx, s, t, cam.s, estilo);
-    if (estilo !== 'docinho') extrasHumor(ctx, s, t, cam.s, estilo);
+    if (estilo !== 'docinho') extrasHumor(ctx, s, t, cam.s, estilo, olhar);
     if (treme) ctx.restore();
     s.dados.expr = salva;
   }
@@ -265,8 +270,9 @@ function kawaii(ctx, s, t, escala) {
     ctx.strokeStyle = TINTA;
     ctx.lineWidth = traco * 1.3;
     ctx.beginPath();
-    if (ek === 'amassado' || ek === 'medo') {
-      // arregalado: o branco aparece e a pupila encolhe
+    if (ek === 'amassado' || ek === 'medo' || ek === 'susto') {
+      // arregalado: o branco aparece e a pupila encolhe (no susto, vira pontinho)
+      const pp = ek === 'susto' ? 0.3 : 0.45;
       ctx.fillStyle = '#ffffff';
       ctx.lineWidth = traco;
       ctx.ellipse(ex, ey, rx * 1.05, ry * 1.05, 0, 0, Math.PI * 2);
@@ -274,7 +280,7 @@ function kawaii(ctx, s, t, escala) {
       ctx.stroke();
       ctx.fillStyle = TINTA;
       ctx.beginPath();
-      ctx.ellipse(ex, ey - ry * 0.1, rx * 0.45, ry * 0.45, 0, 0, Math.PI * 2);
+      ctx.ellipse(ex, ey - ry * 0.1, rx * pp, ry * pp, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
@@ -306,12 +312,12 @@ function kawaii(ctx, s, t, escala) {
     ctx.ellipse(bx, by, 0.15 * R, 0.09 * R, 0, 0, Math.PI * 2);
     ctx.fill();
   }
-  if (s.dados.expr === 'furioso') sobrancelhasBravas(ctx, tr, [[-0.34 * R, 0.12 * R], [0.34 * R, 0.12 * R]], 0.2 * R, traco);
+  sobrancelhasDaPancada(ctx, s.dados.expr, tr, [[-0.34 * R, 0.12 * R], [0.34 * R, 0.12 * R]], 0.2 * R, traco);
   if (choroso) sobrancelhasTristes(ctx, tr, [[-0.34 * R, 0.12 * R], [0.34 * R, 0.12 * R]], 0.2 * R, traco);
   if (s.n >= 10 && s.dados.expr === 'choro') {
     bocaBerreiro(ctx, tr, R, t, traco, 0.7);
   } else if (s.n >= 10 && bocaDoHumor(ctx, s, tr, R, t, traco, 0.75)) {
-    // boca do humor (contente, amassado, apatico, chorinho, furioso)
+    // boca do humor (contente, amassado, apatico, chorinho e as caretas da pancada)
   } else if (s.n >= 10) {
     const [mx, my] = tr(0, -0.12 * R);
     ctx.strokeStyle = TINTA;
@@ -360,16 +366,21 @@ function monstrinho(ctx, s, t, alvo, escala) {
     ctx.ellipse(ex, ey, rx, ry, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+    const em = s.dados.expr || '';
     let dx = 0;
     let dy = -0.5;
-    if (alvo) {
+    if (em === 'zonzo' && lx) {
+      // vesgo: as duas pupilas para o meio
+      dx = lx < 0 ? 0.9 : -0.9;
+      dy = -0.2;
+    } else if (alvo) {
       dx = alvo[0] - ex;
       dy = alvo[1] - ey;
       const l = Math.hypot(dx, dy) || 1;
       dx /= l;
       dy /= l;
     }
-    const pr = rx * 0.42;
+    const pr = rx * (em === 'susto' ? 0.26 : 0.42);
     ctx.fillStyle = '#7a2bd6';
     ctx.beginPath();
     ctx.arc(ex + dx * rx * 0.4, ey + dy * ry * 0.4, pr, 0, Math.PI * 2);
@@ -387,8 +398,8 @@ function monstrinho(ctx, s, t, alvo, escala) {
     else if (s.n >= 10) bocaDoHumor(ctx, s, tr, R, t, traco, 1.1);
     return;
   }
-  if (ex0 === 'furioso') sobrancelhasBravas(ctx, (x, y) => tr(x * R, y * R), olhos.map(([lx, ly]) => [lx, ly]), olhos[0][2] * 0.9, traco);
-  if (s.n >= 10 && (ex0 === 'apatico' || ex0 === 'furioso') && bocaDoHumor(ctx, s, tr, R, t, traco, 1.1)) return;
+  sobrancelhasDaPancada(ctx, ex0, (x, y) => tr(x * R, y * R), olhos.map(([lx, ly]) => [lx, ly]), olhos[0][2] * 0.9, traco);
+  if (s.n >= 10 && (ex0 === 'apatico' || PANCADA.includes(ex0)) && bocaDoHumor(ctx, s, tr, R, t, traco, 1.1)) return;
   if (s.n >= 10) {
     const [m0x, m0y] = tr(-0.32 * R, -0.2 * R);
     const [m1x, m1y] = tr(0.32 * R, -0.2 * R);
@@ -457,7 +468,7 @@ function boneco(ctx, s, t, escala) {
     else if (s.n >= 10) bocaDoHumor(ctx, s, tr, R, t, traco, 0.9);
     return;
   }
-  if (eb === 'furioso') sobrancelhasBravas(ctx, (x, y) => tr(x * R, y * R), [[-0.34, 0.16], [0.34, 0.16]], 0.27, traco);
+  sobrancelhasDaPancada(ctx, eb, (x, y) => tr(x * R, y * R), [[-0.34, 0.16], [0.34, 0.16]], 0.27, traco);
   if (s.n >= 10 && bocaDoHumor(ctx, s, tr, R, t, traco, 0.9)) return;
   if (s.n >= 10) {
     const [bx, by] = tr(0, -0.22 * R);
@@ -653,7 +664,7 @@ function desenharRosto(ctx, s, t, alvo, escala, fator = 1) {
   // olhos sempre abertos (pedido do usuario em 2026-10-18: nenhuma animacao de olho fechado, nem
   // piscar): a expressao vem da pupila, do brilho, da agua no olho, da sobrancelha e da boca
   const choroso = expr === 'choro' || expr === 'chorinho';
-  const arregala = expr === 'medo' || expr === 'amassado';
+  const arregala = expr === 'medo' || expr === 'amassado' || expr === 'susto';
   for (const lado of [-1, 1]) {
     const [ex, ey] = tr(lado * 0.36 * R, 0.16 * R);
     const rx = re * a11 * (arregala ? 1.15 : 1);
@@ -669,17 +680,20 @@ function desenharRosto(ctx, s, t, alvo, escala, fator = 1) {
     ctx.ellipse(ex, ey, rx, ry, 0, 0, Math.PI * 2);
     ctx.stroke();
     const furioso = expr === 'furioso';
-    // pupila olhando para o alvo (ou para baixo; o feliz olha para cima)
+    // pupila olhando para o alvo (ou para baixo; o feliz olha para cima; o zonzo fica vesgo)
     let lx = 0;
     let ly = expr === 'feliz' ? 0.45 : -0.6;
-    if (alvo) {
+    if (expr === 'zonzo') {
+      lx = -lado * 0.92;
+      ly = -0.25;
+    } else if (alvo) {
       lx = alvo[0] - ex;
       ly = alvo[1] - ey;
       const l = Math.hypot(lx, ly) || 1;
       lx /= l;
       ly /= l;
     }
-    const pr = rx * (arregala || furioso ? 0.38 : choroso || expr === 'feliz' ? 0.62 : 0.56);
+    const pr = rx * (expr === 'susto' ? 0.24 : arregala || furioso ? 0.38 : choroso || expr === 'feliz' ? 0.62 : expr === 'zonzo' ? (lado < 0 ? 0.6 : 0.4) : 0.56);
     const off = Math.min(rx, ry) - pr - traco * 0.3;
     const pxp = ex + lx * off * 0.9;
     const pyp = ey + ly * off * 0.9;
@@ -713,8 +727,8 @@ function desenharRosto(ctx, s, t, alvo, escala, fator = 1) {
   }
   // sobrancelha triste do choro
   if (choroso) sobrancelhasTristes(ctx, tr, [[-0.36 * R, 0.16 * R], [0.36 * R, 0.16 * R]], re, traco);
-  // sobrancelhas de quem levou a pancada (mais grossas e mais em V que as da lama)
-  if (expr === 'furioso') sobrancelhasBravas(ctx, tr, [[-0.36 * R, 0.16 * R], [0.36 * R, 0.16 * R]], re, traco);
+  // sobrancelhas de quem levou a pancada (as do furioso, mais grossas e mais em V que as da lama)
+  sobrancelhasDaPancada(ctx, expr, tr, [[-0.36 * R, 0.16 * R], [0.36 * R, 0.16 * R]], re, traco);
   // sobrancelhas da lama ranzinza
   if (expr === 'bravo') {
     ctx.strokeStyle = TINTA;
@@ -731,7 +745,7 @@ function desenharRosto(ctx, s, t, alvo, escala, fator = 1) {
   if (s.n >= 10 && expr === 'choro') {
     bocaBerreiro(ctx, tr, R, t, traco);
   } else if (s.n >= 10 && bocaDoHumor(ctx, s, tr, R, t, traco, 1)) {
-    // boca do humor (contente, amassado, apatico, chorinho, furioso)
+    // boca do humor (contente, amassado, apatico, chorinho e as caretas da pancada)
   } else if (s.n >= 10) {
     const [bx, by] = tr(0, -0.17 * R);
     ctx.strokeStyle = TINTA;
@@ -794,6 +808,43 @@ function sobrancelhasBravas(ctx, tr, olhos, re, traco) {
     ctx.beginPath();
     ctx.moveTo(ax, ay);
     ctx.lineTo(bx, by);
+    ctx.stroke();
+  }
+}
+
+/**
+ * Sobrancelhas das caretas da pancada (src/jogo/humor.js): em V no furioso, la em cima no susto,
+ * retas e franzidas no emburrado, uma em V e a outra erguida no xingando; o zonzo nao tem.
+ * @param {CanvasRenderingContext2D} ctx @param {string} expr @param {(x: number, y: number) => number[]} tr
+ * @param {number[][]} olhos centros [lx, ly] na escala do `tr` @param {number} re raio do olho @param {number} traco
+ */
+function sobrancelhasDaPancada(ctx, expr, tr, olhos, re, traco) {
+  if (expr === 'furioso') { sobrancelhasBravas(ctx, tr, olhos, re, traco); return; }
+  if (expr !== 'susto' && expr !== 'emburrado' && expr !== 'xingando') return;
+  ctx.strokeStyle = TINTA;
+  ctx.lineCap = 'round';
+  for (const [lx, ly] of olhos) {
+    const lado = lx < 0 ? -1 : 1;
+    // quem xinga: a da esquerda em V (o ciclope fica so com ela), a outra erguida
+    if (expr === 'xingando' && (lado < 0 || olhos.length === 1)) { sobrancelhasBravas(ctx, tr, [[lx, ly]], re, traco); continue; }
+    ctx.beginPath();
+    if (expr === 'emburrado') {
+      ctx.lineWidth = traco * 1.8;
+      const [ax, ay] = tr(lx + lado * re * 1.0, ly + re * 1.3);
+      const [bx, by] = tr(lx - lado * re * 0.75, ly + re * 1.05);
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+    } else {
+      // arco alto: simetrico no susto, com a ponta de fora mais alta no xingando
+      ctx.lineWidth = traco * 1.4;
+      const fora = expr === 'xingando' ? 1.8 : 1.45;
+      const dentro = expr === 'xingando' ? 1.35 : 1.45;
+      const [ax, ay] = tr(lx + lado * re * 0.85, ly + re * fora);
+      const [cx, cy] = tr(lx, ly + re * 2.05);
+      const [bx, by] = tr(lx - lado * re * 0.85, ly + re * dentro);
+      ctx.moveTo(ax, ay);
+      ctx.quadraticCurveTo(cx, cy, bx, by);
+    }
     ctx.stroke();
   }
 }
@@ -890,6 +941,88 @@ function bocaDoHumor(ctx, s, tr, R, t, traco, tam) {
     ctx.stroke();
     return true;
   }
+  if (expr === 'zonzo') {
+    // boca torta em onda e a lingua de fora, de lado
+    const [lx, ly] = tr(0.07 * R * tam, -0.27 * R);
+    ctx.fillStyle = '#ff7a9a';
+    ctx.lineWidth = traco;
+    ctx.beginPath();
+    ctx.ellipse(lx, ly, 0.055 * R * tam, 0.075 * R, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.lineWidth = traco * 1.1;
+    ctx.beginPath();
+    for (let k = 0; k <= 8; k++) {
+      const [qx, qy] = tr((-0.16 + k * 0.04) * R * tam, (-0.2 + 0.03 * Math.sin(k * 1.4 + t * 5)) * R);
+      if (k) ctx.lineTo(qx, qy); else ctx.moveTo(qx, qy);
+    }
+    ctx.stroke();
+    return true;
+  }
+  if (expr === 'susto') {
+    // "O" de susto
+    const [bx, by] = tr(0, -0.25 * R);
+    ctx.fillStyle = TINTA;
+    ctx.beginPath();
+    ctx.ellipse(bx, by, 0.08 * R * tam, 0.11 * R, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ff7a9a';
+    ctx.beginPath();
+    ctx.ellipse(bx, by - 0.055 * R, 0.05 * R * tam, 0.035 * R, 0, 0, Math.PI * 2);
+    ctx.fill();
+    return true;
+  }
+  if (expr === 'emburrado') {
+    // biquinho (os labios franzidos, de lado) entre as bochechas infladas
+    const [bx, by] = tr(0.05 * R * tam, -0.22 * R);
+    const rx = 0.075 * R * tam;
+    const ry = 0.05 * R;
+    ctx.fillStyle = '#ff8aa8';
+    ctx.lineWidth = traco;
+    ctx.beginPath();
+    ctx.ellipse(bx, by, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.lineWidth = traco * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(bx - rx * 0.7, by);
+    ctx.lineTo(bx + rx * 0.7, by);
+    ctx.stroke();
+    ctx.lineWidth = traco;
+    for (const l of [-1, 1]) {
+      const [cx, cy] = tr(l * 0.2 * R * tam, -0.22 * R);
+      ctx.beginPath();
+      if (l > 0) ctx.arc(cx, cy, 0.12 * R, -Math.PI * 0.4, Math.PI * 0.4);
+      else ctx.arc(cx, cy, 0.12 * R, Math.PI * 0.6, Math.PI * 1.4);
+      ctx.stroke();
+    }
+    return true;
+  }
+  if (expr === 'xingando') {
+    // boca aberta gritando (dentes em cima, lingua embaixo), tremendo
+    const [bx, by] = tr(0, -0.25 * R);
+    const rx = 0.16 * R * tam;
+    const ry = 0.1 * R * (1 + 0.2 * Math.sin(t * 30 + s.idx));
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(bx, by, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fillStyle = TINTA;
+    ctx.fill();
+    ctx.clip();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(bx - rx, by + ry * 0.45, 2 * rx, ry);
+    ctx.fillStyle = '#ff7a9a';
+    ctx.beginPath();
+    ctx.ellipse(bx, by - ry * 0.75, rx * 0.6, ry * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = TINTA;
+    ctx.lineWidth = traco;
+    ctx.beginPath();
+    ctx.ellipse(bx, by, rx, ry, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    return true;
+  }
   return false;
 }
 
@@ -908,12 +1041,15 @@ function rubor(ctx, s) {
 
 /**
  * O que todo estilo com rosto ganha no humor: bochechas no contente, lagrimas pequenas no
- * chorinho, e no furioso a veia e a fumacinha.
+ * chorinho e o extra de cada careta da pancada (veia e fumacinha no furioso, galo e estrelinhas no
+ * zonzo, tracinhos de impacto no susto, bochechas e bufo no emburrado; o xingando e so o rosto:
+ * o balao de palavrao e o "!" do susto sairam em 2026-10-18, pedido do usuario).
  * @param {CanvasRenderingContext2D} ctx @param {any} s @param {number} t @param {number} escala @param {string} estilo
+ * @param {number[]|null} [olhar] para onde o rosto olha (o bufo vai para esse lado)
  */
-function extrasHumor(ctx, s, t, escala, estilo) {
+function extrasHumor(ctx, s, t, escala, estilo, olhar = null) {
   const expr = s.dados.expr || '';
-  if (expr !== 'contente' && expr !== 'chorinho' && expr !== 'furioso') return;
+  if (expr !== 'contente' && expr !== 'chorinho' && !PANCADA.includes(expr)) return;
   if (s.n < 10) return;
   const { R, tr } = quadro(s);
   const traco = Math.max(0.035, 1.5 / escala);
@@ -947,6 +1083,7 @@ function extrasHumor(ctx, s, t, escala, estilo) {
     ctx.globalAlpha = 1;
     return;
   }
+  if (expr !== 'furioso') { extrasCareta(ctx, s, t, traco, estilo, olhar); return; }
   // furioso: veia na testa e fumacinha subindo (o rosto vermelho vem antes, em `rubor`)
   const [vx, vy] = tr(0.5 * R, 0.62 * R);
   const v = 0.1 * R * (1 + 0.12 * Math.sin(t * 16));
@@ -973,4 +1110,111 @@ function extrasHumor(ctx, s, t, escala, estilo) {
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
+}
+
+/**
+ * Extras das caretas novas da pancada (2026-10-18).
+ * @param {CanvasRenderingContext2D} ctx @param {any} s @param {number} t @param {number} traco
+ * @param {string} estilo @param {number[]|null} olhar
+ */
+function extrasCareta(ctx, s, t, traco, estilo, olhar) {
+  const expr = s.dados.expr || '';
+  const { R, tr } = quadro(s);
+  const lado = olhar ? (olhar[0] >= s.cx ? 1 : -1) : 1;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (expr === 'zonzo') {
+    // galo no alto da cabeca (o chapeu cobre) e tres estrelinhas girando em volta
+    if (estilo !== 'chapeus') {
+      const [gx, gy] = tr(0.24 * R, 1.0 * R);
+      const r = 0.2 * R;
+      ctx.fillStyle = tom(s.dados.hex, 0.25);
+      ctx.strokeStyle = TINTA;
+      ctx.lineWidth = traco;
+      ctx.beginPath();
+      ctx.arc(gx, gy, r, 0, Math.PI * 2);
+      ctx.fill();
+      // vermelhinho do galo
+      const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, r);
+      g.addColorStop(0, 'rgba(255, 70, 100, 0.55)');
+      g.addColorStop(1, 'rgba(255, 70, 100, 0.1)');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(gx, gy, r, -Math.PI * 0.12, Math.PI * 1.12);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.lineWidth = Math.max(traco, 0.04 * R);
+      ctx.beginPath();
+      ctx.arc(gx, gy, r * 0.6, Math.PI * 0.55, Math.PI * 0.9);
+      ctx.stroke();
+    }
+    const [cx, cy] = tr(0, (estilo === 'chapeus' ? 1.6 : 1.08) * R);
+    for (let k = 0; k < 3; k++) {
+      const a = t * 4.5 + (k * Math.PI * 2) / 3;
+      // a da frente (embaixo da orbita) e maior
+      estrela(ctx, cx + Math.cos(a) * 0.6 * R, cy + Math.sin(a) * 0.16 * R, 0.13 * R * (1 - 0.25 * Math.sin(a)), traco);
+    }
+    return;
+  }
+  if (expr === 'susto') {
+    // tracinhos de impacto em volta do alto da cabeca (o "!" amarelo saiu em 2026-10-18, pedido do usuario)
+    ctx.strokeStyle = TINTA;
+    ctx.lineWidth = traco * 1.3;
+    for (const g of [45, 70, 110, 135]) {
+      const a = (g * Math.PI) / 180;
+      const [ax, ay] = tr(Math.cos(a) * 1.32 * R, Math.sin(a) * 1.32 * R);
+      const [bx, by] = tr(Math.cos(a) * 1.58 * R, Math.sin(a) * 1.58 * R);
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.stroke();
+    }
+    return;
+  }
+  if (expr === 'emburrado') {
+    // bochechas cheias (o kawaii ja tem as dele) e a nuvenzinha do bufo para o lado que ele virou
+    if (estilo !== 'kawaii') {
+      ctx.fillStyle = 'rgba(255, 110, 150, 0.45)';
+      for (const l of [-1, 1]) {
+        const [bx, by] = tr(l * 0.56 * R, -0.12 * R);
+        ctx.beginPath();
+        ctx.ellipse(bx, by, 0.17 * R, 0.11 * R, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = TINTA;
+    ctx.lineWidth = traco * 0.8;
+    for (let k = 0; k < 2; k++) {
+      const fase = (t * 1.4 + k * 0.5) % 1;
+      const [px, py] = tr(lado * (0.72 + fase * 0.4) * R, (-0.2 + fase * 0.18) * R);
+      const r = 0.08 * R * (0.7 + fase);
+      ctx.globalAlpha = 1 - fase;
+      for (const [dx, dy, f] of [[-0.8, 0, 0.8], [0, 0.35, 1], [0.8, 0, 0.8]]) {
+        ctx.beginPath();
+        ctx.arc(px + dx * r, py + dy * r, r * f, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+/** Estrelinha de 5 pontas (o zonzo). @param {CanvasRenderingContext2D} ctx */
+function estrela(ctx, x, y, r, traco) {
+  ctx.fillStyle = '#ffd23a';
+  ctx.strokeStyle = TINTA;
+  ctx.lineWidth = traco;
+  ctx.beginPath();
+  for (let k = 0; k < 10; k++) {
+    const a = Math.PI / 2 + (k * Math.PI) / 5;
+    const rr = k % 2 ? r * 0.45 : r;
+    if (k) ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+    else ctx.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
 }

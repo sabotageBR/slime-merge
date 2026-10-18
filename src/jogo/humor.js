@@ -30,8 +30,8 @@ export const HUMOR = Object.freeze({
   apatico: 20,
   /** u/s: abaixo disso conta como parado */
   vParado: 0.3,
-  /** s furioso depois da pancada */
-  furioso: 2,
+  /** s com a careta depois da pancada */
+  careta: 2,
   /** u/s de queda que irrita quem esta embaixo */
   queda: 8,
   /** quem cai precisa ter ao menos esta fracao das particulas de quem leva (o miudo nao irrita o grande) */
@@ -40,6 +40,12 @@ export const HUMOR = Object.freeze({
 
 /** Humores de base (o rosto de sempre); os outros sao passageiros e passam por cima. */
 export const BASE = Object.freeze(['', 'contente', 'amassado', 'chorinho', 'apatico']);
+
+/**
+ * Caretas de quem leva uma pancada na cabeca (2026-10-18, pedido do usuario: "somente com raiva
+ * esta repetitivo, quero umas 5 variacoes"). Todas de olho aberto.
+ */
+export const PANCADA = Object.freeze(['furioso', 'zonzo', 'susto', 'emburrado', 'xingando']);
 
 /**
  * Alongamento do corpo: raiz da razao entre os autovalores de A*At (1 = redondo).
@@ -95,8 +101,18 @@ export function sentir(s, vizinhos, dt) {
 }
 
 /**
- * Pancada: quem pousou caindo rapido irrita os de outro nivel que estao embaixo dele (o rosto
- * furioso olha para quem caiu). Devolve quem ficou furioso.
+ * Careta da proxima pancada no slime: cada um tem o seu rodizio (slimes diferentes fazem caretas
+ * diferentes, e o mesmo passa pelas 5 antes de repetir).
+ * @param {any} o
+ */
+export function careta(o) {
+  const n = PANCADA.length;
+  return PANCADA[((o.idx || 0) + 2 * (o.dados.pancadas || 0)) % n];
+}
+
+/**
+ * Pancada: quem pousou caindo rapido irrita os de outro nivel que estao embaixo dele (a careta da
+ * vez; a maioria olha para quem caiu). Devolve quem levou a pancada.
  * @param {any} s o que pousou
  * @param {number} queda maior velocidade da queda (u/s)
  * @param {any[]} encostados slimes encostados nele agora
@@ -108,11 +124,16 @@ export function pancada(s, queda, encostados, fundem) {
   const out = [];
   for (const o of encostados) {
     if (!o.ativo || o.preso || o.dados.fundindo || o.dados.marcado) continue;
-    // o medo da linha, o tonto e o feliz da fusao ficam (so o humor de base vira furioso)
-    if (!BASE.includes(o.dados.expr || '') && o.dados.expr !== 'furioso') continue;
+    // o medo da linha, o tonto e o feliz da fusao ficam (so o humor de base vira careta)
+    const ja = PANCADA.includes(o.dados.expr);
+    if (!BASE.includes(o.dados.expr || '') && !ja) continue;
     if (o.cy >= s.cy || s.n < o.n * HUMOR.porte || fundem(s, o)) continue;
-    o.dados.expr = 'furioso';
-    o.dados.exprT = HUMOR.furioso;
+    // outra pancada no meio da careta renova o tempo sem trocar o rosto
+    if (!ja) {
+      o.dados.expr = careta(o);
+      o.dados.pancadas = (o.dados.pancadas || 0) + 1;
+    }
+    o.dados.exprT = HUMOR.careta;
     o.dados.bravoDe = s.idx;
     o.dados.paradoT = 0;
     out.push(o);

@@ -83,7 +83,7 @@ for (const p of arquivos) {
 }
 if (gz > 500 * 1024) falhas.push(`build acima de 500 KB gzip (${gz} bytes)`);
 for (const f of usados) if (!existsSync(join(pastaSons, f))) falhas.push(`som escolhido sem arquivo: ${f}`);
-if (kbAudio > 120) falhas.push(`audio acima de 120 KB (${kbAudio.toFixed(1)} KB)`);
+if (kbAudio > 150) falhas.push(`audio acima de 150 KB (${kbAudio.toFixed(1)} KB)`);
 process.stdout.write(`audio: ${usados.size} arquivos, ${kbAudio.toFixed(1)} KB\n`);
 // thumb: assinatura PNG e largura/altura do IHDR (bytes 16..23, big-endian)
 let thumbLado = 0;

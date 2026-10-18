@@ -3,18 +3,45 @@
 //
 // - tocar(nome, p): nome de categoria (soltar, fusao, gotas...) ou um nome de hoje (LEGADO:
 //   descartar, yes, explodir...). p leva k (combo), forca, nivel, i (contagem de gotas).
-// - falar(frase, nivel): no maximo uma fala a cada 1,2 s; abaixa a musica (0,7 por 0,6 s).
+// - falar(frase, nivel, taxa): uma fala por vez, com FOLGA_FALA s entre elas; a que chega no meio
+//   espera a vez numa fila de uma (a de PRIORIDADE mais alta; a de menos some) e vence depois de
+//   VALIDADE s (o main.js chama passo() a cada quadro). O arquivo do locutor toca mais rapido e
+//   agudo nos slimes pequenos e grave nos grandes (taxaDoNivel), ou pela `taxa` (o combo sobe).
+//   Abaixa a musica (0,7 por 0,6 s).
 // - Arquivos: carregados devagar depois do `audio.pronto()` (so os da escolha, ou todos com
 //   carregar({todos: true})); enquanto nao chegam, ou se falharem, toca a `reserva`.
 //   O start() pula o atraso do codificador medido no MP3 (ARQUIVOS[id].inicio).
 
 import { CATEGORIAS, POR_ID, LEGADO, normalizarEscolha, variante, arquivosDa } from './catalogo.js';
 import { RECEITAS } from './receitas.js';
-import { falar as falarSintese, FRASES } from './falas.js';
+import { falar as falarSintese, FRASES, COMBOS, tomDoNivel } from './falas.js';
 import { ARQUIVOS } from './arquivos.js';
 
-/** Intervalo minimo entre duas falas, s. */
-export const INTERVALO_FALA = 1.2;
+/** Silencio entre o fim de uma fala e a proxima, s. */
+export const FOLGA_FALA = 0.15;
+
+/**
+ * Prioridade de cada frase (sem entrada: 2, eventos e reforcos). A fila de espera guarda uma so:
+ * a de prioridade maior (no empate, a mais nova).
+ * @type {Readonly<Record<string, number>>}
+ */
+export const PRIORIDADE = Object.freeze({
+  pronto: 4, vai: 4, oba: 4, uhuu: 4, venceu: 4, perdeu: 4, aww: 4, parabens: 4,
+  missao: 3, objetivo: 3, socorro: 3, tempo: 3,
+  iupi: 1, ...Object.fromEntries(COMBOS.map((k) => ['combo' + k, 1])),
+});
+
+/** Quanto tempo uma fala ainda vale esperando a vez, s, pela prioridade (o combo velho nao fala). */
+export const VALIDADE = Object.freeze([0.6, 0.6, 1.5, 2.5, 3]);
+
+/**
+ * Velocidade do arquivo do locutor pelo nivel do slime: 1 a 1,22x (agudo), 8 normal, 14 a 0,84x.
+ * @param {number} nivel
+ */
+export function taxaDoNivel(nivel) {
+  const n = Math.max(1, Math.min(14, Math.floor(nivel) || 8));
+  return Math.pow(2, (8 - n) / 24);
+}
 /** Volume dos arquivos (os MP3 estao em -18 LUFS; as receitas sao mais baixas). */
 const VOL_ARQUIVO = { sfx: 0.55, voz: 0.5 };
 
@@ -55,7 +82,10 @@ export function criarSons(o) {
   const musica = o.musica || null;
   /** @type {Map<string, any>} id -> AudioBuffer | 'carregando' | 'falhou' */
   const buffers = new Map();
-  let ultimaFala = -Infinity;
+  /** Quando a fala de agora acaba (relogio do audio). */
+  let fimFala = -Infinity;
+  /** @type {{varId: string, frase: string, nivel: number|undefined, taxa: number, prio: number, ate: number}|null} fala esperando a vez */
+  let fila = null;
   let pronto = false;
 
   audio.pronto().then((ok) => {
@@ -63,33 +93,43 @@ export function criarSons(o) {
     if (pronto && o.carregarSozinho !== false) carregar();
   });
 
+  /** @type {Map<string, Promise<boolean>>} cargas em andamento (quem pede de novo espera a mesma) */
+  const cargas = new Map();
+
   /**
    * Busca e decodifica um arquivo (uma vez).
    * @param {string} id
    * @returns {Promise<boolean>}
    */
-  async function carregarUm(id) {
+  function carregarUm(id) {
     const info = ARQUIVOS[id];
     const ctx = audio.ctx;
-    if (!info || !ctx) return false;
+    if (!info || !ctx) return Promise.resolve(false);
     const b = buffers.get(id);
-    if (b === 'carregando') return false;
-    if (b && b !== 'falhou') return true;
+    if (b === 'carregando') return cargas.get(id) || Promise.resolve(false);
+    if (b && b !== 'falhou') return Promise.resolve(true);
     buffers.set(id, 'carregando');
-    try {
-      const r = await buscar(base.replace(/\/?$/, '/') + info.arquivo);
-      if (!r || r.ok === false) throw new Error('arquivo ' + id);
-      const buf = await decodificar(ctx, await r.arrayBuffer());
-      buffers.set(id, buf);
-      return true;
-    } catch {
-      buffers.set(id, 'falhou');
-      return false;
-    }
+    const p = (async () => {
+      try {
+        const r = await buscar(base.replace(/\/?$/, '/') + info.arquivo);
+        if (!r || r.ok === false) throw new Error('arquivo ' + id);
+        const buf = await decodificar(ctx, await r.arrayBuffer());
+        buffers.set(id, buf);
+        return true;
+      } catch {
+        buffers.set(id, 'falhou');
+        return false;
+      } finally {
+        cargas.delete(id);
+      }
+    })();
+    cargas.set(id, p);
+    return p;
   }
 
   /**
-   * Carrega os arquivos da escolha (ou todos). So depois do primeiro gesto (pronto).
+   * Carrega os arquivos da escolha (ou todos). So depois do primeiro gesto (pronto). Os que ja
+   * estao a caminho entram na conta quando chegam.
    * @param {{todos?: boolean}} [op]
    * @returns {Promise<number>} quantos estao prontos
    */
@@ -117,14 +157,15 @@ export function criarSons(o) {
    * @param {string} chave
    * @param {number} max
    * @param {number} [vol] calibragem da variante
+   * @param {number} [taxa] velocidade (e altura) do arquivo
    */
-  function tocarArquivo(id, destino, chave, max, vol = 1) {
+  function tocarArquivo(id, destino, chave, max, vol = 1, taxa = 1) {
     const buf = bufferPronto(id);
     if (!buf) {
       if (pronto && !buffers.has(id)) carregarUm(id);
       return 0;
     }
-    return audio.vozBuffer(buf, { inicio: (ARQUIVOS[id] && ARQUIVOS[id].inicio) || 0, destino, vol: VOL_ARQUIVO[destino] * vol, chave, max });
+    return audio.vozBuffer(buf, { inicio: (ARQUIVOS[id] && ARQUIVOS[id].inicio) || 0, destino, vol: VOL_ARQUIVO[destino] * vol, chave, max, taxa });
   }
 
   /**
@@ -167,41 +208,73 @@ export function criarSons(o) {
   }
 
   /**
-   * Fala com uma variante de falas especifica.
-   * @param {string} varId balbucio | locutor | locutorSlime | nenhum
+   * Toca a fala agora (sem olhar a vez). Devolve a duracao, s.
+   * @param {any} v variante das falas
    * @param {string} frase
-   * @param {number} [nivel]
-   * @param {boolean} [semLimite] ignora o intervalo de 1,2 s (o ▶ do Estudio)
+   * @param {number|undefined} nivel
+   * @param {number} taxa 0: pelo nivel
+   * @param {number} agora
    */
-  function falarCom(varId, frase, nivel, semLimite = false) {
-    const v = variante('falas', varId);
-    if (!v || v.id === 'nenhum' || !FRASES[frase]) return 0;
-    const agora = audio.agora();
-    if (!semLimite && agora - ultimaFala < INTERVALO_FALA) return 0;
+  function tocarFala(v, frase, nivel, taxa, agora) {
+    const sintese = () => audio.tocarReceita((vv, t) => falarSintese(vv, t, frase, { nivel, f0: taxa ? tomDoNivel(nivel || 4) * taxa : 0 }), {}, { destino: 'voz', chave: 'falas', max: 1 });
     let dur = 0;
     if (v.arquivos) {
-      const id = v.arquivos[frase];
-      // o locutor so fala nos marcos: frase sem arquivo fica quieta
-      if (!id) return 0;
-      dur = tocarArquivo(id, 'voz', 'falas', 1);
-      if (!dur && v.reserva) dur = audio.tocarReceita((vv, t) => falarSintese(vv, t, frase, { nivel }), {}, { destino: 'voz', chave: 'falas', max: 1 });
+      dur = tocarArquivo(v.arquivos[frase], 'voz', 'falas', 1, 1, taxa || (nivel ? taxaDoNivel(nivel) : 1));
+      if (!dur && v.reserva) dur = sintese();
     } else {
-      dur = audio.tocarReceita((vv, t) => falarSintese(vv, t, frase, { nivel }), {}, { destino: 'voz', chave: 'falas', max: 1 });
+      dur = sintese();
     }
     if (dur > 0) {
-      ultimaFala = agora;
+      fimFala = agora + dur;
       if (musica) musica.abaixar(0.7, Math.max(0.6, dur));
     }
     return dur;
   }
 
+  /** A fala da fila toca quando a de agora acaba (e se ainda vale). O main.js chama a cada quadro. */
+  function passo() {
+    if (!fila) return 0;
+    const agora = audio.agora();
+    if (agora < fimFala + FOLGA_FALA) return 0;
+    const f = fila;
+    fila = null;
+    const v = variante('falas', f.varId);
+    return agora <= f.ate && v ? tocarFala(v, f.frase, f.nivel, f.taxa, agora) : 0;
+  }
+
   /**
-   * O slime fala (uau, iupi, oba, eek, aww, uhuu, missao, venceu) com a voz escolhida.
+   * Fala com uma variante de falas especifica. Com outra fala tocando, entra na fila (se for mais
+   * importante que a que ja espera) e devolve 0.
+   * @param {string} varId balbucio | locutor | locutorSlime | nenhum
    * @param {string} frase
-   * @param {number} [nivel] tom do slime (1 agudo ... 13 grave)
+   * @param {number} [nivel] tom do slime (1 agudo ... 14 grave)
+   * @param {boolean} [semLimite] fala na hora, por cima (o ▶ do Estudio)
+   * @param {number} [taxa] velocidade do locutor (0: pelo nivel); no balbucio, multiplica o tom
    */
-  function falar(frase, nivel) {
-    return falarCom(escolha.falas, frase, nivel);
+  function falarCom(varId, frase, nivel, semLimite = false, taxa = 0) {
+    const v = variante('falas', varId);
+    if (!v || v.id === 'nenhum' || !FRASES[frase]) return 0;
+    // o locutor so fala nos marcos: frase sem arquivo fica quieta
+    if (v.arquivos && !v.arquivos[frase]) return 0;
+    const agora = audio.agora();
+    if (semLimite) return tocarFala(v, frase, nivel, taxa, agora);
+    passo();
+    if (agora < fimFala + FOLGA_FALA) {
+      const prio = PRIORIDADE[frase] === undefined ? 2 : PRIORIDADE[frase];
+      if (!fila || prio >= fila.prio) fila = { varId: v.id, frase, nivel, taxa, prio, ate: agora + VALIDADE[prio] };
+      return 0;
+    }
+    return tocarFala(v, frase, nivel, taxa, agora);
+  }
+
+  /**
+   * O slime fala com a voz escolhida (frases em FRASES: uau, oba, combo3, pronto, vai...).
+   * @param {string} frase
+   * @param {number} [nivel] tom do slime (1 agudo ... 14 grave)
+   * @param {number} [taxa] velocidade do locutor (0: pelo nivel)
+   */
+  function falar(frase, nivel, taxa = 0) {
+    return falarCom(escolha.falas, frase, nivel, false, taxa);
   }
 
   return {
@@ -209,6 +282,7 @@ export function criarSons(o) {
     tocarVariante,
     falar,
     falarCom,
+    passo,
     carregar,
     /** escolha atual (categoria -> variante), ja normalizada */
     get escolha() { return { ...escolha }; },

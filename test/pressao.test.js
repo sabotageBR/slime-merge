@@ -206,13 +206,16 @@ test('eventos no pote: coringas, gigante, terremoto, calor e gelo fazem o que di
   }
   // terremoto: o pote inteiro treme (as paredes andam e voltam ao lugar); calor e gelo: o pote todo muda de estado
   {
-    const { modo, S, J } = comeca('terremoto');
+    const { modo, S, J, ev } = comeca('terremoto');
     assert.ok(J.pote.tremorDur > 0, 'o pote nao tremeu');
     const base = J.pote.idxParedes.map((k) => ({ ...S.mundo.paredes[k] }));
-    quadros(modo, 10);
+    const ev2 = quadros(modo, 10);
     assert.ok(J.pote.idxParedes.some((k) => S.mundo.paredes[k].tx !== 0), 'as paredes nao andaram');
     assert.ok(modo.visual().tremor, 'sem o tremor no visual');
-    quadros(modo, Math.round(EVENTOS.terremoto.dur * 60) + 10);
+    ev2.push(...quadros(modo, Math.round(EVENTOS.terremoto.dur * 60) + 10));
+    // uma tremida so (pedido do usuario em 2026-10-18; eram tres)
+    assert.equal([...ev, ...ev2].filter((e) => e.tipo === 'tremor').length, 1, 'tremeu mais de uma vez');
+    assert.ok(ev2.some((e) => e.tipo === 'evento' && e.id === 'terremoto' && e.acao === 'fim'), 'o terremoto nao acabou');
     J.pote.idxParedes.forEach((k, i) => {
       const p = S.mundo.paredes[k];
       assert.equal(p.tx, 0);
@@ -290,4 +293,78 @@ test('save no meio de um evento: a agenda e o pedido voltam; a chuva de gosma de
   assert.ok(ev.some((e) => e.tipo === 'escada' && e.piso === pisoPara(10)), 'o save antigo nao evoluiu');
   assert.ok(v.S.mundo.vivos().every((s) => s.nivel >= pisoPara(10)));
   assert.ok(Math.abs(v.S.extra.agenda.prox - 430) < 0.1, `agenda do save antigo em ${v.S.extra.agenda.prox}`);
+});
+
+test('falas (2026-10-18): o aviso diz a classe do evento; o pedido pede pressa nos 5 s finais (uma vez) e nao no cumprido', () => {
+  const modo = criarModo({ semente: 6, salvo: {}, toque: true });
+  modo.S.jogadores[0].maxNivel = 13;
+  modo.forcarEvento('pedido');
+  const ev = quadros(modo, Math.round((AGENDA.aviso + EVENTOS.pedido.dur + 0.2) * 60));
+  const aviso = ev.filter((e) => e.tipo === 'evento' && e.acao === 'aviso');
+  assert.equal(aviso.length, 1);
+  assert.equal(aviso[0].id, 'pedido');
+  assert.equal(aviso[0].classe, EVENTOS.pedido.tipo);
+  const pressa = ev.findIndex((e) => e.tipo === 'evento' && e.acao === 'pressa');
+  if (!ev.some((e) => e.acao === 'ok')) {
+    assert.ok(pressa >= 0, 'sem a pressa');
+    assert.equal(ev.filter((e) => e.acao === 'pressa').length, 1, 'pressa mais de uma vez');
+    // a pressa vem ~5 s antes do fim (quadros de 1/60 s entre ela e o falhou)
+    const falhou = ev.findIndex((e) => e.tipo === 'evento' && e.acao === 'falhou');
+    const entre = ev.slice(pressa, falhou).length;
+    assert.ok(entre > 0 && falhou > pressa);
+  }
+  // terremoto e coringas: as outras classes
+  for (const id of ['terremoto', 'coringas']) {
+    const m = criarModo({ semente: 6, salvo: {}, toque: true });
+    m.forcarEvento(id);
+    const e = quadros(m, Math.round((AGENDA.aviso + 0.1) * 60)).find((x) => x.tipo === 'evento' && x.acao === 'aviso');
+    assert.ok(e && e.id === id && e.classe === EVENTOS[id].tipo, id);
+  }
+  // cumprido antes dos 5 s finais: sem pressa
+  const ok = criarModo({ semente: 6, salvo: {}, toque: true });
+  const J = ok.S.jogadores[0];
+  J.pote.crescer(0);
+  J.maxNivel = 7;
+  por(ok, { nivel: 4 }, -3, 1);
+  ok.forcarEvento('pedido');
+  quadros(ok, Math.round((AGENDA.aviso + 0.1) * 60));
+  por(ok, { nivel: 4 }, -1.3, 4);
+  por(ok, { nivel: 4 }, 1.3, 4);
+  const evs = quadros(ok, Math.round(EVENTOS.pedido.dur * 60));
+  assert.ok(evs.some((e) => e.acao === 'ok'), 'o pedido nao fechou');
+  assert.ok(!evs.some((e) => e.acao === 'pressa'), 'pressa no pedido cumprido');
+});
+
+test('recorde no meio do sem fim: avisa uma vez ao passar o de antes; a partida que e o recorde nao avisa de novo ao voltar; recomecar guarda o recorde', () => {
+  const modo = criarModo({ semente: 6, salvo: { recorde: 100 }, toque: true });
+  const J = modo.S.jogadores[0];
+  J.pontos = 100;
+  assert.ok(!quadros(modo, 2).some((e) => e.tipo === 'recorde'), 'empatar nao e recorde');
+  J.pontos = 101;
+  const ev = quadros(modo, 2);
+  assert.equal(ev.filter((e) => e.tipo === 'recorde').length, 1);
+  J.pontos = 500;
+  assert.ok(!quadros(modo, 2).some((e) => e.tipo === 'recorde'), 'avisou duas vezes');
+  // o save leva o recorde com esta partida: ao voltar, ela ja e o recorde
+  const salvo = modo.salvar();
+  assert.equal(salvo.recorde, 500);
+  const volta = criarModo({ semente: 6, salvo, toque: true });
+  volta.S.jogadores[0].pontos = 501;
+  assert.ok(!quadros(volta, 2).some((e) => e.tipo === 'recorde'), 'avisou de novo depois do save');
+  // recomecar no meio (o sem fim nao acaba): a partida nova mira o recorde de 501
+  volta.reiniciar();
+  volta.eventos.splice(0);
+  assert.equal(volta.hud().recorde, 501, 'o recorde voltou para o de antes');
+  assert.equal(volta.salvar().recorde, 501);
+  volta.S.jogadores[0].pontos = 400;
+  assert.ok(!quadros(volta, 2).some((e) => e.tipo === 'recorde'));
+  volta.S.jogadores[0].pontos = 502;
+  assert.equal(quadros(volta, 2).filter((e) => e.tipo === 'recorde').length, 1);
+  // primeiro recorde (0) e sem a pressao (?pressao=0, o fim de partida diz): sem aviso
+  const novo = criarModo({ semente: 6, salvo: {}, toque: true });
+  novo.S.jogadores[0].pontos = 50;
+  assert.ok(!quadros(novo, 2).some((e) => e.tipo === 'recorde'));
+  const sem = criarModo({ semente: 6, salvo: { recorde: 10 }, toque: true, pressao: false });
+  sem.S.jogadores[0].pontos = 50;
+  assert.ok(!quadros(sem, 2).some((e) => e.tipo === 'recorde'));
 });

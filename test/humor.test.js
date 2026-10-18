@@ -1,8 +1,8 @@
 // Humor de cada slime (src/jogo/humor.js): o rosto de base vem do aperto (alongamento e
-// vizinhos), do tempo parado e da pancada; o passageiro passa por cima.
+// vizinhos), do tempo parado e da pancada (5 caretas em rodizio); o passageiro passa por cima.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HUMOR, sentir, pancada, alongamento, aperto } from '../src/jogo/humor.js';
+import { HUMOR, PANCADA, sentir, pancada, careta, alongamento, aperto } from '../src/jogo/humor.js';
 import { criarModo } from '../src/jogo/modos/merge.js';
 
 /** Slime de mentira: alongado em `k` (a11 = k, a22 = 1/k), parado. */
@@ -81,21 +81,51 @@ test('passageiro por cima: o medo e o feliz ficam; o humor volta quando eles aca
   assert.equal(s.dados.expr, 'contente');
 });
 
-test('pancada: quem esta embaixo, de outro nivel e nao menor que metade, fica furioso olhando para quem caiu', () => {
+test('pancada: quem esta embaixo, de outro nivel e nao menor que metade, faz uma careta olhando para quem caiu', () => {
   const cai = slime(1, { idx: 7, cy: 3, n: 40 });
   const baixo = slime(1, { idx: 2, cy: 1, n: 60 });
   const lado = slime(1, { idx: 3, cy: 3.5, n: 40 });
   const grande = slime(1, { idx: 4, cy: 1, n: 200 });
   const igual = slime(1, { idx: 5, cy: 1, n: 40 });
+  const esperada = careta(baixo);
   const ok = pancada(cai, HUMOR.queda + 1, [baixo, lado, grande, igual], (a, b) => b === igual);
   assert.deepEqual(ok, [baixo]);
-  assert.equal(baixo.dados.expr, 'furioso');
+  assert.ok(PANCADA.includes(baixo.dados.expr));
+  assert.equal(baixo.dados.expr, esperada);
+  assert.equal(baixo.dados.exprT, HUMOR.careta);
   assert.equal(baixo.dados.bravoDe, 7);
   // devagar nao irrita ninguem
   assert.deepEqual(pancada(cai, HUMOR.queda - 1, [slime(1, { cy: 1 })], () => false), []);
 });
 
-test('no pote: um slime solto de cima irrita o de baixo, e o furioso passa', () => {
+test('pancada: o mesmo slime passa pelas 5 caretas antes de repetir; outra pancada no meio nao troca o rosto', () => {
+  assert.equal(PANCADA.length, 5);
+  for (const idx of [0, 1, 2, 3, 4, 9]) {
+    const baixo = slime(1, { idx, cy: 1, n: 40 });
+    const vistas = [];
+    for (let k = 0; k < 5; k++) {
+      const cai = slime(1, { idx: 20 + k, cy: 3, n: 40 });
+      pancada(cai, HUMOR.queda + 1, [baixo], () => false);
+      vistas.push(baixo.dados.expr);
+      // de novo antes de passar: renova o tempo e o alvo do olhar, o rosto fica
+      baixo.dados.exprT = 0.5;
+      pancada(slime(1, { idx: 30, cy: 3, n: 40 }), HUMOR.queda + 1, [baixo], () => false);
+      assert.equal(baixo.dados.expr, vistas[k], 'trocou de careta no meio');
+      assert.equal(baixo.dados.exprT, HUMOR.careta);
+      assert.equal(baixo.dados.bravoDe, 30);
+      // a careta passa (o soltar.js zera a expressao quando o exprT acaba)
+      baixo.dados.expr = '';
+    }
+    assert.deepEqual([...vistas].sort(), [...PANCADA].sort(), `idx ${idx}: ${vistas.join(', ')}`);
+  }
+  // dois vizinhos levando a pancada juntos fazem caretas diferentes
+  const a = slime(1, { idx: 2, cy: 1, n: 40 });
+  const b = slime(1, { idx: 3, cy: 1, n: 40 });
+  pancada(slime(1, { idx: 8, cy: 3, n: 40 }), HUMOR.queda + 1, [a, b], () => false);
+  assert.notEqual(a.dados.expr, b.dados.expr);
+});
+
+test('no pote: um slime solto de cima irrita o de baixo, e a careta passa', () => {
   const modo = criarModo({ semente: 4, salvo: {}, toque: true, pressao: false });
   const S = modo.S;
   S.jogadores[0].pote.crescer(0);
@@ -106,9 +136,9 @@ test('no pote: um slime solto de cima irrita o de baixo, e o furioso passa', () 
   const cai = S.R.criar(S, S.jogadores[0], { nivel: 5 }, 0.2, 9, false);
   cai.dados.pote = 0;
   cai.dados.solto = S.mundo.tempo;
-  let furioso = false;
-  for (let f = 0; f < 120; f++) { modo.passo(1 / 60); if (baixo.dados.expr === 'furioso') furioso = true; }
-  assert.ok(furioso, 'o de baixo nao ficou furioso');
-  for (let f = 0; f < 60 * (HUMOR.furioso + 1.5); f++) modo.passo(1 / 60);
-  assert.notEqual(baixo.dados.expr, 'furioso');
+  let feita = '';
+  for (let f = 0; f < 120; f++) { modo.passo(1 / 60); if (PANCADA.includes(baixo.dados.expr)) feita = baixo.dados.expr; }
+  assert.ok(feita, 'o de baixo nao fez careta');
+  for (let f = 0; f < 60 * (HUMOR.careta + 1.5); f++) modo.passo(1 / 60);
+  assert.ok(!PANCADA.includes(baixo.dados.expr), `a careta ${feita} nao passou`);
 });

@@ -10,6 +10,7 @@ import { lerDepuracao } from './core/depuracao.js';
 import { criarArmazem } from './core/armazenamento.js';
 import { criarAudio } from './core/audio.js';
 import { criarSons } from './som/sons.js';
+import { COMBOS } from './som/falas.js';
 import { criarMusica } from './som/musica.js';
 import { criarLaco, PASSO } from './core/laco.js';
 import { criarEntrada } from './core/entrada.js';
@@ -69,6 +70,7 @@ const J = {
   demos: 0, // gotas soltas pela demonstracao (quem nao toca no comeco), com a da abertura
   demoMedida: false, // a dica/demo/show ja foi (a abertura tem a dela)
   seguindo: /** @type {{ cat: string, oque: string, t: number }[]} */ ([]), // completes que esperam o tempo de jogo
+  largada: -1, // J.t do "Ready?" enquanto o "Go!" nao veio
   usouPoder: false, // algum reforco usado nesta sessao (a dica do reforco so vem sem isso)
   dica: /** @type {{ id: string, t: number }|null} */ (null),
   fpsQ: 0, // quadros e tempo real do minuto de jogo (telemetria do fps)
@@ -103,6 +105,8 @@ const DEMO_OCIOSO = 2;
 const DEMOS = 3;
 /** s de jogo depois do intervalo comercial ou do "Ufa!" que contam como "ficou" (o complete) */
 const SEGUIU = 20;
+/** "Ready... Go!" (2026-10-18): s entre o "Ready?" e o "Go!" (a gota da abertura cai em 1 s) */
+const LARGADA_VAI = 0.75;
 /** Dicas que o aparelho ja viu (uma vez cada). */
 const dicasVistas = armazem.ler('dicas', {}) || {};
 // qualidade do render: desce sozinha quando o aparelho nao segura o fps (?qualidade= fixa).
@@ -484,8 +488,11 @@ function tratarEventos() {
         const k = e.combo || 1;
         sons.tocar('fusao', { k, nivel: e.nivel });
         if (k >= 2) sons.tocar('combo', { k });
-        if (k >= 3) sons.falar('iupi', e.nivel);
-        else if ((e.nivel || 0) >= 8) sons.falar('uau', e.nivel);
+        // o slime conta o combo (x3 a x10, cada vez mais agudo); fora dele, a fusao grande
+        if (minhaVoz(e.pote)) {
+          if (COMBOS.includes(k)) sons.falar('combo' + k, e.nivel, 1 + 0.04 * (k - 3));
+          else if ((e.nivel || 0) >= 8) sons.falar('uau', e.nivel);
+        }
         if (e.cor) cena.vfx.respingo(e.x, e.y, e.cor, 8, 5);
         for (let k = 0; k < (e.brilhos || 0); k++) cena.vfx.brilho(e.x + (k % 5 - 2) * 0.3, e.y + ((k * 7) % 5 - 2) * 0.3);
         if (e.texto) cena.vfx.texto(e.x, e.y + 1, T[e.texto] || e.texto, e.corTexto || '#ffffff', e.escala || 1, 'combo');
@@ -528,7 +535,7 @@ function tratarEventos() {
         const r = perfil.superSlime(e.n);
         perfilSujo = true;
         if (r.gotas) contarGotas(r.gotas, 900);
-        if (r.recorde && e.n > 1) sons.tocar('missao');
+        if (r.recorde && e.n > 1) { sons.tocar('missao'); sons.falar('parabens'); }
         if (J.chave === 'semfim') poki.measure('super', e.n > 10 ? '10+' : String(e.n), 'm' + J.minutos);
         break;
       }
@@ -548,6 +555,7 @@ function tratarEventos() {
         sons.tocar('splat');
         cena.vfx.explosao(e.x, e.y, e.cor, e.raio || 1);
         cena.respingarTela(e.x, e.y, e.cor, e.raio || 1);
+        if (minhaVoz(e.pote)) sons.falar('acertou');
         break;
       case 'texto':
         cena.vfx.texto(e.x, e.y, T[e.texto] || e.texto, e.cor || '#ffffff', e.escala || 1, e.grupo || '');
@@ -556,8 +564,8 @@ function tratarEventos() {
         poki.measure('level', String(e.n), e.acao);
         // o ritmo real: em que minuto de jogo cada nivel novo chega (o painel nao mostra o tempo)
         if (e.acao === 'complete' && J.chave === 'semfim') { poki.measure('ritmo', 'n' + e.n, 'm' + J.minutos); pagarParcial(); }
-        // partida nova: as metas da partida recomecam
-        if (e.acao === 'start' && e.n === 1) J.metas = null;
+        // partida nova: as metas da partida recomecam e o "Ready... Go!"
+        if (e.acao === 'start' && e.n === 1) { J.metas = null; largada('pronto'); }
         break;
       case 'registro':
         if (e.chave === 'poder') usouPoder(e.id);
@@ -576,6 +584,12 @@ function tratarEventos() {
           poki.measure('partida', 'ufa', 'm' + J.minutos);
           acompanhar('ufa', 'resgate');
         }
+        sons.falar('socorro');
+        break;
+      case 'recorde':
+        // o sem fim passou o recorde de antes da partida (uma vez; a partida nao acaba para dizer)
+        hud.aviso(T.novoRecorde);
+        sons.falar('uhuu');
         break;
       case 'escada':
         // o piso das gotas subiu (do nivel 9 em diante) e os pequenos evoluiram
@@ -590,6 +604,12 @@ function tratarEventos() {
           hud.aviso(`${T.pedidoFeito} +${g} 💧`);
           gravarPerfil();
         }
+        // a fala de cada momento: o aviso pela classe (terremoto: "Get down!"; alivio: "Power up!"),
+        // a pressa nos 5 s finais do pedido e o resultado dele
+        if (e.acao === 'aviso') sons.falar(e.id === 'terremoto' ? 'abaixa' : e.classe === 'alivio' ? 'uau' : 'eek');
+        else if (e.acao === 'pressa') sons.falar('depressa');
+        else if (e.acao === 'ok') sons.falar('objetivo');
+        else if (e.acao === 'falhou') sons.falar('tempo');
         if (e.acao === 'fim') pagarParcial();
         break;
       case 'fim':
@@ -614,11 +634,41 @@ function tratarEventos() {
       case 'som':
         // nomes de hoje (LEGADO) e as categorias (choro, missil, trocar, alvo, alargar, ataque...)
         sons.tocar(e.nome, e);
+        // as falas dos reforcos e da gosma cinza que vai para o rival (2 ou mais)
+        if (minhaVoz(e.pote)) {
+          if (e.nome === 'trocar') sons.falar('recarga');
+          else if (e.nome === 'alvo' && e.id === 'mira') sons.falar('alvo');
+          else if (e.nome === 'ataque' && e.qtd >= 2) sons.falar('fogo');
+        }
         break;
       default:
         break;
     }
   }
+}
+
+/**
+ * Fala de quem joga: o pote 0 (ou sem pote); no Duelo de 2 jogadores, os dois. A CPU nao fala.
+ * @param {number} [pote]
+ */
+function minhaVoz(pote) {
+  return !pote || J.chave === 'duelo2';
+}
+
+/**
+ * "Ready... Go!" no comeco de cada partida (e de cada rodada do Duelo): o texto estoura no meio de
+ * cada pote e some em 1,1 s, e o slime fala. O "Go!" vem LARGADA_VAI s depois (passoJogo).
+ * @param {'pronto'|'vai'} fase
+ */
+function largada(fase) {
+  const S = J.modo && J.modo.S;
+  J.largada = fase === 'pronto' ? J.t : -1;
+  if (!S || dep.vitrine) { J.largada = -1; return; }
+  const pronto = fase === 'pronto';
+  for (const K of S.jogadores) {
+    cena.vfx.texto(K.pote.cx, K.pote.linha * 0.6, T[pronto ? 'largada.pronto' : 'largada.vai'], pronto ? '#ffd23a' : '#7fe36b', pronto ? 2 : 2.6, 'largada' + K.idx);
+  }
+  sons.falar(fase);
 }
 
 /** Progresso das missoes do dia e dos niveis descobertos (premios em gotas, com aviso). */
@@ -796,9 +846,10 @@ function terminar(e) {
   musica.abaixar(0.6);
   const g = pagarFim(e);
   J.ganho = g.total;
-  // recorde ou vitoria: palmas; derrota: um "aww"; depois as gotas contadas
-  const festa = e.novo || e.venceu;
-  setTimeout(() => { if (festa) { sons.tocar('palmas'); sons.falar(e.venceu ? 'venceu' : 'uhuu'); } else sons.falar('aww'); }, 400);
+  // vitoria (no Duelo de 2, alguem sempre vence) ou recorde: palmas; derrota para a CPU: "You lose";
+  // o resto: "Game over". Depois as gotas contadas
+  const fala = e.venceu || J.chave === 'duelo2' ? 'venceu' : J.chave === 'duelo' ? 'perdeu' : e.novo ? 'uhuu' : 'aww';
+  setTimeout(() => { if (fala === 'venceu' || fala === 'uhuu') sons.tocar('palmas'); sons.falar(fala); }, 400);
   contarGotas(J.ganho, 1300);
   J.dobravel = g.dobravel;
   fecharDica();
@@ -925,6 +976,8 @@ function passoJogo(dt) {
   J.modo.passo(dt);
   cena.passo(dt);
   tratarEventos();
+  if (J.largada >= 0 && J.t - J.largada >= LARGADA_VAI) largada('vai');
+  sons.passo();
   if (J.tocou) {
     J.tempoJogo += dt;
     const min = Math.floor(J.tempoJogo / 60);
@@ -1108,7 +1161,17 @@ async function iniciar() {
   const dia = perfil.checkin();
   if (dia.premio) {
     gravarPerfil();
-    setTimeout(() => hud.aviso(`${formatar(T.sequenciaDia, { n: dia.dia })} +${dia.premio} 💧`), 1200);
+    // o aviso vem junto com o "Congratulations!": no primeiro gesto (o audio so destrava nele, e a
+    // fala espera o arquivo), a partir de 1,2 s; sem gesto, aos 6 s e mudo
+    let avisou = false;
+    const avisar = () => {
+      if (avisou) return;
+      avisou = true;
+      hud.aviso(`${formatar(T.sequenciaDia, { n: dia.dia })} +${dia.premio} 💧`);
+      sons.falar('parabens');
+    };
+    setTimeout(() => audio.pronto().then((ok) => (ok ? sons.carregar() : 0)).then(avisar), 1200);
+    setTimeout(avisar, 6000);
   }
   // prints deterministicos: N quadros de fisica antes do primeiro desenho
   for (let k = 0; k < dep.passos; k++) {

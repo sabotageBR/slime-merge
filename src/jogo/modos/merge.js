@@ -16,8 +16,10 @@ import { PESOS, PESOS_ESCADA, ESCADA, pisoPara, AGENDA, CICLO, EVENTOS, NIVEL_FI
 const PRISMA = { pig: [0.06, 0.04, 0.08, 0], textura: 6 };
 /** Eventos com contagem na pilula (os outros acabam quando o que cai, cai). */
 const COM_RELOGIO = ['pedido', 'terremoto', 'calor', 'gelo'];
-/** Duracao de cada um dos 3 tremores do terremoto (s; um a cada 2,5 s). */
+/** Duracao do tremor do terremoto (s; um so desde 2026-10-18, pedido do usuario). */
 const TREMOR_EVENTO = 1.8;
+/** Faltando isto (s) no pedido, o slime pede pressa. */
+const PRESSA_PEDIDO = 5;
 /** Cor do texto do aviso de cada tipo de evento. */
 const COR_EVENTO = { alivio: '#7fe36b', aperto: '#ff8a5c', meta: '#ffd23a', caos: '#5fd9ff' };
 
@@ -195,6 +197,8 @@ export function criarModo(o = {}) {
     S.eventos.push({ tipo: 'texto', x: J.pote.cx, y: J.pote.linha * 0.62, texto: 'ev.' + ev.id, cor: COR_EVENTO[tipo], escala: 1.35 });
     const ruim = tipo === 'aperto' || tipo === 'caos';
     S.eventos.push({ tipo: 'som', nome: ruim ? 'ataque' : 'yes' });
+    // a fala do aviso vem pela classe do evento (main.js)
+    S.eventos.push({ tipo: 'evento', id: ev.id, acao: 'aviso', n: ev.n, classe: tipo });
   }
 
   /** O evento comeca. */
@@ -208,7 +212,6 @@ export function criarModo(o = {}) {
       // o pote inteiro treme (as paredes andam; o cesto, desenhado delas, treme junto)
       J.pote.tremer(TREMOR_EVENTO);
       S.eventos.push({ tipo: 'som', nome: 'descartar' });
-      S.extra.tremores = 1;
     } else if (ev.id === 'gigante') {
       J.fila[1] = { nivel: nivelGigante(piso(S), J.maxNivel), gigante: true };
     } else if (ev.id === 'calor' || ev.id === 'gelo') {
@@ -228,10 +231,9 @@ export function criarModo(o = {}) {
   function durante(S, J, ev) {
     if (ev.id === 'coringas') ev.feito = !(S.extra.coringas > 0) && !J.fila.some((f) => f && f.prisma);
     else if (ev.id === 'gigante') ev.feito = !J.fila.some((f) => f && f.gigante);
-    else if (ev.id === 'terremoto' && S.extra.tremores < 3 && ev.t >= 2.5 * S.extra.tremores) {
-      J.pote.tremer(TREMOR_EVENTO);
-      S.eventos.push({ tipo: 'som', nome: 'descartar' });
-      S.extra.tremores++;
+    else if (ev.id === 'pedido' && !ev.feito && !ev.pressa && ev.dur - ev.t <= PRESSA_PEDIDO) {
+      ev.pressa = true;
+      S.eventos.push({ tipo: 'evento', id: 'pedido', acao: 'pressa', n: ev.n });
     }
   }
 
@@ -327,6 +329,11 @@ export function criarModo(o = {}) {
       const J0 = S.jogadores[0];
       if (J0.pote.estreito && S.tempo >= ini.tempoCresce) crescer(S, J0, 'tempo');
       if (comPressao) pressionar(S, J0, dt);
+      // o sem fim nao acaba: o recorde de antes da partida, quando passa, avisa na hora (uma vez)
+      if (comPressao && !S.extra.bateu && S.recorde > 0 && J0.pontos > S.recorde) {
+        S.extra.bateu = true;
+        S.eventos.push({ tipo: 'recorde', pontos: J0.pontos });
+      }
       // desafio "chacoalho": o pote sacode sozinho a cada 25 s
       if (regra !== 'chacoalho') return;
       S.extra.tChac = (S.extra.tChac || 0) + dt;
@@ -502,6 +509,8 @@ export function criarModo(o = {}) {
     restaurar(S, p) {
       const J = S.jogadores[0];
       J.pontos = p.pontos || 0;
+      // o recorde salvo ja conta esta partida: se ela e o recorde, o aviso ja saiu
+      S.extra.bateu = J.pontos >= S.recorde;
       S.tempo = p.tempo || 0;
       if (p.fila) J.fila = p.fila;
       if (p.poderes) J.poderes = p.poderes;
@@ -553,7 +562,6 @@ export function criarModo(o = {}) {
       if (ev && ev.fase === 'ativo' && (ev.id === 'calor' || ev.id === 'gelo')) {
         for (const s of S.mundo.vivos()) { s.estado = ev.id; s.tEstado = Math.max(0, ev.dur - ev.t); }
       }
-      if (ev && ev.id === 'terremoto') S.extra.tremores = 3;
       // partida de antes da escada (1.2.0) com slimes abaixo do piso: evoluem ao voltar
       if (piso(S) > 1 && (p.slimes || []).some((q) => !q[3] && q[0] < piso(S))) S.extra.evoluir = piso(S);
     },

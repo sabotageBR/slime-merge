@@ -588,6 +588,34 @@ test('mira: um missil por vez, o alvo nao e escolhido duas vezes e o slot reapro
   assert.equal(J.missil, null);
 });
 
+test('mira: o video do missil volta com a mira armada; com o missil no ar ou a partida acabada, so soma', async () => {
+  const { modo, S, J, par } = await doisIguais();
+  J.poderes.mira = 0;
+  modo.eventos.splice(0);
+  modo.poder('mira');
+  assert.ok(modo.eventos.some((e) => e.tipo === 'pedirVideo' && e.id === 'mira'), 'nao pediu o video');
+  assert.equal(J.alvoPoder, '');
+  modo.darPoder('mira');
+  assert.equal(J.poderes.mira, 1);
+  assert.equal(J.alvoPoder, 'mira', 'a mira nao voltou armada');
+  assert.equal(modo.visual().alvo.id, 'mira');
+  assert.ok(modo.hud().poderes.find((p) => p.id === 'mira').ativo, 'o botao nao acendeu');
+  // o toque seguinte no slime dispara o missil
+  modo.apontar(par[0].cx, par[0].cy, 'baixo');
+  assert.ok(J.missil, 'o toque nao disparou');
+  assert.equal(J.poderes.mira, 0);
+  // com o missil no ar: soma e nao arma outro
+  modo.darPoder('mira');
+  assert.equal(J.poderes.mira, 1);
+  assert.equal(J.alvoPoder, '');
+  // partida acabada: soma e nao arma
+  for (let k = 0; k < 60; k++) modo.passo(1 / 60);
+  S.acabou = true;
+  modo.darPoder('mira');
+  assert.equal(J.poderes.mira, 2);
+  assert.equal(J.alvoPoder, '');
+});
+
 test('mira: o fim da partida espera o missil explodir', async () => {
   const { modo, J, par } = await doisIguais();
   modo.poder('mira');

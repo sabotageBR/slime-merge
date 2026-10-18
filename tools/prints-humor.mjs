@@ -1,10 +1,13 @@
 // Folha dos humores de cada slime (2026-10-17) para a aprovacao do usuario: cada humor (neutro,
-// contente, feliz da fusao, amassado, chorinho, apatico, furioso e o berreiro do missil) em cada estilo de
-// personagem com rosto, e um pote de verdade (o bot jogando) com os humores misturados.
+// contente, feliz da fusao, amassado, chorinho, apatico, as 5 caretas da pancada e o berreiro do
+// missil) em cada estilo de personagem com rosto, e um pote de verdade (o bot jogando) com os humores
+// misturados.
 // Chrome headless pelo DevTools Protocol, laco pausado; o humor e posto direto nos slimes e
 // __slime.avancar(0) so desenha. Folha em docs/visuais/humor-<LxA>.jpg e o pote em
 // docs/visuais/humor-pote-<LxA>.jpg.
-// Uso: node tools/prints-humor.mjs [--tam=480x600]
+// Uso: node tools/prints-humor.mjs [--tam=480x600] [--humores=furioso,zonzo,susto,emburrado,xingando --nome=pancada]
+//   --humores: so essas colunas, recortadas em volta do maior slime (com folga em cima para os extras),
+//   na folha docs/visuais/humor-<nome>-<LxA>.jpg (sem o pote); use uma janela grande (--tam=1000x1000)
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -21,7 +24,9 @@ rmSync(pasta, { recursive: true, force: true });
 mkdirSync(pasta, { recursive: true });
 
 const ESTILOS = ['classico', 'kawaii', 'bichinhos', 'monstrinhos', 'chapeus', 'boneco', 'frutinhas'];
-const HUMORES = ['', 'contente', 'feliz', 'amassado', 'chorinho', 'apatico', 'furioso', 'choro'];
+const HUMORES = opt.humores !== undefined ? opt.humores.split(',')
+  : ['', 'contente', 'feliz', 'amassado', 'chorinho', 'apatico', 'furioso', 'zonzo', 'susto', 'emburrado', 'xingando', 'choro'];
+const sufixo = opt.humores !== undefined ? `${opt.nome || 'parcial'}-` : '';
 
 const fechar = await servir(porta);
 const c = await abrirChrome({ largura: W, altura: H, porta: 9376 });
@@ -33,8 +38,12 @@ try {
     await c.ir(`http://127.0.0.1:${porta}/index.html?modelo=1&vitrine=4&semente=3&passos=240&semhud&lang=pt&semanuncio&objeto=${estilo}&zoom=-4.9,-0.3,4.9,4.6`, 3000);
     if (!(await c.avaliar('!!(window.__slime && __slime.J.modo)'))) throw new Error('o jogo nao subiu');
     await c.avaliar('__slime.laco.pausar(true); true');
-    // o zoom enquadra o fundo do pote dentro da #area do HUD: recorta so ele
-    recorte = await c.avaliar(`(() => { const a = __slime.cena.paraTela(-4.9, 4.6); const b = __slime.cena.paraTela(4.9, -0.3);
+    // o zoom enquadra o fundo do pote dentro da #area do HUD: recorta so ele (ou o maior slime, com --humores)
+    recorte = await c.avaliar(sufixo
+      ? `(() => { const v = __slime.J.modo.S.mundo.vivos().sort((a, b) => b.n - a.n)[0];
+        const a = __slime.cena.paraTela(v.cx - v.raio0 * 1.5, v.cy + v.raio0 * 2.1); const b = __slime.cena.paraTela(v.cx + v.raio0 * 1.5, v.cy - v.raio0 * 1.1);
+        return [a[0], a[1], b[0] - a[0], b[1] - a[1]].map(Math.round); })()`
+      : `(() => { const a = __slime.cena.paraTela(-4.9, 4.6); const b = __slime.cena.paraTela(4.9, -0.3);
       return [Math.round(a[0]), Math.round(a[1]), Math.round(b[0] - a[0]), Math.round(b[1] - a[1])]; })()`);
     for (const h of HUMORES) {
       await c.avaliar(`(() => { for (const s of __slime.J.modo.S.mundo.vivos()) { s.dados.expr = '${h}'; s.dados.exprT = 0; } __slime.avancar(0); return true; })()`);
@@ -45,10 +54,12 @@ try {
     }
   }
   // um pote de verdade: o bot jogando 4 min, o humor de cada um vem da fisica
-  await c.ir(`http://127.0.0.1:${porta}/index.html?modelo=1&semente=5&auto=1500&passos=14000&lang=pt&semanuncio`, 4000);
-  await c.avaliar('__slime.laco.pausar(true); __slime.pararAuto(); __slime.avancar(30); true');
-  await espera(60);
-  writeFileSync(join(destino, `humor-pote-${tam}.jpg`.replace('.jpg', '.png')), await c.print());
+  if (!sufixo) {
+    await c.ir(`http://127.0.0.1:${porta}/index.html?modelo=1&semente=5&auto=1500&passos=14000&lang=pt&semanuncio`, 4000);
+    await c.avaliar('__slime.laco.pausar(true); __slime.pararAuto(); __slime.avancar(30); true');
+    await espera(60);
+    writeFileSync(join(destino, `humor-pote-${tam}.png`), await c.print());
+  }
   if (c.erros.length) throw new Error('erro na pagina: ' + c.erros.join(' | '));
 } finally {
   await c.fechar();
@@ -67,9 +78,11 @@ const filtro = celulas.map((_, k) => `[${k}]${corte},scale=${larg}:-1[q${k}]`).j
     const y = k >= col ? Array.from({ length: Math.floor(k / col) }, () => 'h0').join('+') : '0';
     return `${x}_${y}`;
   }).join('|');
-const folha = join(destino, `humor-${tam}.jpg`);
+const folha = join(destino, `humor-${sufixo}${tam}.jpg`);
 execFileSync('ffmpeg', ['-loglevel', 'error', '-y', ...entradas, '-filter_complex', filtro, '-q:v', '3', folha]);
-execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-i', join(destino, `humor-pote-${tam}.png`), '-q:v', '3', join(destino, `humor-pote-${tam}.jpg`)]);
-rmSync(join(destino, `humor-pote-${tam}.png`));
 console.log('folha', folha);
-console.log('pote', join(destino, `humor-pote-${tam}.jpg`));
+if (!sufixo) {
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-i', join(destino, `humor-pote-${tam}.png`), '-q:v', '3', join(destino, `humor-pote-${tam}.jpg`)]);
+  rmSync(join(destino, `humor-pote-${tam}.png`));
+  console.log('pote', join(destino, `humor-pote-${tam}.jpg`));
+}

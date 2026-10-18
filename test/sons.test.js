@@ -6,9 +6,9 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CATEGORIAS, POR_ID, PADRAO, LEGADO, normalizarEscolha, variante, arquivosDa } from '../src/som/catalogo.js';
 import { RECEITAS } from '../src/som/receitas.js';
-import { FRASES, FALAS_DO_JOGO, VOGAIS, tomDoNivel, falar } from '../src/som/falas.js';
+import { FRASES, FALAS_DO_JOGO, VOGAIS, COMBOS, tomDoNivel, falar } from '../src/som/falas.js';
 import { ARQUIVOS } from '../src/som/arquivos.js';
-import { criarSons, pesoDaEscolha, decodificar, INTERVALO_FALA } from '../src/som/sons.js';
+import { criarSons, pesoDaEscolha, decodificar, FOLGA_FALA, PRIORIDADE, VALIDADE, taxaDoNivel } from '../src/som/sons.js';
 import { criarAudio } from '../src/core/audio.js';
 import { contextoAvulso, criarContextoFalso, esvaziar } from './apoio/audio-falso.js';
 
@@ -54,9 +54,9 @@ test('catalogo: o PADRAO (escolha do usuario) e valido, cabe no limite da build,
     assert.ok(v, `${c.id}: ${PADRAO[c.id]}`);
     for (const a of arquivosDa(v)) assert.ok(ARQUIVOS[a], `${c.id}: arquivo ${a} existe`);
   }
-  // o tools/empacotar.mjs falha acima de 120 KB de audio
+  // o tools/empacotar.mjs falha acima de 150 KB de audio (era 120 ate as falas de 2026-10-18)
   const kb = pesoDaEscolha(PADRAO);
-  assert.ok(kb > 0 && kb <= 120, `${kb} KB`);
+  assert.ok(kb > 0 && kb <= 150, `${kb} KB`);
   // a 1a variante de cada categoria continua sendo o som de antes de 2026-10-15
   const antes = { soltar: 'gotaAtual', pouso: 'pousoAtual', fusao: 'fusaoAtual', combo: 'comboBrilho', estouro: 'explodir', chacoalhar: 'descartar', alargar: 'graduar', compra: 'yes', nivelNovo: 'yes', missao: 'yes', fim: 'fimAtual' };
   for (const [cat, receita] of Object.entries(antes)) assert.equal(POR_ID[cat].variantes[0].receita, receita, cat);
@@ -105,7 +105,8 @@ test('arquivos: todo arquivo tem reserva, existe no indice e no disco, sem sobra
   assert.deepEqual(noDisco.sort(), Object.values(ARQUIVOS).map((x) => x.arquivo).sort(), 'disco = indice');
   assert.deepEqual([...usados].sort(), Object.keys(ARQUIVOS).sort(), 'todo arquivo e usado por uma variante');
   const total = Object.values(ARQUIVOS).reduce((s, x) => s + x.kb, 0);
-  assert.ok(total < 150, `arquivos somam ${total} KB`);
+  // o repositorio guarda as duas vozes do locutor (a normal so no Estudio): 28 falas cada
+  assert.ok(total < 350, `arquivos somam ${total} KB`);
 });
 
 test('receitas: todas rodam no contexto falso, agendam fontes, sem NaN, sem instante no passado', () => {
@@ -142,6 +143,12 @@ test('receitas: as palmas e o ruido sao deterministicos (sem Math.random)', () =
 
 test('falas: frases do jogo e do choro, formantes e tom pelo nivel', () => {
   for (const f of ['uau', 'iupi', 'oba', 'eek', 'aww', 'uhuu', 'missao', 'venceu', 'buaa', 'solucos']) assert.ok(FRASES[f], f);
+  // as de 2026-10-18: largada, combo contado, eventos, resgate, reforcos, Duelo e sequencia
+  for (const f of ['pronto', 'vai', 'abaixa', 'objetivo', 'depressa', 'tempo', 'socorro', 'alvo', 'acertou', 'recarga', 'parabens', 'perdeu', 'fogo']) assert.ok(FALAS_DO_JOGO.includes(f), f);
+  for (const k of COMBOS) assert.ok(FALAS_DO_JOGO.includes('combo' + k), 'combo' + k);
+  // o locutor de slime (o PADRAO) tem arquivo para todas as falas do jogo menos o "iupi"
+  const loc = /** @type {any} */ (variante('falas', 'locutorSlime')).arquivos;
+  for (const f of FALAS_DO_JOGO) if (f !== 'iupi') assert.ok(loc[f] && ARQUIVOS[loc[f]], `locutor: ${f}`);
   for (const f of FALAS_DO_JOGO) assert.ok(FRASES[f], f);
   assert.deepEqual([...VOGAIS.a], [800, 1200]);
   assert.deepEqual([...VOGAIS.i], [300, 2300]);
@@ -209,7 +216,7 @@ test('sons: tocar categoria, nome de hoje e variante; nenhum fica quieto', async
   assert.equal(sons.escolha.soltar, PADRAO.soltar);
 });
 
-test('sons: no maximo uma fala a cada 1,2 s, e a musica abaixa enquanto o slime fala', async () => {
+test('sons: uma fala por vez; a mais importante espera a vez, a menos importante e a velha somem', async () => {
   const { audio, ctx } = await audioPronto();
   /** @type {any[]} */
   const abaixou = [];
@@ -217,18 +224,90 @@ test('sons: no maximo uma fala a cada 1,2 s, e a musica abaixa enquanto o slime 
   // o balbucio fala todas as frases (o locutor do PADRAO so fala nos marcos)
   const sons = criarSons({ audio, musica, escolha: { falas: 'balbucio' }, carregarSozinho: false });
   ctx.currentTime = 10;
-  assert.ok(sons.falar('uau', 8) > 0);
+  const d = sons.falar('combo4', 4, 1.04);
+  assert.ok(d > 0);
   assert.equal(abaixou.length, 1);
   assert.equal(abaixou[0][0], 0.7);
   assert.ok(abaixou[0][1] >= 0.6);
-  ctx.currentTime = 10.5;
-  assert.equal(sons.falar('iupi', 3), 0, 'cedo demais');
-  ctx.currentTime = 10 + INTERVALO_FALA + 0.01;
-  assert.ok(sons.falar('iupi', 3) > 0);
+  // no meio da fala: o combo entra na fila, o nivel novo passa na frente dele e o combo seguinte some
+  ctx.currentTime = 10 + d / 2;
+  assert.equal(sons.falar('combo5', 4), 0, 'fila');
+  assert.equal(sons.falar('oba', 5), 0, 'fila: mais importante');
+  assert.equal(sons.falar('combo6', 4), 0, 'menos importante que a da fila');
+  assert.equal(sons.passo(), 0, 'ainda falando');
+  ctx.currentTime = 10 + d + FOLGA_FALA + 0.01;
+  const n = ctx.inicios.length;
+  const d2 = sons.passo();
+  assert.ok(d2 > 0, 'a da fila fala quando a outra acaba');
+  assert.ok(ctx.inicios.length > n);
+  assert.equal(sons.passo(), 0, 'a fila esvaziou');
+  // a fala que espera demais (mais que a VALIDADE dela) nao sai
+  const t2 = ctx.currentTime;
+  assert.equal(sons.falar('combo3', 3), 0);
+  ctx.currentTime = t2 + d2 + FOLGA_FALA + VALIDADE[PRIORIDADE.combo3] + 0.1;
+  assert.equal(sons.passo(), 0, 'o combo velho nao fala');
+  // livre: fala na hora; o semLimite (o ▶ do Estudio) nao entra na fila
+  assert.ok(sons.falar('uau', 8) > 0);
+  ctx.currentTime += 0.1;
+  assert.equal(sons.falar('pronto', 4), 0, 'fila');
+  ctx.currentTime += 3.5;
+  assert.equal(sons.passo(), 0, 'o "pronto" venceu esperando (mais de 3 s)');
+  assert.ok(sons.falarCom('balbucio', 'vai', 4, true) > 0);
   assert.equal(sons.falar('nao-existe'), 0);
   sons.escolher('falas', 'nenhum');
-  ctx.currentTime = 20;
+  ctx.currentTime = 40;
   assert.equal(sons.falar('oba'), 0);
+});
+
+test('sons: o locutor fala mais agudo nos slimes pequenos e grave nos grandes; o combo sobe pela taxa', async () => {
+  assert.equal(taxaDoNivel(8), 1);
+  assert.ok(taxaDoNivel(1) > 1.2 && taxaDoNivel(1) < 1.25);
+  assert.ok(taxaDoNivel(14) > 0.82 && taxaDoNivel(14) < 0.86);
+  for (let k = 1; k < 14; k++) assert.ok(taxaDoNivel(k) > taxaDoNivel(k + 1));
+  const { audio, ctx } = await audioPronto();
+  const buscar = async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(16) });
+  const sons = criarSons({ audio, escolha: { falas: 'locutorSlime' }, base: 'http://x/', buscar, carregarSozinho: false });
+  await sons.carregar();
+  /** a velocidade do ultimo buffer que comecou */
+  const taxa = () => {
+    const no = ctx.inicios.at(-1).no;
+    assert.equal(no.tipo, 'buffer');
+    return no.playbackRate.final();
+  };
+  ctx.currentTime = 1;
+  assert.ok(sons.falar('oba', 2) > 0);
+  assert.equal(taxa(), taxaDoNivel(2));
+  ctx.currentTime = 5;
+  assert.ok(sons.falar('combo5', 4, 1.08) > 0);
+  assert.equal(taxa(), 1.08);
+  ctx.currentTime = 9;
+  assert.ok(sons.falar('pronto') > 0);
+  assert.equal(taxa(), 1, 'sem nivel: a voz de sempre');
+  // o arquivo mais rapido dura menos
+  ctx.currentTime = 13;
+  const dLento = sons.falar('oba', 14);
+  ctx.currentTime = 17;
+  const dRapido = sons.falar('oba', 1);
+  assert.ok(dRapido < dLento);
+});
+
+test('sons: carregar() espera os arquivos que ja estao a caminho', async () => {
+  const { audio } = await audioPronto();
+  /** @type {Function[]} */
+  const soltar = [];
+  const buscar = () => new Promise((ok) => soltar.push(() => ok({ ok: true, arrayBuffer: async () => new ArrayBuffer(16) })));
+  const sons = criarSons({ audio, escolha: { falas: 'locutorSlime' }, base: 'http://x/', buscar, carregarSozinho: false });
+  const a = sons.carregar();
+  await esvaziar();
+  let pronto = false;
+  const b = sons.carregar().then((n) => { pronto = true; return n; });
+  await esvaziar();
+  assert.equal(pronto, false, 'a 2a espera as mesmas cargas');
+  for (const f of soltar) f();
+  const [na, nb] = await Promise.all([a, b]);
+  assert.equal(na, nb);
+  assert.ok(nb > 20);
+  assert.equal(sons.estadoArquivo('vozParabensSlime'), 'pronto');
 });
 
 test('sons: arquivos so depois do pronto, so os da escolha, com a reserva enquanto nao chegam', async () => {

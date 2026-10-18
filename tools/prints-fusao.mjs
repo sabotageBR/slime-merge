@@ -32,7 +32,7 @@ const CENAS = [
   ['super', '', `${POR} const a = por(13, 0, 3); const r = a.raio0; S.mundo.remover(a); por(13, 0, r * 0.8); por(13, 0.4, r * 2.6 + 0.3); true`,
     [2, 3, 70], { 4: 'abraco', 14: 'nasce14', 30: 'comemora', 56: 'estoura', 62: 'super' }],
   ['terremoto', '&auto=1500&passos=6000', `__slime.pararAuto(); __slime.J.modo.S.jogadores[0].jogadas = 9; __slime.J.modo.forcarEvento('terremoto'); true`,
-    [118, 2, 60], { 2: 'comeca', 8: 'treme', 14: 'treme2', 40: 'para' }],
+    [118, 2, 60], { 2: 'comeca', 8: 'treme', 30: 'pico', 58: 'para' }],
 ];
 const quais = opt.cenas ? opt.cenas.split(',') : CENAS.map((c) => c[0]);
 

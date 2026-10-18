@@ -39,8 +39,10 @@ for (const [W, H] of tamanhos) {
     if (!(await c.avaliar('!!(window.__slime && __slime.J.modo)'))) throw new Error('o jogo nao subiu');
     if ((await c.avaliar('__slime.J.chave')) !== 'semfim') falhas.push('a build nao abriu no sem fim');
     if ((await c.avaliar('__slime.perfil.gotas')) !== 20) falhas.push('a sequencia do dia 1 nao pagou 20 gotas');
-    await espera(600);
-    if (await c.avaliar('document.getElementById("aviso").hidden')) falhas.push('o aviso da sequencia nao apareceu');
+    // o aviso da sequencia vem com o "Congratulations!" no primeiro gesto (o audio destrava nele)
+    await c.clicar(Math.round(W / 2), Math.round(H * 0.4));
+    await espera(900);
+    if (await c.avaliar('document.getElementById("aviso").hidden')) falhas.push('o aviso da sequencia nao apareceu no primeiro toque');
     await foto('1-jogo');
 
     // o sem fim nao acaba (2.0.0): o transbordo depois dos 3 min e um "Ufa!" e o jogo segue

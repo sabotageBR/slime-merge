@@ -15,18 +15,60 @@ Kenney - Casino Audio (CC0 1.0)
   fichas.mp3 <- Audio/chips-stack-3.ogg
 
 Kenney - Voiceover Pack (CC0 1.0), voz masculina de Jeffrey M. Smith
+  vozAbaixa.mp3 <- Male/war_get_down.ogg
+  vozAbaixaSlime.mp3 <- Male/war_get_down.ogg (tom x1.35)
+  vozAcertou.mp3 <- Male/war_target_destroyed.ogg
+  vozAcertouSlime.mp3 <- Male/war_target_destroyed.ogg (tom x1.35)
+  vozAlvo.mp3 <- Male/war_target_engaged.ogg
+  vozAlvoSlime.mp3 <- Male/war_target_engaged.ogg (tom x1.35)
+  vozCombo10.mp3 <- Male/10.ogg
+  vozCombo10Slime.mp3 <- Male/10.ogg (tom x1.35)
+  vozCombo3.mp3 <- Male/3.ogg
+  vozCombo3Slime.mp3 <- Male/3.ogg (tom x1.35)
+  vozCombo4.mp3 <- Male/4.ogg
+  vozCombo4Slime.mp3 <- Male/4.ogg (tom x1.35)
+  vozCombo5.mp3 <- Male/5.ogg
+  vozCombo5Slime.mp3 <- Male/5.ogg (tom x1.35)
+  vozCombo6.mp3 <- Male/6.ogg
+  vozCombo6Slime.mp3 <- Male/6.ogg (tom x1.35)
+  vozCombo7.mp3 <- Male/7.ogg
+  vozCombo7Slime.mp3 <- Male/7.ogg (tom x1.35)
+  vozCombo8.mp3 <- Male/8.ogg
+  vozCombo8Slime.mp3 <- Male/8.ogg (tom x1.35)
+  vozCombo9.mp3 <- Male/9.ogg
+  vozCombo9Slime.mp3 <- Male/9.ogg (tom x1.35)
   vozCuidado.mp3 <- Male/war_look_out.ogg
   vozCuidadoSlime.mp3 <- Male/war_look_out.ogg (tom x1.35)
+  vozDepressa.mp3 <- Male/hurry_up.ogg
+  vozDepressaSlime.mp3 <- Male/hurry_up.ogg (tom x1.35)
   vozFim.mp3 <- Male/game_over.ogg
   vozFimSlime.mp3 <- Male/game_over.ogg (tom x1.35)
+  vozFogo.mp3 <- Male/war_fire_in_the_hole.ogg
+  vozFogoSlime.mp3 <- Male/war_fire_in_the_hole.ogg (tom x1.35)
   vozMissao.mp3 <- Male/mission_completed.ogg
   vozMissaoSlime.mp3 <- Male/mission_completed.ogg (tom x1.35)
   vozNivel.mp3 <- Male/level_up.ogg
   vozNivelSlime.mp3 <- Male/level_up.ogg (tom x1.35)
+  vozObjetivo.mp3 <- Male/objective_achieved.ogg
+  vozObjetivoSlime.mp3 <- Male/objective_achieved.ogg (tom x1.35)
+  vozParabens.mp3 <- Male/congratulations.ogg
+  vozParabensSlime.mp3 <- Male/congratulations.ogg (tom x1.35)
+  vozPerdeu.mp3 <- Male/you_lose.ogg
+  vozPerdeuSlime.mp3 <- Male/you_lose.ogg (tom x1.35)
   vozPowerUp.mp3 <- Male/power_up.ogg
   vozPowerUpSlime.mp3 <- Male/power_up.ogg (tom x1.35)
+  vozPronto.mp3 <- Male/ready.ogg
+  vozProntoSlime.mp3 <- Male/ready.ogg (tom x1.35)
+  vozRecarga.mp3 <- Male/war_reloading.ogg
+  vozRecargaSlime.mp3 <- Male/war_reloading.ogg (tom x1.35)
   vozRecorde.mp3 <- Male/new_highscore.ogg
   vozRecordeSlime.mp3 <- Male/new_highscore.ogg (tom x1.35)
+  vozSocorro.mp3 <- Male/war_medic.ogg
+  vozSocorroSlime.mp3 <- Male/war_medic.ogg (tom x1.35)
+  vozTempo.mp3 <- Male/time_over.ogg
+  vozTempoSlime.mp3 <- Male/time_over.ogg (tom x1.35)
+  vozVai.mp3 <- Male/go.ogg
+  vozVaiSlime.mp3 <- Male/go.ogg (tom x1.35)
   vozVenceu.mp3 <- Male/you_win.ogg
   vozVenceuSlime.mp3 <- Male/you_win.ogg (tom x1.35)
 

@@ -7,7 +7,7 @@ import { criarMundo, RAMPA_VEL } from '../fisica/mundo.js';
 import { criarPote, COMBO_JANELA } from './pote.js';
 import { criarRng } from '../core/rng.js';
 import { difundir } from '../cor/difusao.js';
-import { sentir, pancada } from './humor.js';
+import { sentir, pancada, PANCADA } from './humor.js';
 
 export const BASE = ['trocar', 'chacoalhar', 'alargar', 'mira'];
 export const PREMIOS = ['calor', 'gelo', 'tesoura', 'tinta'];
@@ -420,7 +420,7 @@ export function criarSoltar(R, o = {}) {
       S.mundo.remover(s);
       J.pote.preso = null;
       prepararPreso(J);
-      eventos.push({ tipo: 'som', nome: 'trocar' });
+      eventos.push({ tipo: 'som', nome: 'trocar', pote: J.idx });
       gastar(J, id);
     } else if (id === 'chacoalhar') {
       J.pote.sacudir();
@@ -430,7 +430,7 @@ export function criarSoltar(R, o = {}) {
       if (J.pote.alargar()) { eventos.push({ tipo: 'som', nome: 'alargar' }); gastar(J, id); }
     } else {
       J.alvoPoder = id;
-      eventos.push({ tipo: 'som', nome: 'alvo' });
+      eventos.push({ tipo: 'som', nome: 'alvo', id, pote: J.idx });
     }
   }
 
@@ -605,7 +605,7 @@ export function criarSoltar(R, o = {}) {
       }
       for (const s of m.slimes) {
         if (!s.ativo) continue;
-        if (s.dados.exprT > 0) { s.dados.exprT -= dt; if (s.dados.exprT <= 0 && (s.dados.expr === 'feliz' || s.dados.expr === 'furioso')) s.dados.expr = ''; }
+        if (s.dados.exprT > 0) { s.dados.exprT -= dt; if (s.dados.exprT <= 0 && (s.dados.expr === 'feliz' || PANCADA.includes(s.dados.expr))) s.dados.expr = ''; }
         if (s.dados.texturaT < 1) s.dados.texturaT = Math.min(1, s.dados.texturaT + dt * 1.4);
         if (s.dados.solto !== undefined && !s.dados.pousou) {
           if (-s.vy > (s.dados.queda || 0)) s.dados.queda = -s.vy;
@@ -613,7 +613,7 @@ export function criarSoltar(R, o = {}) {
           else if (s.dados.caindo && s.vy > -1) {
             s.dados.pousou = true;
             eventos.push({ tipo: 'pouso', x: s.cx, y: s.base, forca: 1 + s.raio0 * 0.4, cor: s.dados.hex, nivel: s.nivel });
-            // quem levou a pancada (de outro nivel, embaixo) fica furioso
+            // quem levou a pancada (de outro nivel, embaixo) faz uma careta
             pancada(s, s.dados.queda || 0, encostados.get(s.idx) || [], (a, b) => !!R.fusao(S, a, b));
           }
         }
@@ -683,6 +683,8 @@ export function criarSoltar(R, o = {}) {
       J.poderes[id]++;
       eventos.push({ tipo: 'texto', x: J.pote.cx, y: 12.6, texto: '+1', cor: '#ffd23a', escala: 1.1 });
       eventos.push({ tipo: 'som', nome: 'yes' });
+      // o missil volta do video com a mira ja armada (pedido do usuario em 2026-10-18)
+      if (id === 'mira' && J.alvoPoder !== 'mira') usarPoder(J, id);
     },
     bot: () => bot(jogador(0)),
     hud() {
@@ -741,6 +743,8 @@ export function criarSoltar(R, o = {}) {
       return vis;
     },
     reiniciar() {
+      // a partida abandonada no meio (o sem fim nao acaba) ja foi salva como recorde: vale aqui tambem
+      recorde = Math.max(recorde, jogador(0).pontos);
       semente = (semente * 1103515245 + 12345) >>> 0;
       nova(semente, null);
       eventos.push({ tipo: 'nivel', n: 1, acao: 'start' });

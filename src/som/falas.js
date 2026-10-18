@@ -46,6 +46,23 @@ const CONSOANTES = {
  * @property {number} [pausa] silencio depois, s
  */
 
+/** Combos contados em voz (do x3 ao x10; acima disso o selo mostra e o slime fica quieto). */
+export const COMBOS = Object.freeze([3, 4, 5, 6, 7, 8, 9, 10]);
+
+/**
+ * O "iupi" do combo k: a altura sobe 5% por degrau a partir do x3.
+ * @param {number} k
+ * @returns {Silaba[]}
+ */
+function comboFrase(k) {
+  const m = 1 + 0.05 * (k - 3);
+  return [
+    { v: 'i', d: 0.08, f: [1.1 * m, 1.16 * m] },
+    { c: 'y', v: 'u', d: 0.09, f: [1.2 * m, 1.26 * m] },
+    { c: 'p', v: 'i', d: 0.2, f: [1.5 * m, 1.78 * m] },
+  ];
+}
+
 /** @type {Readonly<Record<string, readonly Silaba[]>>} */
 export const FRASES = Object.freeze({
   /** fusao grande */
@@ -54,7 +71,7 @@ export const FRASES = Object.freeze({
   iupi: [{ v: 'i', d: 0.08, f: [1.1, 1.16] }, { c: 'y', v: 'u', d: 0.09, f: [1.2, 1.26] }, { c: 'p', v: 'i', d: 0.2, f: [1.5, 1.78] }],
   /** nivel novo */
   oba: [{ v: 'o', d: 0.11, f: [1.0, 1.06] }, { c: 'b', v: 'a', d: 0.25, f: [1.36, 1.16] }],
-  /** mira apontada / susto */
+  /** aviso de evento (susto) */
   eek: [{ v: 'i', d: 0.22, f: [1.7, 2.1], coda: 'k' }],
   /** fim de partida */
   aww: [{ v: 'a', d: 0.2, f: [1.06, 0.96] }, { c: 'w', v: 'u', d: 0.4, f: [0.95, 0.7], vib: 6 }],
@@ -66,6 +83,33 @@ export const FRASES = Object.freeze({
   venceu: [{ c: 'y', v: 'e', d: 0.12, f: [1.25, 1.35] }, { c: 'y', v: 'e', d: 0.26, f: [1.6, 1.86] }],
   /** choro antes do missil ("buaa") */
   buaa: [{ c: 'b', v: 'u', d: 0.12, f: [1.25, 1.3] }, { v: 'a', d: 0.55, f: [1.3, 0.85], vib: 7 }],
+  /** largada: "re-di?" e "go!" (o "Ready... Go!" do comeco da partida) */
+  pronto: [{ v: 'e', d: 0.1, f: [1.0, 1.04] }, { c: 'd', v: 'i', d: 0.2, f: [1.1, 1.36] }],
+  vai: [{ c: 'k', v: 'o', d: 0.24, f: [1.42, 1.2] }],
+  /** aviso do terremoto ("get down": cai) */
+  abaixa: [{ c: 'k', v: 'e', d: 0.08, f: [1.3, 1.25], coda: 't' }, { c: 'd', v: 'a', d: 0.26, f: [1.2, 0.88] }],
+  /** pedido cumprido ("ta-da-da!") */
+  objetivo: [{ c: 't', v: 'a', d: 0.08, f: [1.0, 1.0] }, { c: 'd', v: 'a', d: 0.08, f: [1.12, 1.12] }, { c: 'd', v: 'a', d: 0.26, f: [1.33, 1.5] }],
+  /** o pedido esta acabando ("ha-ri-ap") */
+  depressa: [{ c: 'h', v: 'a', d: 0.07, f: [1.2, 1.2] }, { c: 'y', v: 'i', d: 0.07, f: [1.26, 1.26] }, { v: 'a', d: 0.1, f: [1.32, 1.4], coda: 'p' }],
+  /** o pedido acabou sem ninguem cumprir (desce) */
+  tempo: [{ c: 't', v: 'a', d: 0.14, f: [1.1, 1.0] }, { v: 'o', d: 0.12, f: [0.95, 0.9] }, { c: 'w', v: 'a', d: 0.22, f: [0.88, 0.74] }],
+  /** "Ufa!": o slime pede socorro ("me-dik!") */
+  socorro: [{ c: 'm', v: 'e', d: 0.12, f: [1.5, 1.62] }, { c: 'd', v: 'i', d: 0.1, f: [1.72, 1.84], coda: 'k' }],
+  /** mira armada ("ta-ket") */
+  alvo: [{ c: 't', v: 'a', d: 0.09, f: [1.1, 1.1] }, { c: 'k', v: 'e', d: 0.1, f: [1.18, 1.12], coda: 't' }],
+  /** o missil acertou ("di-so-toi!") */
+  acertou: [{ c: 'd', v: 'i', d: 0.07, f: [1.2, 1.2] }, { c: 's', v: 'o', d: 0.08, f: [1.3, 1.3] }, { c: 't', v: 'o', d: 0.07, f: [1.32, 1.32] }, { c: 'y', v: 'i', d: 0.2, f: [1.44, 1.12] }],
+  /** trocar a gota ("ri-lo-din") */
+  recarga: [{ v: 'i', d: 0.07, f: [1.1, 1.1] }, { c: 'd', v: 'o', d: 0.08, f: [1.16, 1.16] }, { c: 'd', v: 'i', d: 0.16, f: [1.22, 1.32] }],
+  /** recorde de super slimes e sequencia diaria ("ko-ha-tu-ie!") */
+  parabens: [{ c: 'k', v: 'o', d: 0.09, f: [1.0, 1.0] }, { c: 'h', v: 'a', d: 0.09, f: [1.2, 1.2] }, { c: 't', v: 'u', d: 0.08, f: [1.35, 1.35] }, { c: 'y', v: 'e', d: 0.24, f: [1.5, 1.72] }],
+  /** derrota no Duelo contra a CPU ("iu-uu...") */
+  perdeu: [{ c: 'y', v: 'u', d: 0.14, f: [1.0, 0.95] }, { v: 'u', d: 0.34, f: [0.9, 0.7], vib: 6 }],
+  /** gosma cinza para o rival ("fa-ia-hol!") */
+  fogo: [{ c: 'h', v: 'a', d: 0.1, f: [1.3, 1.35] }, { c: 'y', v: 'a', d: 0.08, f: [1.4, 1.4] }, { c: 'h', v: 'o', d: 0.22, f: [1.5, 1.2] }],
+  /** combo contado: o "iupi" sobe um pouco a cada degrau (o locutor diz o numero) */
+  ...Object.fromEntries(COMBOS.map((k) => [/** @type {string} */ ('combo' + k), comboFrase(k)])),
   /** solucos ("hic hic hic") */
   solucos: [
     { c: 'h', v: 'i', d: 0.08, f: [1.6, 1.4], coda: 'k', pausa: 0.09 },
@@ -78,10 +122,20 @@ export const FRASES = Object.freeze({
  * Ganho por frase: as vogais e a altura mudam a energia que passa pelos formantes; com isto
  * as frases ficam no mesmo RMS (medido no Chrome, nivel 4).
  */
-const GANHO_FRASE = { uau: 0.6, iupi: 1.35, oba: 1, eek: 1.8, aww: 0.55, uhuu: 0.85, missao: 1, venceu: 0.65 };
+const GANHO_FRASE = {
+  uau: 0.6, iupi: 1.35, oba: 1, eek: 1.8, aww: 0.55, uhuu: 0.85, missao: 1, venceu: 0.65,
+  // as de 2026-10-18 pela vogal mais parecida das de cima (sem medida no Chrome ainda)
+  pronto: 1.3, vai: 0.8, abaixa: 0.8, objetivo: 1, depressa: 1, tempo: 0.7, socorro: 1.3, alvo: 1,
+  acertou: 1.2, recarga: 1.3, parabens: 1, perdeu: 0.7, fogo: 0.8,
+  ...Object.fromEntries(COMBOS.map((k) => ['combo' + k, 1.35])),
+};
 
 /** Frases que o jogo fala (as outras sao do choro). */
-export const FALAS_DO_JOGO = Object.freeze(['uau', 'iupi', 'oba', 'eek', 'aww', 'uhuu', 'missao', 'venceu']);
+export const FALAS_DO_JOGO = Object.freeze([
+  'uau', 'iupi', 'oba', 'eek', 'aww', 'uhuu', 'missao', 'venceu',
+  'pronto', 'vai', ...COMBOS.map((k) => 'combo' + k), 'abaixa', 'objetivo', 'depressa', 'tempo', 'socorro',
+  'alvo', 'acertou', 'recarga', 'parabens', 'perdeu', 'fogo',
+]);
 
 /**
  * Tom (f0, Hz) do slime pelo nivel: 1 fala a ~470 Hz, 13 a ~170 Hz, 14 a ~156 Hz.

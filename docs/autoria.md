@@ -276,3 +276,53 @@ Pedidos com prints anotados do Merge Lab (plano em
   física acima de 8 ms (faixas `16` e `16+`) no minuto 5 em ≤ 15%.
 - **Metas do próximo teste (dois PFTs):** média limitada a 30 min ≥ 7:15 (a 2.0.2 teve 6:53; a média
   crua, 7:41, subia com duas sessões de 1 h 33 e 3 h); 5m+ ≥ 46%; 1–2m ≤ 14%; `tempo/15` ≥ 16%.
+
+## 2026-10-18 (noite): terremoto, caretas da pancada e míssil depois do vídeo
+- Pedido (lista do usuário): "1) Terremoto só 1 tremida. 2) As caretas têm que ser variadas quando o slime
+  toma uma na cabeça. Somente com raiva está repetitivo. Quero umas 5 variações. 3) Quando ele clica no
+  míssil e tem que assistir o vídeo, no retorno tem que vir com a mira acionada". Plano em
+  `~/.claude/plans/pasted-content-id-9c33-1-terremoto-idempotent-fox.md`.
+- **Terremoto:** um tremor de 1,8 s, com a mesma força de antes (eram 3, um a cada 2,5 s). O evento dura
+  2,5 s (era 7): o tremor e o assentar.
+- **Caretas da pancada (5, todas de olho aberto):** `furioso` (a de antes: sobrancelha em V, dentes
+  cerrados, rosto vermelho, veia e fumacinha), `zonzo` (vesgo, língua de fora, galo na cabeça e
+  estrelinhas girando), `susto` (olho arregalado com a pupila em pontinho, boca em "O" e tracinhos de impacto; o "!" amarelo
+  saiu no mesmo dia: "e o outro balaozinho que tem exclamação"),
+  `emburrado` (vira a cara, sobrancelha reta, biquinho, bochechas cheias e bufo) e `xingando` (uma
+  sobrancelha em V e a outra erguida, boca gritando e rosto vermelho; o balão com "#@$!" saiu no mesmo
+  dia: "tira esse balaozinho", com o print de um pote). **Rodízio por slime:** cada um
+  começa numa careta (pelo índice) e passa pelas 5 antes de repetir; outra pancada no meio renova o tempo
+  sem trocar o rosto. Não usa o sorteio do jogo (as gotas não mudam). Folha:
+  `docs/visuais/humor-pancada-1000x1000.jpg` (5 caretas × 7 estilos).
+- **Míssil:** o vídeo do reforço acabado volta com a mira armada (a retícula na tela; o próximo toque num
+  slime dispara). Os outros reforços continuam só ganhando +1, porque agem na hora.
+- **Build: versão 2.0.4** (`dist-poki/slime-merge-2.0.4.zip`, com a thumb), pedida pelo usuário depois de
+  tirar os dois balões ("gere a build da poki").
+
+## 2026-10-18 (noite): mais falas do locutor de slime
+- Pedido: "quero adicionar mais falas de slime no jogo, o powerup e mission complete está muito legal.
+  Quero em outros lugares tb, me sugira". Das sugestões (ouvidas numa página com a voz de slime), a
+  escolha: "Inicio: Ready, Go! e os outros eu quero todos de maneira dinamica" e "e aparece Ready go na
+  tela... escrito e some rapido".
+- **Largada:** "Ready?… Go!" no começo de cada partida (sem fim, desafio, cada rodada do Duelo): a fala e o
+  texto grande no meio de cada pote ("Ready?" amarelo, "Go!" verde 0,75 s depois, cada um some em 1,1 s).
+  Em inglês nas 3 línguas, como a fala. Na primeira abertura o áudio ainda não destravou: só o texto.
+- **As outras, todas:** combo contado do x3 ao x10 ("Three!"…"Ten!"; no lugar do "iupi" que o locutor
+  não tinha e calava a fusão grande); aviso de evento ("Get down!" no terremoto, "Power up!" nos de alívio,
+  "Look out!" nos outros); pedido ("Hurry up!" nos 5 s finais, "Objective achieved!", "Time over");
+  "Medic!" no "Ufa!"; "Target engaged" ao armar a mira e "Target destroyed!" no impacto; "Reloading!" no
+  trocar; "New high score!" com o aviso "Novo recorde!" quando o sem fim passa o recorde de antes (uma vez
+  por partida); "Congratulations!" no recorde de super slimes e na sequência diária; Duelo: "Fire in the
+  hole!" na gosma de 2 ou mais, "You lose" na derrota contra a CPU, "You win!" no de 2 jogadores (antes,
+  "Game over" quando o jogador 2 vencia). "It's a tie" ficou de fora: o Duelo não tem empate.
+- **Dinâmica:** a voz do arquivo segue o slime (mais rápida e aguda nos pequenos, grave nos grandes) e o
+  combo sobe 4% por degrau; uma fala por vez, e a mais importante espera a vez em vez de sumir (o "Level
+  up!" passa na frente de um combo; o combo velho não fala).
+- **Sequência diária:** o aviso agora vem no primeiro gesto, junto com o "Congratulations!" (sem gesto,
+  aos 6 s e mudo); antes vinha a 1,2 s, sem áudio.
+- **Peso:** 21 falas novas (~95 KB na voz de slime); a build vai a ~136 KB de áudio e 462 KB gzip. O limite
+  de áudio do empacotar subiu de 120 para 150 KB (a qualidade das vozes ficou em 56 kbps).
+- **Bug junto:** no sem fim, "Recomeçar" no meio da partida fazia a partida nova gravar o recorde antigo
+  por cima do maior (o `soltar.js` só atualizava o recorde no fim, que o sem fim não tem).
+- **Build: versão 2.0.5** (`dist-poki/slime-merge-2.0.5.zip`, com a thumb), pedida pelo usuário depois de
+  testar ("pode gerar a build da poki"): 136,2 KB de áudio, 462 KB gzip.

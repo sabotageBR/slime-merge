@@ -62,7 +62,7 @@ export const FIM_CORINGA = 3;
 export const EVENTOS = Object.freeze({
   coringas: { dur: 20, tipo: 'alivio' }, // as 3 proximas gotas sao prismas
   pedido: { dur: 45, tipo: 'meta' }, // faca um nivel X: premio fisico e gotas
-  terremoto: { dur: 7, tipo: 'caos' }, // tres tremores do pote inteiro
+  terremoto: { dur: 2.5, tipo: 'caos' }, // um tremor do pote inteiro (1,8 s) e o assentar
   gigante: { dur: 15, tipo: 'aperto' }, // a proxima gota e grande
   calor: { dur: 5, tipo: 'alivio' }, // o pote todo amolece e assenta
   gelo: { dur: 8, tipo: 'aperto' }, // o pote todo endurece

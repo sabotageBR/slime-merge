@@ -12,6 +12,8 @@
 // `max`: quantos sons da categoria podem tocar juntos (limite de polifonia).
 // `exemplo`: parametros do ▶ da pagina (k do combo, forca, nivel, i da contagem).
 
+import { COMBOS } from './falas.js';
+
 /**
  * @typedef {object} Variante
  * @property {string} id
@@ -38,8 +40,13 @@
 /** Silencio (combo, interface, falas, choro, palmas). */
 const NENHUM = { id: 'nenhum', nome: 'Nenhum', desc: 'Sem som neste evento.' };
 
-/** Frase -> arquivo do locutor (Voiceover Pack da Kenney). uau usa "power up". */
-const LOCUTOR = { uau: 'vozPowerUp', oba: 'vozNivel', eek: 'vozCuidado', aww: 'vozFim', uhuu: 'vozRecorde', missao: 'vozMissao', venceu: 'vozVenceu' };
+/** Frase -> arquivo do locutor (Voiceover Pack da Kenney). uau usa "power up"; combo3..10, os numeros. */
+const LOCUTOR = {
+  uau: 'vozPowerUp', oba: 'vozNivel', eek: 'vozCuidado', aww: 'vozFim', uhuu: 'vozRecorde', missao: 'vozMissao', venceu: 'vozVenceu',
+  pronto: 'vozPronto', vai: 'vozVai', abaixa: 'vozAbaixa', objetivo: 'vozObjetivo', depressa: 'vozDepressa', tempo: 'vozTempo',
+  socorro: 'vozSocorro', alvo: 'vozAlvo', acertou: 'vozAcertou', recarga: 'vozRecarga', parabens: 'vozParabens', perdeu: 'vozPerdeu',
+  fogo: 'vozFogo', ...Object.fromEntries(COMBOS.map((k) => ['combo' + k, 'vozCombo' + k])),
+};
 const LOCUTOR_SLIME = Object.fromEntries(Object.entries(LOCUTOR).map(([k, v]) => [k, v + 'Slime']));
 
 /** @type {readonly Categoria[]} */
@@ -219,10 +226,10 @@ export const CATEGORIAS = Object.freeze([
     ],
   },
   {
-    id: 'falas', nome: 'Falas', desc: 'O slime comemora e reclama: fusão grande, combo, nível novo, susto, fim, recorde.', voz: true, max: 1, exemplo: { nivel: 4 },
+    id: 'falas', nome: 'Falas', desc: 'O slime comemora e reclama: largada, fusão grande, combo contado, nível novo, eventos, reforços, fim, recorde.', voz: true, max: 1, exemplo: { nivel: 4 },
     variantes: [
       { id: 'balbucio', nome: 'Balbucio de slime', desc: 'Voz sem idioma ("Uau!", "Iupi!", "Oba!", "Aww..."), aguda nos pequenos e grave nos grandes.' },
-      { id: 'locutor', nome: 'Locutor (inglês)', desc: 'Locutor de arcade: "Level up!", "New high score!", "Game over"... Só fala nos marcos.', arquivos: LOCUTOR, reserva: 'balbucio' },
+      { id: 'locutor', nome: 'Locutor (inglês)', desc: 'Locutor de arcade: "Ready... Go!", "Level up!", "Three! Four!", "New high score!", "Game over"... Só fala nos marcos.', arquivos: LOCUTOR, reserva: 'balbucio' },
       { id: 'locutorSlime', nome: 'Locutor de slime', desc: 'O mesmo locutor com voz de slime (mais aguda e rápida).', arquivos: LOCUTOR_SLIME, reserva: 'balbucio' },
       NENHUM,
     ],

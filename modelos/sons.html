@@ -388,7 +388,8 @@ const CONTEXTOS = {
   missao: () => [[0, T('missao')], [150, F('missao', 4)], ...contagem(1100, 3)],
   palmas: () => [[0, T('palmas')], [150, F('uhuu', 3)]],
   fim: () => [[0, T('fim')], [300, F('aww', 6)], ...contagem(1300, 8), [2600, T('palmas')], [2700, F('uhuu', 3)]],
-  falas: () => FALAS_DO_JOGO.map((f, i) => [i * 950, F(f, [8, 2, 5, 1, 6, 3, 4, 10][i])]),
+  // as falas mais longas ("Congratulations!") passam de 1 s: 1,25 s entre elas
+  falas: () => FALAS_DO_JOGO.map((f, i) => [i * 1250, F(f, [8, 2, 5, 1, 6, 3, 4, 10][i % 8])]),
 };
 document.addEventListener('click', async (e) => {
   const b = e.target.closest('[data-contexto]');

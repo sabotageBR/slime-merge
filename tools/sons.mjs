@@ -52,6 +52,12 @@ export const FONTES = [
   ...[
     ['vozPowerUp', 'power_up'], ['vozNivel', 'level_up'], ['vozCuidado', 'war_look_out'], ['vozFim', 'game_over'],
     ['vozRecorde', 'new_highscore'], ['vozMissao', 'mission_completed'], ['vozVenceu', 'you_win'],
+    // falas de 2026-10-18: largada, combo contado, eventos, resgate, reforcos, Duelo e sequencia
+    ['vozPronto', 'ready'], ['vozVai', 'go'],
+    ...[3, 4, 5, 6, 7, 8, 9, 10].map((k) => ['vozCombo' + k, String(k)]),
+    ['vozAbaixa', 'war_get_down'], ['vozObjetivo', 'objective_achieved'], ['vozDepressa', 'hurry_up'], ['vozTempo', 'time_over'],
+    ['vozSocorro', 'war_medic'], ['vozAlvo', 'war_target_engaged'], ['vozAcertou', 'war_target_destroyed'], ['vozRecarga', 'war_reloading'],
+    ['vozParabens', 'congratulations'], ['vozPerdeu', 'you_lose'], ['vozFogo', 'war_fire_in_the_hole'],
   ].flatMap(([id, nome]) => [
     { id, pacote: /** @type {const} */ ('voz'), arquivo: `Male/${nome}.ogg` },
     { id: id + 'Slime', pacote: /** @type {const} */ ('voz'), arquivo: `Male/${nome}.ogg`, pitch: 1.35 },
