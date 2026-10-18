@@ -504,6 +504,28 @@ function tratarEventos() {
         // terremoto: o pote inteiro treme (e o celular, onde da)
         if (e.pote === 0) vibrar([40, 30, 40, 30, 60]);
         break;
+      case 'volta':
+        // rede de seguranca do pote: um slime espetado na parede (ou caido por fora) voltou para dentro
+        sons.tocar('pouso', { forca: 1 });
+        if (e.cor) cena.vfx.respingo(e.x, e.y, e.cor, 6, 4);
+        for (let k = 0; k < 4; k++) cena.vfx.brilho(e.x + (k - 1.5) * 0.4, e.y + ((k * 3) % 4 - 1.5) * 0.3);
+        // quantas vezes isso acontece de verdade (o esperado e quase nunca)
+        if (e.pote === 0) poki.measure('rede', 'volta', 'm' + J.minutos);
+        break;
+      case 'super': {
+        // o 14 comemorou e estourou: o novo alvo depois do ultimo nivel (gotas e recorde)
+        const r = perfil.superSlime(e.n);
+        perfilSujo = true;
+        if (r.gotas) contarGotas(r.gotas, 900);
+        if (r.recorde && e.n > 1) sons.tocar('missao');
+        if (J.chave === 'semfim') poki.measure('super', e.n > 10 ? '10+' : String(e.n), 'm' + J.minutos);
+        break;
+      }
+      case 'comemora':
+        // o ultimo nivel nasceu: incha e estoura em ~2 s
+        sons.falar('uau', e.nivel);
+        vibrar(40);
+        break;
       case 'brilhos':
         // um slime que evoluiu na escada
         if (e.cor) cena.vfx.respingo(e.x, e.y, e.cor, 6, 4);
@@ -909,6 +931,8 @@ function desenharJogo(dt = 0) {
   const h = J.modo.hud();
   // a meta da vez mostra as gotas da descoberta quando o nivel ainda e novo para o jogador
   if (h.objetivo && h.objetivo.novo) h.objetivo = { ...h.objetivo, premio: PREMIO_DESCOBERTA };
+  // depois do 14: os super slimes da partida e o recorde do jogador
+  if (h.objetivo && h.objetivo.supers) h.objetivo = { supers: { ...h.objetivo.supers, recorde: Math.max(perfil.recordeSupers, h.objetivo.supers.n) } };
   metaDaVez(h);
   // no desafio, o lugar do recorde mostra a meta do dia (com o ✓ quando o premio ja saiu)
   if (J.chave === 'desafio') h.recorde = formatar(T.meta, { n: fmtNumero(J.meta) }) + (J.premiado || (h.pontos || 0) >= J.meta ? ' ✓' : '');

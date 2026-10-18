@@ -1,5 +1,5 @@
 // Folha dos humores de cada slime (2026-10-17) para a aprovacao do usuario: cada humor (neutro,
-// contente, amassado, chorinho, apatico, furioso e o berreiro do missil) em cada estilo de
+// contente, feliz da fusao, amassado, chorinho, apatico, furioso e o berreiro do missil) em cada estilo de
 // personagem com rosto, e um pote de verdade (o bot jogando) com os humores misturados.
 // Chrome headless pelo DevTools Protocol, laco pausado; o humor e posto direto nos slimes e
 // __slime.avancar(0) so desenha. Folha em docs/visuais/humor-<LxA>.jpg e o pote em
@@ -21,7 +21,7 @@ rmSync(pasta, { recursive: true, force: true });
 mkdirSync(pasta, { recursive: true });
 
 const ESTILOS = ['classico', 'kawaii', 'bichinhos', 'monstrinhos', 'chapeus', 'boneco', 'frutinhas'];
-const HUMORES = ['', 'contente', 'amassado', 'chorinho', 'apatico', 'furioso', 'choro'];
+const HUMORES = ['', 'contente', 'feliz', 'amassado', 'chorinho', 'apatico', 'furioso', 'choro'];
 
 const fechar = await servir(porta);
 const c = await abrirChrome({ largura: W, altura: H, porta: 9376 });

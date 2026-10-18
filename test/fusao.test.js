@@ -1,5 +1,5 @@
 // Fusao animada (2026-10-17): os iguais se abracam, escoam num corpo so e estalam; 3 juntos pulam
-// um nivel; o super slime do 13 segura um instante antes de estourar. E o tremor do terremoto.
+// um nivel; o 14 (2026-10-18) comemora e estoura: e o super slime. E o tremor do terremoto.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { criarModo } from '../src/jogo/modos/merge.js';
@@ -160,36 +160,38 @@ test('a mira, o bot e o "Ufa!" nao pegam quem esta fundindo', () => {
   assert.equal(S.fusoes.length, 0);
 });
 
-test('super slime: dois do 13 (ou tres do 12) viram um corpo so, seguram ~1 s e estouram', () => {
+test('super slime: dois do 13 (ou tres do 12) fazem o 14, que comemora ~2 s e estoura', () => {
   for (const [k, qtd] of [[13, 2], [12, 3]]) {
     const modo = merge();
     const S = modo.S;
     const s0 = por(modo, { nivel: k }, 0, 3);
     const r = s0.raio0;
     S.mundo.remover(s0);
-    const xs = qtd === 2 ? [-r, r] : [-1.6 * r, 0, 1.6 * r];
-    for (const x of xs) por(modo, { nivel: k }, x, qtd === 2 ? r + 0.1 : r + (x === 0 ? 2 * r : 0.1));
-    let segurou = 0;
+    // empilhados no meio do pote (lado a lado eles nao cabem entre as paredes)
+    for (let q = 0; q < qtd; q++) por(modo, { nivel: k }, 0, r + 0.1 + q * (2 * r + 0.2));
+    let comemorou = 0;
     let estouro = -1;
     const ev = [];
-    for (let f = 0; f < 600 && estouro < 0; f++) {
+    for (let f = 0; f < 900 && estouro < 0; f++) {
       modo.passo(1 / 60);
       const e = modo.eventos.splice(0);
       ev.push(...e);
       const so = soltos(modo);
-      if (so.length === 1 && so[0].dados.super) {
-        segurou++;
+      if (so.length === 1 && so[0].nivel === MAX_NIVEL && S.fusoes.some((F) => F.fase === 'comemora')) {
+        comemorou++;
         const m = S.mundo;
-        assert.equal(m.iniSl[so[0].idx + 1] - m.iniSl[so[0].idx], qtd * particulasNivel(k), 'o super slime perdeu particulas');
+        assert.equal(m.iniSl[so[0].idx + 1] - m.iniSl[so[0].idx], particulasNivel(MAX_NIVEL), 'o 14 perdeu particulas');
       }
       if (e.some((x) => x.tipo === 'estouro')) estouro = f;
     }
     assert.ok(estouro > 0, `${k}: nao estourou`);
-    assert.ok(segurou / 60 >= FUSAO.segura - 0.1, `${k}: segurou so ${segurou / 60} s`);
-    assert.ok(ev.some((e) => e.tipo === 'texto' && e.texto === 'perfeito'));
+    assert.ok(comemorou / 60 >= FUSAO.comemora - 0.1, `${k}: comemorou so ${comemorou / 60} s`);
+    assert.ok(ev.some((e) => e.tipo === 'texto' && e.texto === 'super'));
+    assert.ok(ev.some((e) => e.tipo === 'registro' && e.chave === 'nivel' && e.valor === MAX_NIVEL), `${k}: o 14 nao foi registrado`);
     assert.ok(!ev.some((e) => e.tipo === 'registro' && e.chave === 'nivel' && e.valor > MAX_NIVEL));
     assert.equal(soltos(modo).length, 0);
-    assert.equal(S.jogadores[0].pontos, pontosNivel(MAX_NIVEL) * 2 * qtd);
+    const estalo = qtd >= 3 ? pontosNivel(MAX_NIVEL - 1) + pontosNivel(MAX_NIVEL) : pontosNivel(MAX_NIVEL);
+    assert.equal(S.jogadores[0].pontos, estalo + pontosNivel(MAX_NIVEL) * 2 * qtd);
   }
 });
 
@@ -326,7 +328,7 @@ test('tremor: o pote treme e volta exato; a pilha nao perde particulas; o Alarga
   let maxTx = 0;
   for (let f = 0; f < 150; f++) {
     modo.passo(1 / 60);
-    fora += modo.eventos.splice(0).filter((e) => e.tipo === 'fora' || e.tipo === 'resgate').length;
+    fora += modo.eventos.splice(0).filter((e) => e.tipo === 'volta' || e.tipo === 'resgate').length;
     maxTx = Math.max(maxTx, Math.abs(S.mundo.paredes[idx[0]].tx));
     if (f === 60) assert.ok(soltos(modo).every((s) => !s.dormindo), 'alguem dormiu com o pote tremendo');
   }

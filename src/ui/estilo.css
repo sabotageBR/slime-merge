@@ -59,6 +59,19 @@ body[data-orient="paisagem"] #base { flex-direction: column; justify-content: ce
 .placar .pontos b { font-size: 1.9em; color: var(--azulTexto); -webkit-text-stroke-color: #fff; text-shadow: 0 0.09em 0 var(--tinta); }
 .placar .pontos b::before { content: attr(data-rotulo); }
 .placar .recorde b { font-size: 1.15em; }
+.placar .pontos b i { font-style: normal; }
+/* retrato (celular): o botao da Poki fica no canto de cima a esquerda (~53 x 38 px a ~20 px do topo;
+   print do iPhone, 2026-10-18). O placar comeca depois dele, numa linha so, e o rotulo dos pontos
+   some (fica o numero; o recorde continua com o nome) */
+body[data-orient="retrato"] .placar { padding-left: 58px; padding-top: 2px; }
+body[data-orient="retrato"] #topo, body[data-orient="retrato"] .placar > div { min-width: 0; }
+body[data-orient="retrato"] .placar b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body[data-orient="retrato"] .placar .pontos b i { display: none; }
+/* telas estreitas (menos de 380 px): ao lado do botao nao cabe o numero; o placar desce para baixo dele */
+@media (max-width: 379px) {
+  body[data-orient="retrato"] .placar { padding-left: 0; padding-top: 50px; }
+  body[data-orient="retrato"] .placar .pontos b { font-size: 1.6em; }
+}
 .proximo {
   position: relative; width: 4.4em; height: 4.4em; border-radius: 0.9em; background: var(--turquesa);
   border: 0.17em solid var(--tinta); box-shadow: 0 0.17em 0 var(--tinta); display: grid; place-items: center;
@@ -182,6 +195,7 @@ body[data-orient="paisagem"] #meta { flex-direction: row; justify-content: cente
   border: 0.15em solid var(--tinta); box-shadow: 0 0.14em 0 var(--tinta); font-size: 0.82em; white-space: nowrap; }
 .objetivo.cresce { background: #e4faf7; }
 .objetivo.missao { background: #fff4d1; }
+.objetivo.super { background: linear-gradient(90deg, #fff4c2, #ffe08a); }
 /* eventos da pressao do sem fim: a cor pelo tipo; o aviso (2 s antes) pulsa */
 .objetivo.evento.alivio { background: #e3f9dc; }
 .objetivo.evento.aperto { background: #ffe2d6; }
@@ -329,7 +343,7 @@ body[data-orient="paisagem"] .gradeLoja { grid-template-columns: repeat(4, 1fr);
    cartoes do nivel aberto (a miniatura chega depois: ate la, o circulo na cor da skin) */
 .niveisSkin { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(7, 2.25em); justify-content: center; gap: 0.3em 0.35em;
   padding-bottom: 0.2em; font-size: 0.8em; }
-body[data-orient="paisagem"] .niveisSkin { grid-template-columns: repeat(13, 2.1em); gap: 0.3em; }
+body[data-orient="paisagem"] .niveisSkin { grid-template-columns: repeat(14, 2.1em); gap: 0.3em; }
 .nivelSkin { font: inherit; width: 100%; aspect-ratio: 1; border-radius: 50%; border: 0.14em solid var(--tinta); cursor: pointer;
   background: var(--c, #2c2c34); color: #fff; -webkit-text-stroke: 0.16em var(--tinta); paint-order: stroke fill; padding: 0; }
 .nivelSkin.atual { outline: 0.2em solid var(--turquesa); outline-offset: 0.1em; }
@@ -386,23 +400,45 @@ body.sem-hud #hud > * { visibility: hidden; }
 .bequer .vidro { fill: none; stroke: var(--tinta); stroke-width: 6; stroke-linejoin: round; stroke-linecap: round; }
 .bequer .brilho { fill: none; stroke: #fff; stroke-width: 7; stroke-linecap: round; opacity: 0.85; }
 .bequer .marcas { fill: none; stroke: var(--azulTexto); stroke-width: 3; stroke-linecap: round; }
-/* o nivel sobe depressa e vai desacelerando (o jogo costuma ficar pronto antes do fim) */
-.bequer .nivel { transform: translateY(200px); animation: encher 6s cubic-bezier(0.12, 0.7, 0.3, 1) forwards; }
-@keyframes encher { to { transform: translateY(68px); } }
-.bequer .onda { animation: onda 1.1s linear infinite; }
-@keyframes onda { to { transform: translateX(-60px); } }
-.bequer .onda path { fill: #7fe36b; stroke: var(--tinta); stroke-width: 5; stroke-linejoin: round; }
-.bequer .cara { animation: boia 1.1s ease-in-out infinite; }
-@keyframes boia { 50% { transform: translateY(4px); } }
-.bequer .olho { transform-box: fill-box; transform-origin: center; animation: piscaCarga 3.2s infinite; }
-.bequer .olho ellipse { fill: #fff; stroke: var(--tinta); stroke-width: 4; }
+/* camadas (2026-10-18): uma gota de cada nivel cai do bico e vira uma camada daquela cor; os
+   atrasos (--d, no index.html) vao alargando, e o jogo costuma ficar pronto antes do fim */
+.bequer .camada { transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(0); animation: camada 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) var(--d) forwards; }
+@keyframes camada { to { transform: scaleY(1); } }
+.bequer .ondinha { animation: ondinha 2.6s linear infinite; }
+.bequer .ondinha.volta { animation-direction: reverse; }
+@keyframes ondinha { to { transform: translateX(-30px); } }
+.bequer .ondinha .linha { fill: none; stroke: var(--tinta); stroke-width: 2.8; stroke-linejoin: round; }
+.bequer .pingo { stroke: var(--tinta); stroke-width: 3; stroke-linejoin: round; opacity: 0; animation: pingo 0.3s ease-in calc(var(--d) - 0.3s) forwards; }
+@keyframes pingo { 0%, 85% { opacity: 1; } 0% { transform: translateY(0); } 100% { opacity: 0; transform: translateY(var(--y)); } }
+/* cheio, as gotas seguem pingando, cada uma de uma cor */
+.bequer .pingoFim { stroke: var(--tinta); stroke-width: 3; stroke-linejoin: round; opacity: 0; fill: #3295df;
+  animation: pingoFim 0.9s ease-in 6.4s infinite, pingoCor 5.4s steps(1) 6.4s infinite; }
+@keyframes pingoFim { 0%, 80% { opacity: 1; } 0% { transform: translateY(0); } 100% { opacity: 0; transform: translateY(80px); } }
+@keyframes pingoCor { 0% { fill: #3295df; } 17% { fill: #569c5b; } 33% { fill: #7b5098; } 50% { fill: #dc3a55; } 67% { fill: #e86148; } 83% { fill: #ffd528; } }
+/* a carinha boia na camada de cima, de olhos abertos (nenhuma animacao de olho fechado) */
+.bequer .cara { opacity: 0; transform: translateY(204px); animation: caraSobe 6.2s linear forwards; }
+@keyframes caraSobe {
+  0% { opacity: 0; transform: translateY(204px); }
+  5% { transform: translateY(204px); }
+  10% { transform: translateY(193px); }
+  16% { opacity: 1; transform: translateY(182px); }
+  23% { transform: translateY(171px); }
+  29% { transform: translateY(160px); }
+  36% { transform: translateY(149px); }
+  44% { transform: translateY(138px); }
+  52% { transform: translateY(127px); }
+  60% { transform: translateY(116px); }
+  68% { transform: translateY(105px); }
+  78% { transform: translateY(94px); }
+  87% { transform: translateY(83px); }
+  97% { transform: translateY(72px); }
+  100% { opacity: 1; transform: translateY(72px); }
+}
+.bequer .boia { animation: boia 1.1s ease-in-out infinite; }
+@keyframes boia { 50% { transform: translateY(3px); } }
+.bequer .olho ellipse { fill: #fff; stroke: var(--tinta); stroke-width: 3.5; }
 .bequer .olho circle { fill: var(--tinta); }
-@keyframes piscaCarga { 0%, 90%, 100% { transform: scaleY(1); } 94% { transform: scaleY(0.1); } }
-.bequer .boca { fill: none; stroke: var(--tinta); stroke-width: 4; stroke-linecap: round; }
-.bequer .gota { fill: #7fe36b; stroke: var(--tinta); stroke-width: 3; stroke-linejoin: round; opacity: 0; animation: pinga 1.2s ease-in infinite; }
-.bequer .g2 { animation-delay: 0.4s; }
-.bequer .g3 { animation-delay: 0.8s; }
-@keyframes pinga { 0% { transform: translateY(0); opacity: 0; } 12%, 75% { opacity: 1; } 100% { transform: translateY(120px); opacity: 0; } }
+.bequer .boca { fill: none; stroke: var(--tinta); stroke-width: 3.5; stroke-linecap: round; }
 #carregando .pontinhos { display: flex; gap: 0.5em; }
 #carregando .pontinhos i {
   width: 0.75em; height: 0.75em; border-radius: 50%; background: #fff; border: 0.18em solid var(--tinta);
@@ -412,5 +448,7 @@ body.sem-hud #hud > * { visibility: hidden; }
 #carregando .pontinhos i:nth-child(3) { animation-delay: 0.3s; }
 @keyframes saltinho { 30% { transform: translateY(-0.45em); } 60% { transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) {
-  #carregando *, #carregando .bequer .nivel { animation-duration: 0.01s; animation-iteration-count: 1; }
+  #carregando * { animation: none !important; }
+  #carregando .bequer .camada { transform: none; }
+  #carregando .bequer .cara { opacity: 1; transform: translateY(72px); }
 }

@@ -148,8 +148,8 @@ function combo(ctx, cam, c, t, W, H) {
 
 /**
  * Aura das fusoes em andamento: um halo em volta do grupo que cresce no abraco (com brilhinhos
- * girando), um anel que abre quando os iguais viram um corpo so, e o vermelho-brasa pulsando do
- * super slime que vai estourar.
+ * girando), um anel que abre quando os iguais viram um corpo so, e o dourado pulsando do 14 que
+ * comemora e vai estourar (o super slime), com estrelas girando.
  * @param {CanvasRenderingContext2D} ctx @param {import('./camera.js').Camera} cam
  * @param {{ x: number, y: number, r: number, fase: string, p: number }[]} lista
  * @param {number} t
@@ -158,8 +158,8 @@ function auras(ctx, cam, lista, t) {
   for (const f of lista) {
     const [sx, sy] = paraTela(cam, f.x, f.y);
     const r = Math.max(10, f.r * cam.s);
-    const segura = f.fase === 'segura';
-    const rgb = segura ? '255, 120, 40' : '255, 248, 214';
+    const comemora = f.fase === 'comemora';
+    const rgb = comemora ? '255, 200, 60' : '255, 248, 214';
     const forca = f.fase === 'atrai' ? 0.35 + 0.5 * f.p : f.fase === 'funde' ? 0.85 * (1 - f.p) + 0.15 : 0.55 + 0.35 * f.p + 0.15 * Math.sin(t * 22);
     const g = ctx.createRadialGradient(sx, sy, r * 0.72, sx, sy, r * 1.4);
     g.addColorStop(0, `rgba(${rgb}, 0)`);
@@ -169,10 +169,11 @@ function auras(ctx, cam, lista, t) {
     ctx.beginPath();
     ctx.arc(sx, sy, r * 1.4, 0, Math.PI * 2);
     ctx.fill();
-    if (f.fase === 'atrai') {
-      // brilhinhos girando em volta do grupo
-      for (let k = 0; k < 4; k++) {
-        const a = t * 3 + (k * Math.PI) / 2;
+    if (f.fase === 'atrai' || comemora) {
+      // brilhinhos girando em volta do grupo (na comemoracao, mais e mais depressa)
+      const q = comemora ? 6 : 4;
+      for (let k = 0; k < q; k++) {
+        const a = t * (comemora ? 5 : 3) + (k * 2 * Math.PI) / q;
         estrela(ctx, sx + Math.cos(a) * r * 1.08, sy + Math.sin(a) * r * 1.08, Math.max(4, r * 0.09) * (0.7 + 0.5 * f.p));
       }
     } else if (f.fase === 'funde') {

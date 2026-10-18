@@ -363,4 +363,25 @@ export const CANDIDATAS = [
       '0000565005650000', '0000550000550000', '0205000000005020', '0000000000000000',
     ],
   },
+  // ---- nivel 14 (2026-10-18: o ultimo nivel, que comemora e estoura)
+  {
+    id: 'trofeu', nivel: 14, nome: 'Troféus', tipo: 'pixel', preco: precoSugerido('pixel', 14), pig: [0.45, 0.62, 0, 0.04], modo: 0, escala: 0.85, nota: 'Taças douradas no veludo roxo.',
+    px: [
+      '0000000000000000', '0006666666600000', '0656666666656000', '0606666626606000',
+      '0656666626656000', '0006666666600000', '0000666666000000', '0000066660000000',
+      '0000006600000000', '0000006600000000', '0000066660000000', '0000555555000000',
+      '0000555555000000', '0000000000000000', '0000000000002000', '0000000000000000',
+    ],
+  },
+  {
+    id: 'coroas', nivel: 14, nome: 'Coroas', tipo: 'pixel', preco: precoSugerido('pixel', 14), pig: [0.82, 0.42, 0, 0.02], modo: 0, escala: 0.85, nota: 'Coroas com rubis no azul real.',
+    px: [
+      '0000000000000000', '0000000000000000', '0060006000600000', '0066066606600000',
+      '0066666666600000', '0064666466400000', '0066666666600000', '0055555555500000',
+      '0000000000000000', '0000000000000200', '0000000000000000', '0000000000000000',
+      '0002000000000000', '0000000000000000', '0000000000000000', '0000000000000000',
+    ],
+  },
+  { id: 'arcoNeon', nivel: 14, nome: 'Arco-íris neon', tipo: 'proc', preco: precoSugerido('proc', 14), pig: [0.1, 0.1, 0.1, 0], proc: PROC.faixas, cor: '#ffffff', escala: 0.9, nota: 'Faixas de arco-íris bem vivas.' },
+  { id: 'confeteOuro', nivel: 14, nome: 'Confete de ouro', tipo: 'proc', preco: precoSugerido('proc', 14), pig: [0.62, 0.42, 0, 0.3], proc: PROC.confete, cor: '#ffd23a', escala: 1.1, nota: 'Confete dourado na noite da festa.' },
 ];

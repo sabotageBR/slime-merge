@@ -253,9 +253,10 @@ function sobrancelhasTristes(ctx, tr, olhos, re, traco) {
 function kawaii(ctx, s, t, escala) {
   const { R, a11, a22, tr } = quadro(s);
   const traco = Math.max(0.04, 1.8 / escala);
-  const fase = (t + s.idx * 1.37) % (3.1 + (s.idx % 5) * 0.53);
-  const pisca = fase < 0.12;
   brilhoCartum(ctx, s);
+  const ek = s.dados.expr || '';
+  // olhos sempre abertos (2026-10-18): sem piscar, sem ^ ^ nem > <
+  const choroso = ek === 'choro' || ek === 'chorinho';
   for (const lado of [-1, 1]) {
     const [ex, ey] = tr(lado * 0.34 * R, 0.12 * R);
     const rx = 0.2 * R * a11;
@@ -264,30 +265,39 @@ function kawaii(ctx, s, t, escala) {
     ctx.strokeStyle = TINTA;
     ctx.lineWidth = traco * 1.3;
     ctx.beginPath();
-    const ek = s.dados.expr || '';
-    if (ek === 'amassado') {
-      ctx.moveTo(ex - lado * rx * 0.9, ey + ry * 0.45);
-      ctx.lineTo(ex + lado * rx * 0.5, ey);
-      ctx.lineTo(ex - lado * rx * 0.9, ey - ry * 0.45);
-      ctx.stroke();
-    } else if (ek === 'apatico') {
-      // meio fechado: a linha da palpebra e a metade de baixo do olho
-      ctx.ellipse(ex, ey - ry * 0.25, rx, ry * 0.55, 0, Math.PI, Math.PI * 2);
-      ctx.closePath();
+    if (ek === 'amassado' || ek === 'medo') {
+      // arregalado: o branco aparece e a pupila encolhe
+      ctx.fillStyle = '#ffffff';
+      ctx.lineWidth = traco;
+      ctx.ellipse(ex, ey, rx * 1.05, ry * 1.05, 0, 0, Math.PI * 2);
       ctx.fill();
-    } else if (pisca || ek === 'feliz' || ek === 'choro' || ek === 'chorinho') {
-      ctx.arc(ex, ey - ry * 0.2, rx * 0.9, Math.PI * 0.15, Math.PI * 0.85);
       ctx.stroke();
-    } else {
-      ctx.ellipse(ex, ey, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fillStyle = TINTA;
+      ctx.beginPath();
+      ctx.ellipse(ex, ey - ry * 0.1, rx * 0.45, ry * 0.45, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(ex - rx * 0.32, ey + ry * 0.35, rx * 0.36, 0, Math.PI * 2);
+      ctx.arc(ex - rx * 0.15, ey + ry * 0.05, rx * 0.14, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // o apatico tem o olho um pouco menor e o brilho caido (olha para baixo, de lado)
+      const apat = ek === 'apatico';
+      const ryo = ry * (apat ? 0.8 : 1);
+      ctx.ellipse(ex, ey, rx, ryo, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (choroso) aguaNoOlho(ctx, ex, ey, rx, ryo);
+      const grande = choroso || ek === 'feliz' ? 1.25 : 1;
+      const dx = apat ? (s.idx % 2 ? 0.25 : -0.25) * rx : 0;
+      const dy = apat ? -0.45 * ryo : 0;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(ex - rx * 0.32 + dx, ey + ryo * 0.35 + dy, rx * 0.36 * grande, 0, Math.PI * 2);
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(ex + rx * 0.35, ey - ry * 0.35, rx * 0.17, 0, Math.PI * 2);
+      ctx.arc(ex + rx * 0.35 + dx, ey - ryo * 0.35 + dy, rx * 0.17 * grande, 0, Math.PI * 2);
       ctx.fill();
+      if (apat) olhoDoHumor(ctx, s, ex, ey, rx, ryo, traco);
     }
     // bochecha
     const [bx, by] = tr(lado * 0.56 * R, -0.12 * R);
@@ -297,10 +307,11 @@ function kawaii(ctx, s, t, escala) {
     ctx.fill();
   }
   if (s.dados.expr === 'furioso') sobrancelhasBravas(ctx, tr, [[-0.34 * R, 0.12 * R], [0.34 * R, 0.12 * R]], 0.2 * R, traco);
+  if (choroso) sobrancelhasTristes(ctx, tr, [[-0.34 * R, 0.12 * R], [0.34 * R, 0.12 * R]], 0.2 * R, traco);
   if (s.n >= 10 && s.dados.expr === 'choro') {
     bocaBerreiro(ctx, tr, R, t, traco, 0.7);
   } else if (s.n >= 10 && bocaDoHumor(ctx, s, tr, R, t, traco, 0.75)) {
-    // boca do humor (contente, apatico, chorinho, furioso)
+    // boca do humor (contente, amassado, apatico, chorinho, furioso)
   } else if (s.n >= 10) {
     const [mx, my] = tr(0, -0.12 * R);
     ctx.strokeStyle = TINTA;
@@ -588,6 +599,13 @@ function chapeu(ctx, s, escala) {
       }
       break;
     }
+    case 14:
+      // coroa (o 14, 2026-10-18)
+      poli([[-0.6, 0], [0.6, 0], [0.72, 0.8], [0.34, 0.42], [0, 0.9], [-0.34, 0.42], [-0.72, 0.8]], '#ffd23a');
+      bola(0, 0.92, 0.11, '#ff4d6d');
+      bola(-0.72, 0.82, 0.08, '#5fd9ff');
+      bola(0.72, 0.82, 0.08, '#5fd9ff');
+      break;
     case 'prisma': poli([[-0.5, -0.05], [0.5, -0.05], [0, 1.1]], '#7fe36b'); bola(0, 1.12, 0.12, '#ff6fa8'); break;
     default: break;
   }
@@ -632,58 +650,28 @@ function desenharRosto(ctx, s, t, alvo, escala, fator = 1) {
 
   const expr = s.dados.expr || '';
   const re = Math.max(0.13, 0.27 * R);
-  // piscar: cada slime no seu ritmo
-  const fase = (t + s.idx * 1.37) % (3.1 + (s.idx % 5) * 0.53);
-  const piscada = fase < 0.12 ? 0.12 : 1;
+  // olhos sempre abertos (pedido do usuario em 2026-10-18: nenhuma animacao de olho fechado, nem
+  // piscar): a expressao vem da pupila, do brilho, da agua no olho, da sobrancelha e da boca
+  const choroso = expr === 'choro' || expr === 'chorinho';
+  const arregala = expr === 'medo' || expr === 'amassado';
   for (const lado of [-1, 1]) {
     const [ex, ey] = tr(lado * 0.36 * R, 0.16 * R);
-    const rx = re * a11 * (expr === 'medo' ? 1.15 : 1);
-    const ry = re * a22 * (expr === 'medo' ? 1.2 : 1.08) * piscada;
-    if (expr === 'choro' || expr === 'chorinho') {
-      // olhos espremidos de choro (arco para cima) e sobrancelha triste
-      ctx.strokeStyle = TINTA;
-      ctx.lineWidth = traco * 1.5;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(ex - rx * 0.85, ey - ry * 0.2);
-      ctx.quadraticCurveTo(ex, ey + ry * 0.75, ex + rx * 0.85, ey - ry * 0.2);
-      ctx.stroke();
-      ctx.lineWidth = traco * 1.3;
-      ctx.beginPath();
-      ctx.moveTo(...tr(lado * 0.36 * R + lado * re * 0.9, 0.16 * R + re * 1.05));
-      ctx.lineTo(...tr(lado * 0.36 * R - lado * re * 0.55, 0.16 * R + re * 1.5));
-      ctx.stroke();
-      continue;
-    }
-    if (expr === 'feliz' || expr === 'amassado') {
-      // ^ ^ (feliz) ou > < (amassado)
-      ctx.strokeStyle = TINTA;
-      ctx.lineWidth = traco * 1.4;
-      ctx.beginPath();
-      if (expr === 'feliz') {
-        ctx.moveTo(ex - rx * 0.8, ey - ry * 0.1);
-        ctx.lineTo(ex, ey + ry * 0.55);
-        ctx.lineTo(ex + rx * 0.8, ey - ry * 0.1);
-      } else {
-        ctx.moveTo(ex - lado * rx * 0.8, ey + ry * 0.5);
-        ctx.lineTo(ex + lado * rx * 0.5, ey);
-        ctx.lineTo(ex - lado * rx * 0.8, ey - ry * 0.5);
-      }
-      ctx.stroke();
-      continue;
-    }
+    const rx = re * a11 * (arregala ? 1.15 : 1);
+    const ry = re * a22 * (arregala ? 1.2 : 1.08);
     ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = TINTA;
     ctx.lineWidth = traco;
     ctx.beginPath();
     ctx.ellipse(ex, ey, rx, ry, 0, 0, Math.PI * 2);
     ctx.fill();
+    if (choroso) aguaNoOlho(ctx, ex, ey, rx, ry);
+    ctx.beginPath();
+    ctx.ellipse(ex, ey, rx, ry, 0, 0, Math.PI * 2);
     ctx.stroke();
-    if (piscada < 1) continue;
     const furioso = expr === 'furioso';
-    // pupila olhando para o alvo (ou para baixo)
+    // pupila olhando para o alvo (ou para baixo; o feliz olha para cima)
     let lx = 0;
-    let ly = -0.6;
+    let ly = expr === 'feliz' ? 0.45 : -0.6;
     if (alvo) {
       lx = alvo[0] - ex;
       ly = alvo[1] - ey;
@@ -691,7 +679,7 @@ function desenharRosto(ctx, s, t, alvo, escala, fator = 1) {
       lx /= l;
       ly /= l;
     }
-    const pr = rx * (expr === 'medo' || furioso ? 0.38 : 0.56);
+    const pr = rx * (arregala || furioso ? 0.38 : choroso || expr === 'feliz' ? 0.62 : 0.56);
     const off = Math.min(rx, ry) - pr - traco * 0.3;
     const pxp = ex + lx * off * 0.9;
     const pyp = ey + ly * off * 0.9;
@@ -714,9 +702,17 @@ function desenharRosto(ctx, s, t, alvo, escala, fator = 1) {
       ctx.beginPath();
       ctx.arc(pxp - pr * 0.3, pyp + pr * 0.32, pr * 0.28, 0, Math.PI * 2);
       ctx.fill();
+      // o segundo brilho: olho brilhando (feliz) ou marejado (choro)
+      if (choroso || expr === 'feliz') {
+        ctx.beginPath();
+        ctx.arc(pxp + pr * 0.35, pyp - pr * 0.3, pr * 0.16, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
     olhoDoHumor(ctx, s, ex, ey, rx, ry, traco);
   }
+  // sobrancelha triste do choro
+  if (choroso) sobrancelhasTristes(ctx, tr, [[-0.36 * R, 0.16 * R], [0.36 * R, 0.16 * R]], re, traco);
   // sobrancelhas de quem levou a pancada (mais grossas e mais em V que as da lama)
   if (expr === 'furioso') sobrancelhasBravas(ctx, tr, [[-0.36 * R, 0.16 * R], [0.36 * R, 0.16 * R]], re, traco);
   // sobrancelhas da lama ranzinza
@@ -735,7 +731,7 @@ function desenharRosto(ctx, s, t, alvo, escala, fator = 1) {
   if (s.n >= 10 && expr === 'choro') {
     bocaBerreiro(ctx, tr, R, t, traco);
   } else if (s.n >= 10 && bocaDoHumor(ctx, s, tr, R, t, traco, 1)) {
-    // boca do humor (contente, apatico, chorinho, furioso)
+    // boca do humor (contente, amassado, apatico, chorinho, furioso)
   } else if (s.n >= 10) {
     const [bx, by] = tr(0, -0.17 * R);
     ctx.strokeStyle = TINTA;
@@ -752,33 +748,38 @@ function desenharRosto(ctx, s, t, alvo, escala, fator = 1) {
 // ---------------------------------------------------------------- humor (src/jogo/humor.js)
 
 /**
- * Palpebra do apatico (meio fechada, da cor do corpo) por cima do olho ja desenhado.
+ * Apatico de olho aberto (2026-10-18: nenhuma palpebra fechando): a olheira embaixo do olho; o
+ * olhar cai para baixo, de lado (o `olhar` de desenharRostos).
  * @param {CanvasRenderingContext2D} ctx @param {any} s
  * @param {number} ex @param {number} ey @param {number} rx @param {number} ry @param {number} traco
  */
 function olhoDoHumor(ctx, s, ex, ey, rx, ry, traco) {
   if (s.dados.expr !== 'apatico') return;
-  // a linha da palpebra fica um pouco abaixo do meio (y para cima no mundo)
-  const corte = ey - ry * 0.12;
+  ctx.strokeStyle = tom(s.dados.hex || '#888888', -0.3);
+  ctx.globalAlpha = 0.75;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = traco * 1.1;
+  ctx.beginPath();
+  ctx.ellipse(ex, ey - ry * 0.2, rx * 0.95, ry * 1.05, 0, Math.PI * 1.2, Math.PI * 1.8);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+/**
+ * Olho marejado (o choro de olho aberto): a agua enche a metade de baixo do olho.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} ex @param {number} ey @param {number} rx @param {number} ry
+ */
+function aguaNoOlho(ctx, ex, ey, rx, ry) {
   ctx.save();
   ctx.beginPath();
   ctx.ellipse(ex, ey, rx, ry, 0, 0, Math.PI * 2);
   ctx.clip();
-  ctx.fillStyle = tom(s.dados.hex, -0.12);
-  ctx.fillRect(ex - rx * 1.1, corte, rx * 2.2, ry * 2.2);
+  ctx.fillStyle = 'rgba(127, 211, 255, 0.85)';
+  ctx.beginPath();
+  ctx.ellipse(ex, ey - ry * 0.95, rx * 1.1, ry * 0.6, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
-  ctx.strokeStyle = TINTA;
-  ctx.lineCap = 'round';
-  ctx.lineWidth = traco * 1.2;
-  const meia = rx * Math.sqrt(Math.max(0, 1 - ((corte - ey) / ry) * ((corte - ey) / ry)));
-  ctx.beginPath();
-  ctx.moveTo(ex - meia, corte);
-  ctx.lineTo(ex + meia, corte);
-  ctx.stroke();
-  ctx.lineWidth = traco;
-  ctx.beginPath();
-  ctx.ellipse(ex, ey, rx, ry, 0, 0, Math.PI * 2);
-  ctx.stroke();
 }
 
 /** Sobrancelhas da raiva: grossas, em V (a ponta de dentro desce). */
@@ -828,6 +829,17 @@ function bocaDoHumor(ctx, s, tr, R, t, traco, tam) {
     ctx.moveTo(ax, ay);
     ctx.quadraticCurveTo(cx, cy, bx, by);
     ctx.closePath();
+    ctx.stroke();
+    return true;
+  }
+  if (expr === 'amassado') {
+    // boca torta do aperto (zigue-zague)
+    ctx.lineWidth = traco * 1.1;
+    ctx.beginPath();
+    for (let k = 0; k <= 4; k++) {
+      const [qx, qy] = tr((-0.14 + k * 0.07) * R * tam, (-0.2 + (k % 2 ? 0.035 : -0.035)) * R);
+      if (k) ctx.lineTo(qx, qy); else ctx.moveTo(qx, qy);
+    }
     ctx.stroke();
     return true;
   }

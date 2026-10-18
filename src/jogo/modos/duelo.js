@@ -66,10 +66,27 @@ export function criarModo(o = {}) {
       if ((a.dados.pote || 0) !== (b.dados.pote || 0)) return 0;
       return a.nivel === b.nivel && a.nivel < NIVEIS.length ? a.nivel + 1 : 0;
     },
-    // fusao animada como a do Merge (soltar.js FUSAO): 3 iguais juntos pulam um nivel, ate o 13
+    // fusao animada como a do Merge (soltar.js FUSAO): 3 iguais juntos pulam um nivel, ate o 14,
+    // que comemora e estoura (2026-10-18)
     animar: true,
     particulas: particulasNivel,
     nivelGrupo: (S, k, n) => Math.min(NIVEIS.length, n >= 3 ? k + 1 : k),
+    maxNivel: NIVEIS.length,
+    comemora: (S, k) => k >= NIVEIS.length,
+    estourar(S, J, base, info) {
+      const px = base.cx;
+      const py = base.cy;
+      S.mundo.remover(base);
+      J.pontos += pontosNivel(NIVEIS.length) * 2 * info.n * info.combo;
+      S.eventos.push({ tipo: 'estouro', x: px, y: py, cor: ap(NIVEIS.length).hex, corTela: '#ffc93a', grande: true });
+      S.eventos.push({ tipo: 'texto', x: px, y: py + 1.5, texto: 'super', cor: '#ffd23a', escala: 1.6 });
+      // o super slime manda uma chuva de gosma para o rival
+      const R = S.jogadores[1 - J.idx];
+      R.lixo = (R.lixo || 0) + 6;
+      R.tLixo = 1.2;
+      S.eventos.push({ tipo: 'texto', x: R.pote.cx, y: 13.6, texto: '+6 ☁', cor: '#b9b9c2', escala: 1 });
+      S.eventos.push({ tipo: 'som', nome: 'ataque' });
+    },
     agrupa(S, F, c) {
       return F.membros.every((s) => S.R.fusao(S, s, c) === F.k);
     },

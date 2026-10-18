@@ -109,7 +109,7 @@ test('arquivos: todo arquivo tem reserva, existe no indice e no disco, sem sobra
 });
 
 test('receitas: todas rodam no contexto falso, agendam fontes, sem NaN, sem instante no passado', () => {
-  const casos = [{}, { k: 1, forca: 1, nivel: 1, i: 0 }, { k: 4, forca: 3, nivel: 7, i: 5 }, { k: 30, forca: 9, nivel: 13, i: 40, mundo: true }];
+  const casos = [{}, { k: 1, forca: 1, nivel: 1, i: 0 }, { k: 4, forca: 3, nivel: 7, i: 5 }, { k: 30, forca: 9, nivel: 14, i: 40, mundo: true }];
   for (const [nome, fn] of Object.entries(RECEITAS)) {
     for (const p of casos) {
       const ctx = contextoAvulso();
@@ -145,10 +145,10 @@ test('falas: frases do jogo e do choro, formantes e tom pelo nivel', () => {
   for (const f of FALAS_DO_JOGO) assert.ok(FRASES[f], f);
   assert.deepEqual([...VOGAIS.a], [800, 1200]);
   assert.deepEqual([...VOGAIS.i], [300, 2300]);
-  for (let n = 1; n < 13; n++) assert.ok(tomDoNivel(n) > tomDoNivel(n + 1), 'pequenos agudos, grandes graves');
-  assert.ok(tomDoNivel(1) > 400 && tomDoNivel(13) < 200);
+  for (let n = 1; n < 14; n++) assert.ok(tomDoNivel(n) > tomDoNivel(n + 1), 'pequenos agudos, grandes graves');
+  assert.ok(tomDoNivel(1) > 400 && tomDoNivel(14) < 200);
   for (const f of Object.keys(FRASES)) {
-    for (const nivel of [1, 6, 13]) {
+    for (const nivel of [1, 6, 14]) {
       const ctx = contextoAvulso();
       const d = falar({ ctx, destino: ctx.destination }, 0.01, f, { nivel });
       assert.ok(d > 0.2 && d < 1.2, `${f}: ${d}`);

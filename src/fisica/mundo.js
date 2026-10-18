@@ -57,6 +57,8 @@ const V_DORME = 0.12; // u/s
 const T_DORME = 0.5; // s parado para dormir
 const JANELA_SONO = 0.25; // s: o sono mede o deslocamento liquido nessa janela
 const PEN_ACORDA = 0.03; // u de penetracao que acorda um slime dormindo
+const ASSENTAR_QUADROS = 10; // quadros de separacao extra depois de particulas novas
+const ASSENTAR_PASSES = 6; // passes so de posicao em cada um deles
 
 /**
  * @typedef {Object} Slime
@@ -132,6 +134,8 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
   const iniSl = new Int32Array(MAX_SLIMES + 1);
   const marca = new Uint8Array(MAX_SLIMES);
   let sujo = true;
+  /** quadros que ainda separam as particulas novas so na posicao (preEstabilizar) */
+  let assentarNovas = 0;
 
   // grade
   const [gx0, gy0, gx1, gy1] = limites;
@@ -198,6 +202,8 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
     atrair,
     aparar,
     refazerForma,
+    recolocar,
+    reposicionar,
     amolecer,
     pertoDe,
     escalarForma,
@@ -225,19 +231,32 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
   }
 
   /**
-   * Novo slime em disco hexagonal.
+   * Novo slime em disco hexagonal, ou com as particulas em `pontos` (posicoes absolutas [x0, y0,
+   * x1, y1, ...]; a forma de repouso e a de agora: a partida salva volta com cada slime achatado
+   * como estava).
    * @param {{ x: number, y: number, n?: number, diametro?: number, material?: string|import('./materiais.js').Material,
-   *   pigmento?: number[], nivel?: number, preso?: boolean, idv?: number, vx?: number, vy?: number }} o
+   *   pigmento?: number[], nivel?: number, preso?: boolean, idv?: number, vx?: number, vy?: number, pontos?: number[] }} o
    * @returns {Slime|null}
    */
   function criarSlime(o) {
     const k = slotLivre();
     if (k < 0) return null;
-    const qtd = o.n || particulasGirassol(o.diametro || 1.3, ESPACO);
+    const pts = o.pontos && o.pontos.length >= 6 ? o.pontos : null;
+    const qtd = pts ? pts.length >> 1 : o.n || particulasGirassol(o.diametro || 1.3, ESPACO);
     if (n + qtd > cap) return null;
     const disco = discoAneis(qtd, ESPACO);
+    // com os pontos, a forma de repouso e a posicao de cada um em volta da media
+    let mx = o.x;
+    let my = o.y;
+    if (pts) {
+      mx = 0;
+      my = 0;
+      for (let a = 0; a < qtd; a++) { mx += pts[2 * a]; my += pts[2 * a + 1]; }
+      mx /= qtd;
+      my /= qtd;
+    }
     const s = slimes[k];
-    iniciarSlime(s, o);
+    iniciarSlime(s, pts ? { ...o, x: mx, y: my } : o);
     const pg = o.pigmento || [0, 0, 0, 0];
     for (let a = 0; a < qtd; a++) {
       const i = n++;
@@ -246,10 +265,12 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
       const m = (r * r) / (R_PART * R_PART);
       mas[i] = m;
       inv[i] = 1 / m;
-      qx[i] = ox[i] = disco[2 * a];
-      qy[i] = oy[i] = disco[2 * a + 1];
-      x[i] = px[i] = xm[i] = o.x + disco[2 * a];
-      y[i] = py[i] = ym[i] = o.y + disco[2 * a + 1];
+      const dx = pts ? pts[2 * a] - mx : disco[2 * a];
+      const dy = pts ? pts[2 * a + 1] - my : disco[2 * a + 1];
+      qx[i] = ox[i] = dx;
+      qy[i] = oy[i] = dy;
+      x[i] = px[i] = xm[i] = mx + dx;
+      y[i] = py[i] = ym[i] = my + dy;
       vx[i] = o.vx || 0;
       vy[i] = o.vy || 0;
       sl[i] = k;
@@ -474,6 +495,7 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
         }
         for (let c = 0; c < N_PIG; c++) pig[i * N_PIG + c] = pig[melhor * N_PIG + c];
       }
+      assentarNovas = ASSENTAR_QUADROS;
     }
     lista = [];
     for (let i = 0; i < n; i++) if (sl[i] === s.idx) lista.push(i);
@@ -543,6 +565,53 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
   /** Disco de repouso novo para as particulas atuais do slime (fim do aparar). @param {Slime} s */
   function refazerForma(s) {
     refazerRepouso(s, particulasDe(s));
+  }
+
+  /**
+   * Leva as particulas da lista para os pontos dados, paradas (a rede do pote puxa para dentro as
+   * poucas que escaparam pela parede); a separacao das vizinhas fica so na posicao.
+   * @param {number[]} lista indices @param {number[]} pontos [x0, y0, x1, y1, ...] na mesma ordem
+   */
+  function reposicionar(lista, pontos) {
+    lista.forEach((i, k) => {
+      x[i] = px[i] = xm[i] = pontos[2 * k];
+      y[i] = py[i] = ym[i] = pontos[2 * k + 1];
+      vx[i] = 0;
+      vy[i] = 0;
+      const s = slimes[sl[i]];
+      s.dormindo = false;
+      s.tParado = 0;
+    });
+    if (lista.length) assentarNovas = ASSENTAR_QUADROS;
+  }
+
+  /**
+   * O slime volta inteiro, em disco parado, com o centro em (x0, y0): as mesmas particulas (e o
+   * pigmento de cada uma), na forma de repouso nova. Rede de seguranca do pote (src/jogo/pote.js):
+   * quem ficou espetado numa parede ou caiu por fora volta para dentro.
+   * @param {Slime} s @param {number} x0 @param {number} y0
+   */
+  function recolocar(s, x0, y0) {
+    const lista = particulasDe(s);
+    if (!lista.length) return;
+    refazerRepouso(s, lista);
+    for (const i of lista) {
+      x[i] = px[i] = xm[i] = x0 + qx[i];
+      y[i] = py[i] = ym[i] = y0 + qy[i];
+      vx[i] = 0;
+      vy[i] = 0;
+      pen[i] = 0;
+    }
+    limparContatos(s.idx);
+    s.rampa = 0.3;
+    s.rampaVel = RAMPA_VEL;
+    s.cx = x0;
+    s.cy = y0;
+    s.vx = 0;
+    s.vy = 0;
+    sujo = true;
+    assentarNovas = ASSENTAR_QUADROS;
+    acordarTodos();
   }
 
   /**
@@ -987,7 +1056,11 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
     }
   }
 
-  function contatosParedes() {
+  /**
+   * @param {boolean} [atrito] false = so separa (pre-estabilizacao: a posicao de partida e a do quadro)
+   * @param {boolean} [soTravessia] true = so desfaz quem cruzou o eixo (o empurrao normal fica para o subpasso)
+   */
+  function contatosParedes(atrito = true, soTravessia = false) {
     const dt = DT;
     for (let k = 0; k < paredes.length; k++) {
       const p = paredes[k];
@@ -1004,25 +1077,49 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
       const xmax = (ax > bx ? ax : bx) + margem;
       const ymin = (ay < by ? ay : by) - margem;
       const ymax = (ay > by ? ay : by) + margem;
+      const el = Math.sqrt(l2) || 1;
       for (let i = 0; i < n; i++) {
         const xi = x[i];
         const yi = y[i];
-        if (xi < xmin || xi > xmax || yi < ymin || yi > ymax) continue;
+        const x0 = px[i];
+        const y0 = py[i];
+        // fora da caixa agora e no comeco do subpasso: longe desta parede
+        if ((xi < xmin || xi > xmax || yi < ymin || yi > ymax) && (x0 < xmin || x0 > xmax || y0 < ymin || y0 > ymax)) continue;
         if (parada(i)) continue;
+        const lim = rad[i] + p.r;
+        // travessia (print do iPhone, 2026-10-18): um empurrao de contato maior que a parede leva a
+        // particula para o outro lado do eixo, e a capsula de dois lados a deixava la. Se o caminho
+        // do subpasso cruzou o eixo, ela volta encostada no lado de onde veio.
+        const c0 = ex * (y0 - ay) - ey * (x0 - ax);
+        const c1 = ex * (yi - ay) - ey * (xi - ax);
+        if ((c0 > 0 && c1 < 0) || (c0 < 0 && c1 > 0)) {
+          const u = c0 / (c0 - c1);
+          const qx0 = x0 + u * (xi - x0);
+          const qy0 = y0 + u * (yi - y0);
+          const tq = l2 > 0 ? ((qx0 - ax) * ex + (qy0 - ay) * ey) / l2 : 0;
+          const tol = lim / el;
+          if (tq >= -tol && tq <= 1 + tol) {
+            let tc = l2 > 0 ? ((xi - ax) * ex + (yi - ay) * ey) / l2 : 0;
+            if (tc < 0) tc = 0; else if (tc > 1) tc = 1;
+            const lado = c0 > 0 ? 1 : -1;
+            x[i] = ax + tc * ex - (ey / el) * lado * lim;
+            y[i] = ay + tc * ey + (ex / el) * lado * lim;
+            continue;
+          }
+        }
+        if (soTravessia) continue;
         let t = l2 > 0 ? ((xi - ax) * ex + (yi - ay) * ey) / l2 : 0;
         if (t < 0) t = 0; else if (t > 1) t = 1;
         const cx = ax + t * ex;
         const cy = ay + t * ey;
         let dx = xi - cx;
         let dy = yi - cy;
-        const lim = rad[i] + p.r;
         const d2 = dx * dx + dy * dy;
         if (d2 >= lim * lim) continue;
         const d = Math.sqrt(d2);
         let pn;
         if (d < 1e-9) {
           // em cima do eixo: empurra pela normal do segmento
-          const el = Math.sqrt(l2) || 1;
           dx = -ey / el;
           dy = ex / el;
           pn = lim;
@@ -1033,6 +1130,7 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
         }
         x[i] += dx * pn;
         y[i] += dy * pn;
+        if (!atrito) continue;
         // atrito contra a parede (que pode estar andando)
         const s = slimes[sl[i]];
         const wvx = p.vax + t * (p.vbx - p.vax) + p.svx;
@@ -1416,7 +1514,17 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
   function preEstabilizar() {
     if (sujo) reconstruir();
     construirPares();
-    contatosPares(false);
+    // particulas novas (redimensionar, recolocar) nascem por cima das vizinhas:
+    // nos quadros seguintes a separacao roda mais vezes, so na posicao, com as paredes (a
+    // travessia conta a partir daqui). Antes, o empurrao virava velocidade e lancava o vizinho (um
+    // nivel 10 subiu 6 u quando o slime de baixo evoluiu e, na volta, atravessou a parede).
+    const extra = assentarNovas > 0;
+    if (extra) assentarNovas--;
+    // a travessia das paredes conta a partir daqui (sem isso, a separacao do comeco do quadro
+    // levava particulas para o outro lado sem ninguem ver)
+    for (let i = 0; i < n; i++) { px[i] = x[i]; py[i] = y[i]; }
+    for (let it = 0; it < (extra ? ASSENTAR_PASSES : 1); it++) contatosPares(false);
+    contatosParedes(false, !extra);
   }
 
   /**

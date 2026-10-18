@@ -217,3 +217,24 @@ Pedidos com prints anotados do Merge Lab (plano em
 - **Pendente:** aprovar os prints (`docs/visuais/fusao-*`, `humor-*`, `missil-*`, `carregando.jpg`,
   `eventos-*`). O usuário pediu a build em seguida: **versão 2.0.1** (`dist-poki/slime-merge-2.0.1.zip`),
   a que vai para os dois Player Fit Tests.
+
+## 2026-10-18: Player Fit Test da 2.0.1, parede, olhos, nível 14 e loading
+- Pedido: "analise o resultado do player fit test, veja o que pode melhorar para aumentar a retenção, e
+  quero algumas demandas: 1) no mobile deu esse bug no visual [print do iPhone com um slime atravessado
+  na parede do béquer] 2) Eu não quero mais nenhuma animação que os olhos estejam fechados 3) Aumente
+  mais um slime de nível". No meio: "o loading vai caindo slime de todas as cores, fazendo camadas de
+  cores". Plano em `~/.claude/plans/analise-o-resultado-do-eager-duckling.md`; análise em `docs/producao.md`.
+- **Nível 14:** "14 maior, mas não pode passar do 100%" → **dois 14 cabem em 100% do béquer** (8,0 u; o
+  13 tem 7,56). Depois de nascer: **comemora e estoura** (a recomendada; com o 14 parado no pote, o 2º 14
+  pediria ~138% do béquer). É o super slime.
+- **Olhos:** **abertos, a expressão no resto** (a recomendada): sem piscar; brilho, água no olho,
+  olheira, sobrancelha e boca.
+- **Retenção desta vez:** **HUD longe do botão da Poki** e **novo alvo depois do 14** (os super slimes da
+  partida). A física do celular ficou para depois do próximo teste.
+- **Padrões assumidos e ajustáveis:** 2 s de comemoração; 20 gotas por super slime e +20 no recorde;
+  visual do 14 em **ouro** e skins **Troféus** e **Coroas** até a escolha; abaixo de 380 px de largura o
+  placar desce para baixo do botão da Poki.
+- **Aprovado ("Tudo aprovado", 2026-10-18):** o 14 em **ouro** (entre ouro, cristal, aurora e plasma,
+  `docs/visuais/nivel14-comparar.jpg`; as outras três saíram do código), as skins **Troféus** e **Coroas**,
+  os olhos (`humor-480x600.jpg`), o loading (`carregando*`), o 14 comemorando (`fusao-super-*`) e o HUD
+  (`hud-poki-retrato.png`). Build: **versão 2.0.2**.

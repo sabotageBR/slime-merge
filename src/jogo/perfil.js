@@ -25,6 +25,11 @@ export const LOJA = {
 
 /** Gotas pela descoberta de um nivel (a primeira vez que alguem chega nele). */
 export const PREMIO_DESCOBERTA = 25;
+/**
+ * Super slime (o 14 que comemora e estoura, 2026-10-18): o novo alvo depois do ultimo nivel. Cada
+ * estouro paga `cada` gotas; passar o recorde de super slimes numa partida paga mais `recorde`.
+ */
+export const PREMIO_SUPER = Object.freeze({ cada: 20, recorde: 20 });
 
 /** Premio da sequencia diaria (dia 1 a 7; depois repete o 7). */
 export const SEQUENCIA = [20, 30, 40, 50, 60, 80, 120];
@@ -86,8 +91,11 @@ export function criarPerfil(salvo, hoje) {
     totalGotas: 0,
     // skins por nivel: possui ['k:id'], equipado {k: id} (falta = padrao), minhas {k: {m, b, e, px}}
     skins: { possui: [], equipado: {}, minhas: {} },
+    // recorde de super slimes numa partida (o save antigo nao tem: 0)
+    supers: 0,
     ...(salvo || {}),
   };
+  if (!(d.supers >= 0)) d.supers = 0;
   // garante os padroes (save antigo ou parcial)
   for (const g of Object.keys(LOJA)) {
     if (!d.possui[g]) d.possui[g] = [];
@@ -187,6 +195,17 @@ export function criarPerfil(salvo, hoje) {
     get sequencia() { return { ...d.sequencia }; },
     /** Niveis ja vistos antes do perfil existir (save antigo do Merge Lab): marca sem premio. */
     marcarVisto(nivel) { if (nivel > d.visto) d.visto = nivel; },
+    get recordeSupers() { return d.supers; },
+    /**
+     * Um super slime estourou: o n-esimo da partida. Paga PREMIO_SUPER.cada e, ao passar o recorde,
+     * PREMIO_SUPER.recorde (uma vez por super a mais).
+     * @param {number} n @returns {{ gotas: number, recorde: boolean }}
+     */
+    superSlime(n) {
+      const recorde = n > d.supers;
+      if (recorde) d.supers = n;
+      return { gotas: ganhar(PREMIO_SUPER.cada + (recorde ? PREMIO_SUPER.recorde : 0)), recorde };
+    },
     /** Nivel novo descoberto: PREMIO_DESCOBERTA gotas na primeira vez. */
     descobrir(nivel) {
       if (nivel <= d.visto) return 0;

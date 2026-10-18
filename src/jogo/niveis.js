@@ -1,7 +1,9 @@
-// Escada de evolucao do Merge Lab (e do Duelo): 13 niveis, diametro x1,14121 por nivel (area
-// x1,30), do 1,55 u ao 7,56 u: slimes grandes como no conceito (o pote cabe ~10-14), sem
+// Escada de evolucao do Merge Lab (e do Duelo): 14 niveis, diametro x1,14121 por nivel (area
+// x1,30), do 1,55 u ao 7,56 u no 13: slimes grandes como no conceito (o pote cabe ~10-14), sem
 // virar mosaico de rostinhos. Em 2026-10-15 o usuario pediu mais um nivel e escolheu
-// reescalar todos: o 13 tem o tamanho que o 12 tinha (1,155^11 = 1,14121^12). Cores feitas de
+// reescalar todos: o 13 tem o tamanho que o 12 tinha (1,155^11 = 1,14121^12). Em 2026-10-18 pediu
+// mais um: o 14 e maior que o 13, mas dois 14 cabem em 100% do bequer (8,0 u; nasce, comemora e
+// estoura como o super slime, src/jogo/soltar.js). Cores feitas de
 // pigmento de verdade (concentracoes ciano, magenta, amarelo, preto; o resto e branco). Do
 // nivel 7 em diante cada um tem uma TEXTURA desenhada no shader, presa ao corpo (pedido do
 // usuario em 2026-10-14: o roxo alto parecia o lilas, e o marmore do arco-iris virava lama
@@ -12,10 +14,11 @@ import { ESPACO } from '../fisica/mundo.js';
 
 /**
  * Texturas do shader (src/render/composicao.js): 1 bolinhas, 2 listras, 3 arco-iris, 4 ondas,
- * 5 galaxia, 6 glitter, 7 lava.
- * @typedef {{ nome: string, pig: number[], textura?: number }} Nivel
+ * 5 galaxia, 6 glitter, 7 lava, 8 ouro.
+ * @typedef {{ nome: string, pig: number[], textura?: number, d?: number }} Nivel
+ *   d: diametro proprio (sem ele, o da escada x1,14121)
  */
-export const TEXTURAS = Object.freeze({ bolinhas: 1, listras: 2, arcoiris: 3, ondas: 4, galaxia: 5, glitter: 6, lava: 7 });
+export const TEXTURAS = Object.freeze({ bolinhas: 1, listras: 2, arcoiris: 3, ondas: 4, galaxia: 5, glitter: 6, lava: 7, ouro: 8 });
 
 /** @type {Nivel[]} */
 export const NIVEIS = [
@@ -34,14 +37,19 @@ export const NIVEIS = [
   // o topo: lava (escolha do usuario em 2026-10-15, entre ouro, lava, aurora e cristal). A
   // textura cobre a cor de base, como o arco-iris: a frente de cor da fusao nao a vira lama.
   { nome: 'lava', pig: [0, 0.55, 0.8, 0.3], textura: 7 }, // crosta escura com brasas
+  // o 14 (2026-10-18): maior que o 13, mas dois cabem no bequer (2 x 50,3 u2 <= 101,5 u2 ate a
+  // linha). Ouro, escolha do usuario entre ouro, cristal, aurora e plasma
+  { nome: 'ouro', pig: [0.01, 0.04, 0.92, 0], textura: 8, d: 8.0 },
 ];
 export const MAX_NIVEL = NIVEIS.length;
 
 /** Crescimento do diametro por nivel (literal: Math.pow poderia variar entre motores JS). */
 const FATOR = 1.14121;
 
-/** @param {number} k 1..13 */
+/** @param {number} k 1..14 */
 export function diametroNivel(k) {
+  const def = NIVEIS[k - 1];
+  if (def && def.d) return def.d;
   let d = 1.55;
   for (let i = 1; i < k; i++) d *= FATOR;
   return d;

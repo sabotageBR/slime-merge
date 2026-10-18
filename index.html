@@ -11,26 +11,59 @@
 <script src="https://game-cdn.poki.com/scripts/v2/poki-sdk.js"></script>
 </head>
 <body data-orient="retrato">
-<!-- tela de carregamento: o bequer enchendo de slime (so HTML e CSS, aparece antes de qualquer modulo;
-     o main.js tira no 1o quadro, junto do gameLoadingFinished; nenhum toque e pedido) -->
+<!-- tela de carregamento: o bequer enchendo de slime de todas as cores, em camadas (2026-10-18: uma
+     gota de cada nivel cai do bico e vira uma camada; so HTML e CSS, aparece antes de qualquer modulo;
+     o main.js tira no 1o quadro, junto do gameLoadingFinished; nenhum toque e pedido). As cores sao as
+     dos niveis (aparencia padrao de src/jogo/skins.js); as texturas do 7 em diante viram padroes. As
+     camadas vao de cima para baixo no desenho: a onda contornada de cada uma cobre o pe da de cima. -->
 <div id="carregando" role="status" aria-label="Loading">
   <div class="logo">Slime Merge</div>
   <svg class="bequer" viewBox="0 -30 200 260" aria-hidden="true">
-    <defs><clipPath id="vidroCarga"><path d="M53 40 V196 Q53 215 72 215 H128 Q147 215 147 196 V40 Z"/></clipPath></defs>
-    <path class="gota g1" d="M100 -26 Q108 -12 100 -6 Q92 -12 100 -26 Z"/>
-    <path class="gota g2" d="M92 -26 Q100 -12 92 -6 Q84 -12 92 -26 Z"/>
-    <path class="gota g3" d="M108 -26 Q116 -12 108 -6 Q100 -12 108 -26 Z"/>
+    <defs>
+      <clipPath id="vidroCarga"><path d="M53 40 V196 Q53 215 72 215 H128 Q147 215 147 196 V40 Z"/></clipPath>
+      <pattern id="cgNuvem" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="#98d0f0"/><circle cx="5" cy="5" r="2.2" fill="#fff"/></pattern>
+      <linearGradient id="cgArco" x1="53" x2="147" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ff4d4d"/><stop offset=".2" stop-color="#ffb000"/><stop offset=".4" stop-color="#ffe600"/><stop offset=".6" stop-color="#3ddc5a"/><stop offset=".8" stop-color="#2f8cff"/><stop offset="1" stop-color="#9b4dff"/></linearGradient>
+      <pattern id="cgMar" width="15" height="6" patternUnits="userSpaceOnUse"><rect width="15" height="6" fill="#298c82"/><path d="M0 3 q3.75 -2 7.5 0 t7.5 0" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="1.2"/></pattern>
+      <pattern id="cgUva" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="#694189"/><circle cx="5" cy="5" r="2.2" fill="#fff" fill-opacity=".8"/></pattern>
+      <pattern id="cgChiclete" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#d92476"/><rect width="3" height="8" fill="#fff" fill-opacity=".9"/></pattern>
+      <pattern id="cgNoite" width="26" height="12" patternUnits="userSpaceOnUse"><rect width="26" height="12" fill="#2a2350"/><circle cx="5" cy="4" r="1.1" fill="#fff"/><circle cx="17" cy="8" r=".9" fill="#fff"/><circle cx="22" cy="3" r=".8" fill="#ff8ad8"/></pattern>
+      <pattern id="cgLava" width="30" height="12" patternUnits="userSpaceOnUse"><rect width="30" height="12" fill="#3b1612"/><path d="M2 9 L9 5 L14 8 L22 3 L28 6" fill="none" stroke="#ff6a1a" stroke-width="1.6" stroke-linejoin="round"/></pattern>
+    </defs>
     <path class="vidroFundo" d="M50 40 V196 Q50 218 72 218 H128 Q150 218 150 196 V40 Z"/>
+    <path class="pingo" fill="#3295df" style="--d:0.0s;--y:218px" d="M100 -26 Q108 -12 100 -6 Q92 -12 100 -26 Z"/>
+    <path class="pingo" fill="#569c5b" style="--d:0.34s;--y:207px" d="M100 -26 Q108 -12 100 -6 Q92 -12 100 -26 Z"/>
+    <path class="pingo" fill="#7b5098" style="--d:0.71s;--y:196px" d="M100 -26 Q108 -12 100 -6 Q92 -12 100 -26 Z"/>
+    <path class="pingo" fill="#dc3a55" style="--d:1.1s;--y:185px" d="M100 -26 Q108 -12 100 -6 Q92 -12 100 -26 Z"/>
+    <path class="pingo" fill="#e86148" style="--d:1.51s;--y:174px" d="M100 -26 Q108 -12 100 -6 Q92 -12 100 -26 Z"/>
+    <path class="pingo" fill="#ffd528" style="--d:1.95s;--y:163px" d="M100 -26 Q108 -12 100 -6 Q92 -12 100 -26 Z"/>
+    <path class="pingo" fill="url(#cgNuvem)" style="--d:2.41s;--y:152px" d="M100 -26 Q108 -12 100 -6 Q92 -12 100 -26 Z"/>
+    <path class="pingo" fill="url(#cgArco)" style="--d:2.9s;--y:141px" d="M100 -26 Q108 -12 100 -6 Q92 -12 100 -26 Z"/>
+    <path class="pingo" fill="url(#cgMar)" style="--d:3.41s;--y:130px" d="M100 -26 Q108 -12 100 -6 Q92 -12 100 -26 Z"/>
+    <path class="pingo" fill="url(#cgUva)" style="--d:3.94s;--y:119px" d="M100 -26 Q108 -12 100 -6 Q92 -12 100 -26 Z"/>
+    <path class="pingo" fill="url(#cgChiclete)" style="--d:4.5s;--y:108px" d="M100 -26 Q108 -12 100 -6 Q92 -12 100 -26 Z"/>
+    <path class="pingo" fill="url(#cgNoite)" style="--d:5.08s;--y:97px" d="M100 -26 Q108 -12 100 -6 Q92 -12 100 -26 Z"/>
+    <path class="pingo" fill="url(#cgLava)" style="--d:5.69s;--y:86px" d="M100 -26 Q108 -12 100 -6 Q92 -12 100 -26 Z"/>
     <g clip-path="url(#vidroCarga)">
-      <g class="nivel">
-        <g class="onda"><path d="M-60 0 Q-45 -9 -30 0 T0 0 T30 0 T60 0 T90 0 T120 0 T150 0 T180 0 T210 0 T240 0 T270 0 V320 H-60 Z"/></g>
-        <g class="cara">
-          <g class="olho"><ellipse cx="83" cy="34" rx="11" ry="12.5"/><circle cx="85" cy="37" r="5.5"/></g>
-          <g class="olho"><ellipse cx="117" cy="34" rx="11" ry="12.5"/><circle cx="119" cy="37" r="5.5"/></g>
-          <path class="boca" d="M92 55 Q100 63 108 55"/>
-        </g>
-      </g>
+        <g class="camada" style="--d:5.69s"><g class="ondinha"><path fill="url(#cgLava)" d="M-72 72 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 V89 H-60 Z"/><path class="linha" d="M-72 72 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0"/></g></g>
+        <g class="camada" style="--d:5.08s"><g class="ondinha volta"><path fill="url(#cgNoite)" d="M-61 83 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 V100 H-60 Z"/><path class="linha" d="M-61 83 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0"/></g></g>
+        <g class="camada" style="--d:4.5s"><g class="ondinha"><path fill="url(#cgChiclete)" d="M-80 94 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 V111 H-60 Z"/><path class="linha" d="M-80 94 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0"/></g></g>
+        <g class="camada" style="--d:3.94s"><g class="ondinha volta"><path fill="url(#cgUva)" d="M-69 105 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 V122 H-60 Z"/><path class="linha" d="M-69 105 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0"/></g></g>
+        <g class="camada" style="--d:3.41s"><g class="ondinha"><path fill="url(#cgMar)" d="M-88 116 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 V133 H-60 Z"/><path class="linha" d="M-88 116 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0"/></g></g>
+        <g class="camada" style="--d:2.9s"><g class="ondinha volta"><path fill="url(#cgArco)" d="M-77 127 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 V144 H-60 Z"/><path class="linha" d="M-77 127 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0"/></g></g>
+        <g class="camada" style="--d:2.41s"><g class="ondinha"><path fill="url(#cgNuvem)" d="M-66 138 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 V155 H-60 Z"/><path class="linha" d="M-66 138 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0"/></g></g>
+        <g class="camada" style="--d:1.95s"><g class="ondinha volta"><path fill="#ffd528" d="M-85 149 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 V166 H-60 Z"/><path class="linha" d="M-85 149 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0"/></g></g>
+        <g class="camada" style="--d:1.51s"><g class="ondinha"><path fill="#e86148" d="M-74 160 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 V177 H-60 Z"/><path class="linha" d="M-74 160 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0"/></g></g>
+        <g class="camada" style="--d:1.1s"><g class="ondinha volta"><path fill="#dc3a55" d="M-63 171 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 V188 H-60 Z"/><path class="linha" d="M-63 171 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0"/></g></g>
+        <g class="camada" style="--d:0.71s"><g class="ondinha"><path fill="#7b5098" d="M-82 182 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 V199 H-60 Z"/><path class="linha" d="M-82 182 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0"/></g></g>
+        <g class="camada" style="--d:0.34s"><g class="ondinha volta"><path fill="#569c5b" d="M-71 193 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 V210 H-60 Z"/><path class="linha" d="M-71 193 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0"/></g></g>
+        <g class="camada" style="--d:0.0s"><g class="ondinha"><path fill="#3295df" d="M-60 204 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 V221 H-60 Z"/><path class="linha" d="M-60 204 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0 q7.5 -3.6 15 0 t15 0"/></g></g>
+      <g class="cara"><g class="boia">
+        <g class="olho"><ellipse cx="83" cy="14" rx="9" ry="10.5"/><circle cx="84.5" cy="17" r="4.6"/></g>
+        <g class="olho"><ellipse cx="117" cy="14" rx="9" ry="10.5"/><circle cx="118.5" cy="17" r="4.6"/></g>
+        <path class="boca" d="M93 30 Q100 36 107 30"/>
+      </g></g>
     </g>
+    <path class="pingoFim" d="M100 -26 Q108 -12 100 -6 Q92 -12 100 -26 Z"/>
     <path class="brilho" d="M64 62 V168"/>
     <path class="marcas" d="M150 82 H137 M150 110 H142 M150 138 H137 M150 166 H142"/>
     <path class="vidro" d="M38 32 L50 40 V196 Q50 218 72 218 H128 Q150 218 150 196 V40 L162 32"/>

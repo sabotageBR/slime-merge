@@ -8,7 +8,7 @@
 // do nivel 9 em diante, um evento a cada ~60 s e o "Ufa!" vale a partida inteira.
 
 import { criarSoltar, PREMIOS, TEXTO_COMBO, COR_COMBO } from '../soltar.js';
-import { MAX_NIVEL, particulasNivel, pontosNivel } from '../niveis.js';
+import { MAX_NIVEL, particulasNivel, pontosNivel, diametroNivel } from '../niveis.js';
 import { aparencias as tabelaAparencias } from '../skins.js';
 import { iniciarFrente, pintar } from '../../cor/difusao.js';
 import { PESOS, PESOS_ESCADA, ESCADA, pisoPara, AGENDA, CICLO, EVENTOS, criarAgenda, avancarAgenda, encerrarEvento, nivelGigante, alvoPedido } from '../pressao.js';
@@ -29,6 +29,19 @@ const COR_EVENTO = { alivio: '#7fe36b', aperto: '#ff8a5c', meta: '#ffd23a', caos
  * exposto) nao mudou as fusoes do primeiro minuto na simulacao e ficou de fora.
  */
 export const INICIO = Object.freeze({ largura: 0.86, nivelCresce: 6, tempoCresce: 150 });
+
+/**
+ * Forma do slime para o save: as particulas em centesimos de u em volta de (cx, cy).
+ * @param {any} m mundo @param {any} s @param {number} cx @param {number} cy
+ * @returns {number[]} [dx0, dy0, dx1, dy1, ...]
+ */
+function formaDe(m, s, cx, cy) {
+  const out = [];
+  for (let i = 0; i < m.n; i++) {
+    if (m.sl[i] === s.idx) out.push(Math.round((m.x[i] - cx) * 100), Math.round((m.y[i] - cy) * 100));
+  }
+  return out;
+}
 
 /**
  * Pinta o slime com a aparencia do nivel (a skin equipada; a padrao e o visual de sempre) e
@@ -117,12 +130,26 @@ export function criarModo(o = {}) {
   let jogo = null;
 
   function criar(S, J, spec, x, y, preso) {
-    const s = S.mundo.criarSlime({ x, y, n: particulasNivel(spec.nivel), material: 'gelatina', nivel: spec.nivel, preso });
+    const s = S.mundo.criarSlime({ x, y, n: particulasNivel(spec.nivel), pontos: spec.pontos, material: 'gelatina', nivel: spec.nivel, preso });
     if (!s) return null;
     s.dados.prisma = !!spec.prisma;
     s.dados.hex = spec.prisma ? '#ffffff' : ap(spec.nivel).hex;
     colorir(S.mundo, s, spec.prisma ? PRISMA : ap(spec.nivel));
     return s;
+  }
+
+  /**
+   * Onde entram as particulas novas de um slime que cresce (Evolucao!, tinta, tesoura): perto de
+   * (x, y), com o remendo inteiro dentro do pote (encostado na parede, ele nascia do lado de fora).
+   * @param {any} J @param {any} s @param {number} k nivel novo @param {number} x @param {number} y
+   * @returns {[number, number]}
+   */
+  function pontoRemendo(J, s, k, x, y) {
+    const total = particulasNivel(k);
+    const extra = total - (s.n || 0);
+    if (extra <= 0) return [x, y];
+    const [px, py] = J.pote.lugar((diametroNivel(k) / 2) * Math.sqrt(extra / total), x, y);
+    return [px, py];
   }
 
   /** Piso da janela das gotas agora (sem a pressao, sempre 1). */
@@ -137,7 +164,7 @@ export function criarModo(o = {}) {
     let n = 0;
     for (const s of m.vivos()) {
       if (s.preso || s.dados.prisma || s.dados.marcado || s.dados.fundindo || (s.dados.pote || 0) !== J.idx || s.nivel >= k) continue;
-      m.redimensionar(s, particulasNivel(k), s.cx, s.topo);
+      m.redimensionar(s, particulasNivel(k), ...pontoRemendo(J, s, k, s.cx, s.topo));
       s.nivel = k;
       s.dados.irmao = 0;
       s.dados.expr = 'feliz';
@@ -292,9 +319,27 @@ export function criarModo(o = {}) {
     resgatarSempre: () => comPressao,
     fusao,
     // fusao animada (soltar.js FUSAO): 3 ou mais iguais juntos pulam um nivel (escolha do usuario
-    // em 2026-10-17); acima do 13 nasce o super slime, que segura um instante e estoura
+    // em 2026-10-17); o 14 (2026-10-18) nasce de verdade, comemora e estoura: e o super slime
     animar: true,
-    particulas: (k) => (k > MAX_NIVEL ? 0 : particulasNivel(k)),
+    particulas: (k) => particulasNivel(Math.min(k, MAX_NIVEL)),
+    maxNivel: MAX_NIVEL,
+    // na vitrine (prints da textura) o 14 fica parado
+    comemora: (S, k) => !o.vitrine && k >= MAX_NIVEL,
+    estourar(S, J, base, info) {
+      const m = S.mundo;
+      const px = base.cx;
+      const py = base.cy;
+      m.remover(base);
+      // o super slime estoura numa explosao de pontos (os x2 por membro de antes)
+      const ganho = pontosNivel(MAX_NIVEL) * 2 * info.n * info.combo;
+      J.pontos += ganho;
+      J.supers = (J.supers || 0) + 1;
+      S.eventos.push({ tipo: 'estouro', x: px, y: py, cor: ap(MAX_NIVEL).hex, corTela: '#ffc93a', grande: true });
+      S.eventos.push({ tipo: 'texto', x: px, y: py + 1.5, texto: 'super', cor: '#ffd23a', escala: 1.9 });
+      S.eventos.push({ tipo: 'texto', x: px, y: py - 0.2, texto: '+' + ganho, cor: '#ffffff', escala: 0.7, grupo: 'pts' });
+      // o novo alvo depois do 14: quantos super slimes nesta partida (o main.js paga e mede)
+      if (J.idx === 0) S.eventos.push({ tipo: 'super', n: J.supers });
+    },
     nivelGrupo: (S, k, n) => (n >= 3 ? k + 1 : k),
     // o grupo e so de iguais comuns: o coringa, os irmaos da tesoura e niveis diferentes ficam no par
     agrupa(S, F, c) {
@@ -305,16 +350,6 @@ export function criarModo(o = {}) {
       const m = S.mundo;
       base.dados.prisma = false;
       base.dados.irmao = 0;
-      if (k > MAX_NIVEL) {
-        // o super slime: lava, espantado, ate estourar
-        base.nivel = MAX_NIVEL;
-        base.dados.super = true;
-        base.dados.expr = 'medo';
-        base.dados.exprT = 0;
-        transmutar(m, base, ap(MAX_NIVEL), px, py);
-        S.eventos.push({ tipo: 'som', nome: 'alvo' });
-        return;
-      }
       base.nivel = k;
       base.dados.expr = 'feliz';
       base.dados.exprT = 1.1;
@@ -322,17 +357,6 @@ export function criarModo(o = {}) {
       transmutar(m, base, ap(k), px, py);
     },
     concluir(S, J, base, k, px, py, combo, info) {
-      const m = S.mundo;
-      if (k > MAX_NIVEL) {
-        // o super slime estoura numa explosao de pontos (dois do 13 valem os x4 de sempre)
-        m.remover(base);
-        J.pontos += pontosNivel(MAX_NIVEL) * 2 * info.n * combo;
-        // a gosma que voa na tela e a brasa de dentro (a crosta da lava e escura)
-        S.eventos.push({ tipo: 'estouro', x: px, y: py, cor: ap(MAX_NIVEL).hex, corTela: '#ff8a2a', grande: true });
-        S.eventos.push({ tipo: 'texto', x: px, y: py + 1.5, texto: 'perfeito', cor: '#ffd23a', escala: 1.8 });
-        // nenhum nivel novo nasceu (o soltar.js nao registra "nivel 14")
-        return false;
-      }
       base.dados.expr = 'feliz';
       base.dados.exprT = 0.7;
       // o grupo de 3 vale as duas fusoes que ele pulou
@@ -383,7 +407,7 @@ export function criarModo(o = {}) {
           const irmao = (S.extra.cortes = (S.extra.cortes || 0) + 1);
           for (const p of pedacos) {
             p.dados.irmao = irmao;
-            m.redimensionar(p, particulasNivel(k), p.cx, p.cy);
+            m.redimensionar(p, particulasNivel(k), ...pontoRemendo(J, p, k, p.cx, p.cy));
             p.nivel = k;
             p.dados.pote = J.idx;
             p.dados.hex = ap(k).hex;
@@ -400,7 +424,7 @@ export function criarModo(o = {}) {
         if (s.nivel < MAX_NIVEL) {
           const k = s.nivel + 1;
           // a gota de tinta entra pelo alto do slime e a cor nova avanca pelo corpo
-          m.redimensionar(s, particulasNivel(k), s.cx, s.topo);
+          m.redimensionar(s, particulasNivel(k), ...pontoRemendo(J, s, k, s.cx, s.topo));
           s.nivel = k;
           transmutar(m, s, ap(k), s.cx, s.topo - 0.3);
           S.eventos.push({ tipo: 'fusao', x: s.cx, y: s.topo, cor: ap(k).hex, combo: 1, brilhos: 6 });
@@ -428,23 +452,32 @@ export function criarModo(o = {}) {
       return {
         // a bolinha da barra mostra a skin equipada (o HUD desenha a imagem pelas aparencias)
         evolucao: Array.from({ length: MAX_NIVEL }, (_, k) => ({ k, visto: k + 1 <= visto, cor: ap(k + 1).hex, textura: ap(k + 1).ap ? 0 : ap(k + 1).textura || 0 })),
-        objetivo: evento ? { evento, nivel: evento.alvo } : alvo <= MAX_NIVEL ? { nivel: alvo, cresce: J.pote.estreito, novo: alvo > visto } : null,
+        // depois do 14, o novo alvo: os super slimes da partida (o main.js poe o recorde)
+        objetivo: evento ? { evento, nivel: evento.alvo } : alvo <= MAX_NIVEL ? { nivel: alvo, cresce: J.pote.estreito, novo: alvo > visto }
+          : { supers: { n: J.supers || 0 } },
         piso: piso(S),
       };
     },
     salvar(S) {
       const J = S.jogadores[0];
-      const juntos = new Set(S.fusoes.filter((F) => F.fase !== 'atrai').map((F) => F.base));
+      // (o 14 comemorando vai como slime: ao voltar, comemora de novo e estoura)
+      const juntos = new Set(S.fusoes.filter((F) => F.fase === 'funde').map((F) => F.base));
       return {
-        pontos: J.pontos, tempo: S.tempo, fila: J.fila, poderes: J.poderes, premio: J.premio, maxNivel: J.maxNivel,
+        pontos: J.pontos, tempo: S.tempo, fila: J.fila, poderes: J.poderes, premio: J.premio, maxNivel: J.maxNivel, supers: J.supers || 0,
         alargado: J.pote.alargado, estreito: J.pote.estreito,
         // pressao: a agenda (com o evento em curso) e os coringas que ainda vao cair
         agenda: S.extra.agenda || null, coringas: S.extra.coringas || 0,
         // o alvo de um missil em voo ja esta perdido; uma fusao que ja juntou volta como os membros
         // de antes (ao voltar, eles se encostam e a fusao se refaz: os pontos entram uma vez so)
+        // cada slime com a forma (as particulas em centesimos, em volta do centro): o disco no centro
+        // de um slime achatado nascia atravessando o fundo e as paredes (print do iPhone, 2026-10-18)
         slimes: S.mundo.vivos().filter((s) => !s.preso && !s.dados.marcado && !juntos.has(s))
-          .map((s) => [s.nivel, +s.cx.toFixed(2), +s.cy.toFixed(2), s.dados.prisma ? 1 : 0])
-          .concat(...S.fusoes.filter((F) => F.fase !== 'atrai').map((F) => F.origem)),
+          .map((s) => {
+            const cx = +s.cx.toFixed(2);
+            const cy = +s.cy.toFixed(2);
+            return [s.nivel, cx, cy, s.dados.prisma ? 1 : 0, formaDe(S.mundo, s, cx, cy)];
+          })
+          .concat(...S.fusoes.filter((F) => F.fase === 'funde').map((F) => F.origem)),
       };
     },
     salvarMeta: () => ({ visto }),
@@ -456,13 +489,41 @@ export function criarModo(o = {}) {
       if (p.poderes) J.poderes = p.poderes;
       J.premio = p.premio || '';
       J.maxNivel = p.maxNivel || 1;
-      // partida de antes do pote estreito (sem a marca) ou que ja cresceu: largura de sempre
+      J.supers = p.supers || 0;
+      // partida de antes do pote estreito (sem a marca) ou que ja cresceu: largura de sempre. O
+      // pote abre na hora, antes dos slimes (animado, eles nasciam no pote largo com as paredes
+      // ainda estreitas)
       if (!p.estreito) J.pote.crescer(0);
-      if (p.alargado) J.pote.alargar();
-      // (a gosma cinza da chuva saiu do sem fim: a de um save antigo volta como slime do nivel)
-      for (const [k, x, y, prisma] of (p.slimes || []).slice().sort((a, b) => a[2] - b[2])) {
-        const s = criar(S, J, { nivel: k, prisma }, x, y, false);
-        if (s) { s.dados.pote = 0; s.dados.solto = -10; }
+      if (p.alargado) J.pote.alargar(0);
+      // o disco no centro de um slime achatado nascia atravessando o fundo e as paredes (print do
+      // iPhone, 2026-10-18): cada slime volta com a forma salva, presa do lado de dentro; o que nao
+      // tem forma (save antigo, membros de uma fusao) volta em disco inteiro dentro do pote, por cima,
+      // sem sobrepor muito os outros (o contato separa so na posicao). Por 3 s ninguem conta para o
+      // perigo. (a gosma cinza da chuva saiu do sem fim: a de um save antigo volta como slime do nivel)
+      /** @type {number[][]} */
+      const postos = [];
+      const junto = (/** @type {number} */ px, /** @type {number} */ py, /** @type {number} */ r) =>
+        postos.some(([qx, qy, qr]) => (qx - px) * (qx - px) + (qy - py) * (qy - py) < 0.72 * (qr + r) * (qr + r));
+      const lista = (p.slimes || []).slice().sort((a, b) => a[2] - b[2]);
+      // primeiro os que tem a forma salva (voltam como estavam, presos do lado de dentro)...
+      for (const [k, x, y, prisma, forma] of lista) {
+        if (!Array.isArray(forma) || forma.length < 6) continue;
+        const pontos = J.pote.prenderPontos(forma.map((v, i) => (i & 1 ? y : x) + v / 100));
+        const s = criar(S, J, { nivel: k, prisma, pontos }, x, y, false);
+        if (s) { s.dados.pote = 0; s.dados.solto = S.mundo.tempo + 1.6; s.dados.pousou = true; }
+        postos.push([x, y, diametroNivel(k) / 2]);
+      }
+      // ... depois os sem forma (save antigo, membros de uma fusao) em disco, por cima
+      for (const [k, x, y, prisma, forma] of lista) {
+        if (Array.isArray(forma) && forma.length >= 6) continue;
+        const r = diametroNivel(k) / 2;
+        let [px, py] = J.pote.lugar(r, x, y);
+        for (let t = 0; t < 200 && junto(px, py, r); t++) {
+          [px, py] = J.pote.lugar(r, x, py + 0.1);
+        }
+        postos.push([px, py, r]);
+        const s = criar(S, J, { nivel: k, prisma }, px, py, false);
+        if (s) { s.dados.pote = 0; s.dados.solto = S.mundo.tempo + 1.6; s.dados.pousou = true; }
       }
       if (!comPressao) return;
       if (p.agenda) S.extra.agenda = criarAgenda(p.agenda);
@@ -496,7 +557,7 @@ export function criarModo(o = {}) {
     // depuracao: os niveis altos (texturas) e o coringa ja no pote
     const S = jogo.S;
     const J = S.jogadores[0];
-    const lista = o.vitrine === 5 ? [[13, 0, 4.0]]
+    const lista = o.vitrine === 6 ? [[14, 0, 4.2]] : o.vitrine === 5 ? [[13, 0, 4.0]]
       : o.vitrine === 4
         ? [[6, -2.2, 1.7], [5, 1.9, 1.5], [4, -2.6, 5.2], [3, 0.2, 4.8], [2, 2.8, 4.6], [1, -1.2, 7.6], [7, 1.6, 8.2]]
         : o.vitrine === 3 ? [[11, 0, 3.4]] : o.vitrine === 2 ? [[12, 0, 3.8]] : [[10, -1.6, 2.8], [9, 2.2, 2.6], [8, -1.6, 8], [7, 2.2, 7.6]];

@@ -84,11 +84,11 @@ const GANHO_FRASE = { uau: 0.6, iupi: 1.35, oba: 1, eek: 1.8, aww: 0.55, uhuu: 0
 export const FALAS_DO_JOGO = Object.freeze(['uau', 'iupi', 'oba', 'eek', 'aww', 'uhuu', 'missao', 'venceu']);
 
 /**
- * Tom (f0, Hz) do slime pelo nivel: 1 fala a ~470 Hz, 13 a ~170 Hz.
+ * Tom (f0, Hz) do slime pelo nivel: 1 fala a ~470 Hz, 13 a ~170 Hz, 14 a ~156 Hz.
  * @param {number} nivel
  */
 export function tomDoNivel(nivel) {
-  const n = Math.max(1, Math.min(13, Math.floor(nivel) || 4));
+  const n = Math.max(1, Math.min(14, Math.floor(nivel) || 4));
   return 470 * Math.pow(2, -(n - 1) / 8.2);
 }
 

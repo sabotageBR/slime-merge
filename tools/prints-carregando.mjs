@@ -1,6 +1,7 @@
-// Prints da tela de carregamento (o bequer enchendo de slime, 2026-10-17) para a aprovacao do
-// usuario: o index.html sem o SDK e sem o main.js (a tela fica parada nela), em 3 momentos, no
-// retrato e na paisagem. Folha em docs/visuais/carregando.jpg.
+// Prints da tela de carregamento (o bequer enchendo de slime em camadas de todas as cores,
+// 2026-10-18) para a aprovacao do usuario: o index.html sem o SDK e sem o main.js (a tela fica
+// parada nela), em 4 momentos, no retrato e na paisagem, e um GIF de 7 s no retrato. Folha em
+// docs/visuais/carregando.jpg e GIF em docs/visuais/carregando-390x844.gif.
 // Uso: node tools/prints-carregando.mjs
 import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -26,12 +27,14 @@ try {
     try {
       await c.ir(`http://127.0.0.1:${porta}/.tmp/carregando/index.html`, 0);
       let t = 0;
-      for (const ms of [300, 1500, 4000]) {
+      // no retrato tambem os quadros do GIF (a cada 100 ms ate 7 s)
+      const marcas = w < h ? Array.from({ length: 70 }, (_, k) => (k + 1) * 100) : [];
+      for (const ms of [...new Set([400, 1500, 3200, 7000, ...marcas])].sort((a, b) => a - b)) {
         await espera(ms - t);
         t = ms;
-        const nome = join(pasta, `${w}x${h}-${ms}.png`);
+        const nome = join(pasta, `${w}x${h}-${String(ms).padStart(5, '0')}.png`);
         writeFileSync(nome, await c.print());
-        quadros.push(nome);
+        if ([400, 1500, 3200, 7000].includes(ms)) quadros.push(nome);
       }
     } finally {
       await c.fechar();
@@ -45,3 +48,7 @@ const filtro = quadros.map((_, k) => `[${k}]scale=-1:600[q${k}]`).join(';') + ';
 const folha = join(RAIZ, 'docs/visuais/carregando.jpg');
 execFileSync('ffmpeg', ['-loglevel', 'error', '-y', ...entradas, '-filter_complex', filtro, '-q:v', '3', folha]);
 console.log('folha', folha);
+const gif = join(RAIZ, 'docs/visuais/carregando-390x844.gif');
+execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-framerate', '10', '-pattern_type', 'glob', '-i', join(pasta, '390x844-*.png'),
+  '-vf', 'scale=260:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse', gif]);
+console.log('gif', gif);

@@ -33,6 +33,8 @@ function fundoTextura(cor, t) {
     case 5: return 'radial-gradient(circle at 30% 35%, #fff 0 5%, transparent 7%), radial-gradient(circle at 68% 62%, #fff 0 4%, transparent 6%), radial-gradient(circle at 55% 25%, #ff8ad8 0 3%, transparent 5%), radial-gradient(circle at 50% 70%, #6b3fa8, #1c1f45)';
     case 6: return 'conic-gradient(#ffd6f5, #d6f0ff, #fff7c2, #d9ffe0, #ffd6f5)';
     case 7: return 'radial-gradient(circle at 30% 60%, #ffcf4a 0 6%, transparent 12%), linear-gradient(120deg, transparent 40%, #ff6a1a 42% 47%, transparent 49%), linear-gradient(40deg, transparent 55%, #ff8a1a 57% 61%, transparent 63%), #3b1612';
+    // ouro (o nivel 14)
+    case 8: return 'radial-gradient(circle at 70% 30%, #fff 0 6%, transparent 9%), linear-gradient(135deg, #9a6210 0%, #ffd75a 45%, #fff1b0 52%, #e0a020 60%, #8a5410 100%)';
     default: return cor;
   }
 }
@@ -268,7 +270,18 @@ export function criarHud(doc, T) {
       if (!h) return;
       if (h.pontos !== null && h.pontos !== undefined) {
         const p = String(h.pontos);
-        if (p !== ultimo.pontos) { ultimo.pontos = p; el.pontos.textContent = typeof h.pontos === 'string' ? p : (T.pontos || 'Score') + ': ' + p; }
+        if (p !== ultimo.pontos) {
+          ultimo.pontos = p;
+          // o rotulo num span: no retrato do celular ele some e fica so o numero (o botao da Poki
+          // ocupa o canto de cima a esquerda; print do iPhone, 2026-10-18)
+          if (typeof h.pontos === 'string') el.pontos.textContent = p;
+          else {
+            el.pontos.textContent = '';
+            const rot = doc.createElement('i');
+            rot.textContent = (T.pontos || 'Score') + ': ';
+            el.pontos.append(rot, p);
+          }
+        }
         const r = String(h.recorde || 0);
         if (r !== ultimo.recorde) { ultimo.recorde = r; el.recorde.textContent = typeof h.recorde === 'string' ? r : (T.recorde || 'Best') + ': ' + r; }
       }
@@ -296,6 +309,9 @@ export function criarHud(doc, T) {
                 + '</div>'
             : mi
               ? `<div class="objetivo missao"><b aria-hidden="true">${ICONE_MISSAO[mi.tipo] || '•'}</b><span>${texto('missao.' + mi.tipo, { n: mi.meta })} · ${mi.prog}/${mi.meta} · +${mi.premio} 💧</span></div>`
+            : ob.supers
+              // depois do 14 (2026-10-18): os super slimes da partida e o recorde
+              ? `<div class="objetivo super"><b aria-hidden="true">🌟</b><span>${texto('pilula.super', { n: ob.supers.n, r: ob.supers.recorde || 0 })}</span></div>`
               : `<div class="objetivo${ob.cresce ? ' cresce' : ''}">${bola(ob.nivel)}<span>${texto(ob.cresce ? 'objetivoCresce' : 'objetivoProximo', { n: ob.nivel })}${ob.premio ? ` · +${ob.premio} 💧` : ''}</span></div>`;
           el.meta.innerHTML = pilula + '<div class="evolucao">' + h.evolucao.map((e) => {
             const tam = (1.05 + e.k * 0.07).toFixed(2);

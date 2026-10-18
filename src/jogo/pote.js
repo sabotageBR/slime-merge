@@ -3,7 +3,8 @@
 // pote inteiro (terremoto).
 // Logica pura: sem DOM, sem relogio, sem Math.random (o tempo entra por dt).
 
-import { polilinha } from '../fisica/paredes.js';
+import { polilinha, ESPESSURA } from '../fisica/paredes.js';
+import { R_PART } from '../fisica/mundo.js';
 import { cesto as acharCesto } from './cestos.js';
 
 /** Alargar: o cesto inteiro abre 14% na horizontal (vale para qualquer formato). */
@@ -29,6 +30,27 @@ function tri(u) {
 const GUIA = [0.87, 0.5];
 /** Folga minima entre a guia e o meio entre dois potes (Duelo). */
 const FOLGA_MEIO = 0.25;
+/** Distancia do eixo da parede ao centro de uma particula encostada nela (por dentro). */
+const ENCOSTA = ESPESSURA + R_PART;
+/**
+ * Rede de seguranca (2026-10-18, print do iPhone com um nivel 11 atravessado na parede): a parede e
+ * uma capsula de dois lados, e a particula que passa do eixo dela fica do lado de fora para
+ * sempre. Quem tem particulas fora do pote (abaixo da borda) por `REDE_T` s volta inteiro para dentro.
+ */
+export const REDE_T = 0.4;
+/** Ate esta fracao do slime fora, so as particulas de fora voltam (o resto do corpo fica). */
+const POUCAS = 0.15;
+
+/** Distancia do ponto ao segmento. */
+function distSeg(x, y, ax, ay, bx, by) {
+  const ex = bx - ax;
+  const ey = by - ay;
+  const l2 = ex * ex + ey * ey;
+  const t = l2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * ex + (y - ay) * ey) / l2)) : 0;
+  const dx = x - ax - t * ex;
+  const dy = y - ay - t * ey;
+  return Math.sqrt(dx * dx + dy * dy);
+}
 
 /**
  * @param {{ mundo: any, cx?: number, cesto?: string, eventos: any[], indice?: number, faixa?: number[], largura?: number }} o
@@ -40,6 +62,8 @@ export function criarPote({ mundo, cx = 0, cesto = 'becher', eventos, indice = 0
   const base = C.linhas.flatMap((l) => polilinha(l, 0.22));
   // a polilinha do cesto vai do topo esquerdo ao topo direito (as pontas da borda)
   const pts = C.linhas[0];
+  /** capsulas da primeira polilinha (o contorno do pote, as primeiras de `base`) */
+  const nContorno = pts.length - 1;
   const topos = [pts[0], pts[pts.length - 1]];
   // Alargar por lado, sem invadir a faixa do vizinho (Duelo): no pote sozinho, 14% dos dois lados
   let maxE = 0;
@@ -114,6 +138,8 @@ export function criarPote({ mundo, cx = 0, cesto = 'becher', eventos, indice = 0
     tremorDur: 0,
     /** fusao em andamento neste pote: a janela do combo nao corre (a animacao nao quebra a cadeia) */
     segurarCombo: false,
+    /** particulas que a rede de seguranca puxou de volta para dentro (testes e a cacada de tools/vazamento.mjs) */
+    puxadas: 0,
   };
 
   /**
@@ -122,9 +148,219 @@ export function criarPote({ mundo, cx = 0, cesto = 'becher', eventos, indice = 0
    */
   function limitarMira(x) {
     const ps = mundo.paredes;
-    const e = ps[idxParedes[0]].ax + recuo[0];
-    const d = ps[idxParedes[idxParedes.length - 1]].bx - recuo[1];
+    const r = P.preso ? P.preso.raio0 : 0;
+    const e = ps[idxParedes[0]].ax + recuo[0] + folgaGrande(0, r);
+    const d = ps[idxParedes[idxParedes.length - 1]].bx - recuo[1] - folgaGrande(1, r);
     return Math.max(e, Math.min(d, x));
+  }
+
+  /**
+   * Quanto a mira recua da borda k para o slime de raio r nao nascer espetado na guia ou no topo
+   * da parede (o 8 e o gigante 9 nasciam com particulas do lado de fora). O pequeno continua indo
+   * ate o topo do vidro (escolha de 2026-10-15).
+   * @param {number} k 0 esquerda, 1 direita @param {number} r
+   */
+  function folgaGrande(k, r) {
+    if (r <= 0) return 0;
+    const ps = mundo.paredes;
+    const lado = k === 0 ? 1 : -1;
+    const x0 = k === 0 ? ps[idxParedes[0]].ax + recuo[0] : ps[idxParedes[idxParedes.length - 1]].bx - recuo[1];
+    // o tremor do terremoto anda com as paredes: a folga cobre o pico dele
+    const D = r + ENCOSTA + 0.05 + (P.tremorDur > 0 ? TREMOR.ax : 0);
+    const lista = [...idxParedes, ...idxGuias];
+    for (let s = 0; s < 6; s += 0.05) {
+      const X = x0 + lado * s;
+      let ok = true;
+      for (const i of lista) {
+        const p = ps[i];
+        if (distSeg(X, ySoltar, p.ax, p.ay, p.bx, p.by) < D) { ok = false; break; }
+      }
+      if (ok) return s;
+    }
+    return 6;
+  }
+
+  /**
+   * Contorno do pote agora (eixo das paredes, com o tremor), do topo esquerdo ao topo direito.
+   * @returns {number[]} [x0, y0, x1, y1, ...]
+   */
+  function contorno() {
+    const ps = mundo.paredes;
+    const pts = [];
+    for (let k = 0; k < nContorno; k++) {
+      const p = ps[idxParedes[k]];
+      const tx = p.tx || 0;
+      const ty = p.ty || 0;
+      if (!k) pts.push(p.ax + tx, p.ay + ty);
+      pts.push(p.bx + tx, p.by + ty);
+    }
+    return pts;
+  }
+
+  /**
+   * Eixo das paredes na altura y: [x da esquerda, x da direita]. Acima de uma borda vale a ponta
+   * dela; abaixo do fundo, null.
+   * @param {number[]} pts contorno @param {number} y
+   */
+  function paredesEm(pts, y) {
+    const u = pts.length - 2;
+    const meio = (pts[0] + pts[u]) / 2;
+    let e = -Infinity;
+    let d = Infinity;
+    for (let i = 0; i < u; i += 2) {
+      const ay = pts[i + 1];
+      const by = pts[i + 3];
+      if (ay === by || y < Math.min(ay, by) || y > Math.max(ay, by)) continue;
+      const xi = pts[i] + ((y - ay) * (pts[i + 2] - pts[i])) / (by - ay);
+      if (xi < meio) { if (xi > e) e = xi; } else if (xi < d) d = xi;
+    }
+    if (e === -Infinity) { if (y < pts[1]) return null; e = pts[0]; }
+    if (d === Infinity) { if (y < pts[u + 1]) return null; d = pts[u]; }
+    return [e, d];
+  }
+
+  /**
+   * Um lugar para um disco de raio r inteiro dentro do pote, o mais perto de (x, y): x preso entre
+   * as paredes; sem espaco nessa altura, sobe.
+   * @param {number} r @param {number} x @param {number} y
+   * @returns {number[]} [x, y]
+   */
+  function lugar(r, x, y) {
+    const pts = contorno();
+    for (let k = 0; k < 120; k++, y += 0.1) {
+      // o fundo do disco com a folga da parede tem que ficar acima do fundo
+      if (!paredesEm(pts, y - r - ENCOSTA)) continue;
+      let lo = -Infinity;
+      let hi = Infinity;
+      let ok = true;
+      for (const f of [-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1]) {
+        const w = paredesEm(pts, y + f * r);
+        if (!w) { ok = false; break; }
+        const meia = r * Math.sqrt(1 - f * f);
+        lo = Math.max(lo, w[0] + ENCOSTA + meia);
+        hi = Math.min(hi, w[1] - ENCOSTA - meia);
+      }
+      if (ok && lo <= hi) return [Math.max(lo, Math.min(hi, x)), y];
+    }
+    return [P.cx, y];
+  }
+
+  /**
+   * Prende os pontos [x0, y0, x1, y1, ...] do lado de dentro das paredes, encostados nelas (a
+   * partida salva no meio de um tremor volta com o pote parado). Acima da borda, nada muda.
+   * @param {number[]} lista (alterada no lugar)
+   */
+  function prenderPontos(lista) {
+    const pts = contorno();
+    const borda = Math.min(pts[1], pts[pts.length - 1]);
+    for (let i = 0; i + 1 < lista.length; i += 2) {
+      let y = lista[i + 1];
+      if (y >= borda) continue;
+      for (let k = 0; k < 60 && !paredesEm(pts, y - ENCOSTA); k++) y += 0.02;
+      const w = paredesEm(pts, y);
+      if (!w) continue;
+      const e = w[0] + ENCOSTA;
+      const d = w[1] - ENCOSTA;
+      if (e < d) lista[i] = Math.max(e, Math.min(d, lista[i]));
+      lista[i + 1] = y;
+    }
+    return lista;
+  }
+
+  /** O ponto esta entre as paredes (abaixo da borda) ou acima da boca do pote? */
+  function contem(x, y) {
+    const w = paredesEm(contorno(), y);
+    return !!w && x > w[0] && x < w[1];
+  }
+
+  /**
+   * As particulas do lado de fora do pote, abaixo da borda mais baixa (o que esta acima da boca, em
+   * cima da pilha ou da borda, nao conta), por slime. Uma passada por todas: o miolo seguro de cada
+   * faixa de 0,25 u decide a maioria; o teste exato so perto das paredes.
+   * @param {number[]} pts contorno
+   * @returns {Map<number, number[]>} indice do slime -> indices das particulas
+   */
+  function particulasFora(pts) {
+    const out = new Map();
+    const u = pts.length - 2;
+    const meio = (pts[0] + pts[u]) / 2;
+    const borda = Math.min(pts[1], pts[u + 1]);
+    let fundo = Infinity;
+    for (let i = 1; i < pts.length; i += 2) if (pts[i] < fundo) fundo = pts[i];
+    const H = 0.25;
+    const nf = Math.max(1, Math.ceil((borda - fundo) / H));
+    const mioloE = new Float64Array(nf);
+    const mioloD = new Float64Array(nf);
+    for (let k = 0; k < nf; k++) {
+      const y0 = fundo + k * H;
+      const a = paredesEm(pts, y0);
+      const b = paredesEm(pts, y0 + H);
+      if (!a || !b) { mioloE[k] = Infinity; mioloD[k] = -Infinity; continue; }
+      let e = Math.max(a[0], b[0]);
+      let d = Math.min(a[1], b[1]);
+      // um vertice dentro da faixa pode apertar o miolo (a aba do aquario)
+      for (let i = 0; i <= u; i += 2) {
+        if (pts[i + 1] <= y0 || pts[i + 1] >= y0 + H) continue;
+        if (pts[i] < meio) e = Math.max(e, pts[i]); else d = Math.min(d, pts[i]);
+      }
+      mioloE[k] = e;
+      mioloD[k] = d;
+    }
+    const { x, y, sl } = mundo;
+    for (let i = 0, n = mundo.n; i < n; i++) {
+      const yi = y[i];
+      if (yi >= borda) continue;
+      const k = Math.floor((yi - fundo) / H);
+      if (k >= 0 && k < nf && x[i] > mioloE[k] && x[i] < mioloD[k]) continue;
+      const w = paredesEm(pts, yi);
+      if (w && x[i] >= w[0] && x[i] <= w[1]) continue;
+      const lista = out.get(sl[i]);
+      if (lista) lista.push(i); else out.set(sl[i], [i]);
+    }
+    return out;
+  }
+
+  /**
+   * Rede de seguranca. Poucas particulas fora (a que escorregou por cima da borda ao soltar)
+   * voltam na hora para a face de dentro da parede; um pedaco grande fora por REDE_T s (o slime
+   * atravessado do print, ou o que caiu inteiro por fora) volta o slime inteiro, em disco, por
+   * cima da pilha. A fusao, o alvo do missil e o preso ficam de fora: cada um acaba sozinho.
+   * @param {number} dt
+   */
+  function rede(dt) {
+    const pts = contorno();
+    const fora = particulasFora(pts);
+    for (const s of mundo.slimes) {
+      if (!s.ativo || s.preso || s.dados.pote !== indice || s.dados.fundindo || s.dados.marcado) continue;
+      const lista = fora.get(s.idx);
+      if (!lista) { s.dados.foraT = 0; continue; }
+      if (lista.length <= Math.max(3, POUCAS * s.n)) {
+        const alvo = [];
+        for (const i of lista) alvo.push(mundo.x[i], mundo.y[i]);
+        mundo.reposicionar(lista, prenderPontos(alvo));
+        P.puxadas += lista.length;
+        s.dados.foraT = 0;
+        continue;
+      }
+      s.dados.foraT = (s.dados.foraT || 0) + dt;
+      if (s.dados.foraT < REDE_T) continue;
+      s.dados.foraT = 0;
+      const r = s.raio0;
+      // em cima de quem esta embaixo dele (dentro do pote), na coluna mais perto
+      const [x0] = lugar(r, s.cx, linha);
+      let topo = mundo.chaoY;
+      for (const o of mundo.slimes) {
+        if (!o.ativo || o === s || o.preso || o.dados.pote !== indice) continue;
+        if (o.dir > x0 - r && o.esq < x0 + r && o.topo > topo) topo = o.topo;
+      }
+      const [x1, y1] = lugar(r, x0, topo + r + 0.2);
+      mundo.recolocar(s, x1, y1);
+      s.dados.solto = mundo.tempo;
+      s.dados.pousou = false;
+      s.dados.caindo = false;
+      s.dados.queda = 0;
+      eventos.push({ tipo: 'volta', pote: indice, x: x1, y: y1, cor: s.dados.hex, nivel: s.nivel });
+    }
   }
 
   return Object.assign(P, {
@@ -184,11 +420,8 @@ export function criarPote({ mundo, cx = 0, cesto = 'becher', eventos, indice = 0
       if (P.recarga > 0) P.recarga -= dt;
       if (P.teclaEsq || P.teclaDir) P.apontar(P.mira + (P.teclaDir ? 1 : -1) * 9 * dt);
       if (P.comboT > 0 && !P.segurarCombo) { P.comboT -= dt; if (P.comboT <= 0) P.combo = 0; }
-      // rede de seguranca: quem escapou do pote (nao deve acontecer) sai do mundo
-      for (const s of mundo.slimes) {
-        if (!s.ativo || s.preso || s.dados.pote !== indice) continue;
-        if (s.cy < mundo.chaoY - 1.5) { eventos.push({ tipo: 'fora', pote: indice, x: s.cx, y: s.cy }); mundo.remover(s); }
-      }
+      // rede de seguranca: quem ficou espetado na parede ou caiu por fora volta para dentro
+      rede(dt);
       // chacoalhar: onda quadrada na gravidade lateral (sem trigonometria)
       if (P.chacoalhar > 0) {
         P.chacoalhar -= dt;
@@ -255,17 +488,23 @@ export function criarPote({ mundo, cx = 0, cesto = 'becher', eventos, indice = 0
       const p = mundo.paredes[idxParedes[0]];
       return p && (P.tremorDur > 0 || p.tx || p.ty) ? { x: p.tx, y: p.ty } : null;
     },
-    /** Reforco Alargar: o cesto abre 14% para os lados. */
-    alargar() {
+    /**
+     * Reforco Alargar: o cesto abre 14% para os lados.
+     * @param {number} [tempo] s da animacao (0 = na hora, ao restaurar a partida)
+     */
+    alargar(tempo = 0.6) {
       if (P.alargado) return false;
       P.alargado = true;
       base.forEach((p, k) => {
-        mundo.moverParede(idxParedes[k], { ax: xDe(p.ax, true), ay: p.ay, bx: xDe(p.bx, true), by: p.by }, 0.6);
+        mundo.moverParede(idxParedes[k], { ax: xDe(p.ax, true), ay: p.ay, bx: xDe(p.bx, true), by: p.by }, tempo);
       });
       // as guias andam junto (mesmo tempo: nao descolam da borda)
-      idxGuias.forEach((i, k) => mundo.moverParede(i, guia(k, true), 0.6));
+      idxGuias.forEach((i, k) => mundo.moverParede(i, guia(k, true), tempo));
       return true;
     },
+    lugar,
+    contem,
+    prenderPontos,
     /**
      * O pote estreito do comeco cresce ate a largura de sempre (mantendo o Alargar, se usado).
      * @param {number} [tempo] s da animacao (0 = na hora, ao restaurar a partida)

@@ -139,8 +139,8 @@ body.soFolha .folha { display: none; }
         <p class="dica">O corpo é pigmento de verdade (Kubelka-Munk), por isso não há branco nem tons pastel: com menos de 25% de pigmento, a gosma cinza do Duelo não pegaria a cor. A “cor do nível” mantém a textura do nível por baixo dos pixels transparentes.</p>
         <span class="rotulo">Preços propostos</span>
         <ul class="precos">
-          <li><b>Paramétrica</b> (padrão desenhado no shader, com a cor da skin): 80 + 10 × nível gotas (90 a 210).</li>
-          <li><b>Pixel</b> (desenho 16×16, ladrilho ou estampa): 120 + 15 × nível (135 a 315).</li>
+          <li><b>Paramétrica</b> (padrão desenhado no shader, com a cor da skin): 80 + 10 × nível gotas (90 a 220).</li>
+          <li><b>Pixel</b> (desenho 16×16, ladrilho ou estampa): 120 + 15 × nível (135 a 330).</li>
           <li><b>Minha</b>: 150 por nível, comprada uma vez e editável à vontade.</li>
         </ul>
       </div>
@@ -183,7 +183,7 @@ body.soFolha .folha { display: none; }
 
 <script type="module">
 import { PALETA, NOMES_PALETA, BASES, NOMES_BASES, aparencia, PRECO_MINHA, pxDeLinhas, codificar, SKINS } from '../src/jogo/skins.js';
-import { NIVEIS } from '../src/jogo/niveis.js';
+import { NIVEIS, MAX_NIVEL } from '../src/jogo/niveis.js';
 import { hexDaMistura } from '../src/cor/km.js';
 import { OBJETOS } from '../src/render/rostos.js';
 import { criarPalco } from '../src/render/palco.js';
@@ -193,7 +193,7 @@ import { CANDIDATAS } from './skins-candidatas.js';
 const q = new URLSearchParams(location.search);
 const CHAVE = 'slime.skinsEstudio';
 const NOMES = { gotinha: 'Gotinha', broto: 'Broto', lilas: 'Lilás', pimenta: 'Pimenta', tangerina: 'Tangerina', limao: 'Limão', nuvem: 'Nuvem',
-  arcoiris: 'Arco-íris', mar: 'Mar', uva: 'Uva', chiclete: 'Chiclete', noite: 'Noite', ouro: 'Ouro', lava: 'Lava', aurora: 'Aurora', cristal: 'Cristal' };
+  arcoiris: 'Arco-íris', mar: 'Mar', uva: 'Uva', chiclete: 'Chiclete', noite: 'Noite', ouro: 'Ouro', lava: 'Lava', aurora: 'Aurora', cristal: 'Cristal', plasma: 'Plasma' };
 const nomeNivel = (k) => NOMES[NIVEIS[k - 1].nome] || NIVEIS[k - 1].nome;
 // as 2 por nivel que o usuario escolheu em 2026-10-15 (o catalogo SKINS do jogo)
 const ESCOLHIDAS = {};
@@ -243,11 +243,11 @@ $('perguntas').addEventListener('click', (e) => {
 desenharPerguntas();
 
 // ------------------------------------------------------------ niveis e fichas
-const porNivel = Array.from({ length: 14 }, () => []);
+const porNivel = Array.from({ length: MAX_NIVEL + 1 }, () => []);
 for (const c of CANDIDATAS) porNivel[c.nivel].push(c);
 const fichas = []; // { cv, k, skin, ap }
 let html = '';
-for (let k = 1; k <= 13; k++) {
+for (let k = 1; k <= MAX_NIVEL; k++) {
   const pad = aparencia(k, 'padrao');
   html += `<section class="nivel" id="nivel-${k}" aria-labelledby="t-n${k}"><h2 id="t-n${k}"><i class="bola" style="--c:${pad.hex}" aria-hidden="true"></i>Nível ${k} · ${nomeNivel(k)} <small id="cont-${k}"></small></h2><div class="fichas">`;
   html += `<div class="ficha padrao" data-k="${k}" data-id="padrao" tabindex="0"><canvas></canvas><span class="txt"><span class="tipo">Padrão · grátis</span><b>O de hoje</b><span class="nota">${k >= 7 ? 'Textura do nível no shader.' : 'Cor lisa do nível.'}</span></span></div>`;
@@ -282,7 +282,7 @@ function atualizarMarcas() {
     f.el.setAttribute('aria-pressed', String(n >= 0));
     f.el.querySelector('.marca').textContent = n >= 0 ? String(n + 1) : '';
   }
-  for (let k = 1; k <= 13; k++) $('cont-' + k).textContent = `${(salvo.marcadas[k] || []).length} de 2`;
+  for (let k = 1; k <= MAX_NIVEL; k++) $('cont-' + k).textContent = `${(salvo.marcadas[k] || []).length} de 2`;
   resumir();
 }
 $('niveis').addEventListener('click', (e) => {
@@ -297,7 +297,7 @@ function resumir() {
   let n = 0;
   const linhas = ['Skins escolhidas no Estúdio de skins (modelos/skins.html):'];
   const faltam = [];
-  for (let k = 1; k <= 13; k++) {
+  for (let k = 1; k <= MAX_NIVEL; k++) {
     const lista = salvo.marcadas[k] || [];
     n += lista.length;
     if (lista.length < 2) faltam.push(k);
@@ -402,7 +402,7 @@ function quadro(t) {
 // ------------------------------------------------------------ editor
 let editor = null;
 const sel = $('nivelEditor');
-sel.innerHTML = Array.from({ length: 13 }, (_, i) => `<option value="${i + 1}">${i + 1} · ${nomeNivel(i + 1)}</option>`).join('');
+sel.innerHTML = Array.from({ length: MAX_NIVEL }, (_, i) => `<option value="${i + 1}">${i + 1} · ${nomeNivel(i + 1)}</option>`).join('');
 sel.value = String(salvo.nivelEditor || 3);
 function prontasDe(k) {
   const doNivel = CANDIDATAS.filter((c) => c.tipo === 'pixel' && c.nivel === k);
@@ -446,7 +446,7 @@ async function montarFolha() {
   const larguraBloco = rot + 4 * (C + gap) + gap;
   const altLinha = C + 66;
   const topo = 118;
-  const blocos = [[1, 7], [8, 13]];
+  const blocos = [[1, 7], [8, MAX_NIVEL]];
   cv.width = larguraBloco * 2 + 40;
   cv.height = topo + 7 * altLinha + 30;
   const g = cv.getContext('2d');

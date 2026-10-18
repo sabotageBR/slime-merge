@@ -1,5 +1,5 @@
 // Quadros da fusao animada (2026-10-17) para a aprovacao do usuario: o par com o combo em cadeia
-// e o selo, o grande | vao | grande que vira k+2, o super slime do 13 que segura e estoura, e o
+// e o selo, o grande | vao | grande que vira k+2, o 14 que nasce, comemora e estoura (o super slime), e o
 // terremoto com o pote tremendo. Chrome headless pelo DevTools Protocol, laco pausado e
 // __slime.avancar(n). GIF de cada cena em docs/visuais/fusao-<cena>-<LxA>.gif e a folha com os
 // quadros-chave em docs/visuais/fusao-<LxA>.jpg.
@@ -30,7 +30,7 @@ const CENAS = [
   ['trio', '', `${POR} const a = por(7, 0, 3); const r = a.raio0; S.mundo.remover(a); por(7, -1.8 * r, r + 0.2); por(7, 1.8 * r, r + 0.2); true`,
     [40, 2, 60], { 0: 'grandes', 1: 'gota' }],
   ['super', '', `${POR} const a = por(13, 0, 3); const r = a.raio0; S.mundo.remover(a); por(13, 0, r * 0.8); por(13, 0.4, r * 2.6 + 0.3); true`,
-    [2, 3, 50], { 4: 'abraco', 12: 'super', 26: 'incha', 34: 'estoura', 40: 'perfeito' }],
+    [2, 3, 70], { 4: 'abraco', 14: 'nasce14', 30: 'comemora', 56: 'estoura', 62: 'super' }],
   ['terremoto', '&auto=1500&passos=6000', `__slime.pararAuto(); __slime.J.modo.S.jogadores[0].jogadas = 9; __slime.J.modo.forcarEvento('terremoto'); true`,
     [118, 2, 60], { 2: 'comeca', 8: 'treme', 14: 'treme2', 40: 'para' }],
 ];

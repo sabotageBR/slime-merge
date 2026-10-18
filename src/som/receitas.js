@@ -427,7 +427,7 @@ function fiufiu(v, t0, vol) {
 }
 
 /** Fator de altura pelo nivel: 3 fica igual; os pequenos agudos e os grandes graves. */
-const altura = (/** @type {any} */ p) => Math.pow(2, (3 - Math.max(1, Math.min(13, (p && p.nivel) || 3))) / 24);
+const altura = (/** @type {any} */ p) => Math.pow(2, (3 - Math.max(1, Math.min(14, (p && p.nivel) || 3))) / 24);
 /** Combo k >= 1. */
 const comboK = (/** @type {any} */ p) => Math.max(1, Math.floor((p && p.k) || 1));
 

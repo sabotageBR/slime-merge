@@ -22,12 +22,13 @@ export const MISSIL = Object.freeze({ choro: 0.3, impacto: 0.75 });
  *    moles e puxados para o centro do grupo; entra quem encosta ou chega a `folga` u de um membro
  *    (grande | vao | grande com a gota no meio: os tres juntos);
  *  - `funde` (`funde` s): um corpo so, que escoa e encolhe aos poucos ate o nivel novo;
- *  - `segura` (`segura` s, so acima do ultimo nivel): o super slime incha, treme e estoura.
+ *  - `comemora` (`comemora` s, so no ultimo nivel; 2026-10-18): o 14 nasce de verdade (cartao,
+ *    funil, gotas), incha, treme o rosto e estoura (o super slime; o pote fica livre de novo).
  * Tudo deterministico (o mesmo da fisica: nada de rng aqui).
  */
 export const FUSAO = Object.freeze({
-  atrai: 0.22, atraiExtra: 0.12, atraiMax: 0.45, funde: 0.4, segura: 1.0,
-  folga: 0.5, acel: 25, vmax: 2.5, mole: 0.6, rampa: 2.5, incha: 0.05, treme: 0.9,
+  atrai: 0.22, atraiExtra: 0.12, atraiMax: 0.45, funde: 0.4, comemora: 2.0,
+  folga: 0.5, acel: 25, vmax: 2.5, mole: 0.6, rampa: 2.5, incha: 0.05,
 });
 
 /**
@@ -42,7 +43,10 @@ export const FUSAO = Object.freeze({
  * @property {(S: any, J: any, base: any, outro: any, k: number, px: number, py: number, combo: number) => boolean|void} [fundir]
  *   fusao na hora (sem `animar`: Croma)
  * @property {boolean} [animar]   fusao animada (FUSAO): `particulas`, `juntar` e `concluir` no lugar do `fundir`
- * @property {(k: number) => number} [particulas]   particulas do nivel que nasce (0 = o super slime segura e estoura)
+ * @property {(k: number) => number} [particulas]   particulas do nivel que nasce
+ * @property {number} [maxNivel]   ultimo nivel (o grupo e o coringa que passariam dele fazem o ultimo)
+ * @property {(S: any, k: number) => boolean} [comemora]   o nivel k comemora e estoura depois do estalo (o ultimo)
+ * @property {(S: any, J: any, base: any, info: { n: number, combo: number }) => void} [estourar]   o fim da comemoracao
  * @property {(S: any, F: Fusao, c: any) => boolean} [agrupa]   c entra no grupo em formacao (sem ele, so pares)
  * @property {(S: any, k: number, n: number) => number} [nivelGrupo]   nivel de n membros cujo par daria k
  * @property {(S: any, J: any, base: any, k: number, px: number, py: number) => void} [juntar]   a costura some: nivel, cor, rosto
@@ -64,9 +68,9 @@ export const FUSAO = Object.freeze({
  */
 
 /**
- * @typedef {{ id: number, pote: number, fase: 'atrai'|'funde'|'segura', t: number, fim: number, q: number, k: number, kNovo: number,
+ * @typedef {{ id: number, pote: number, fase: 'atrai'|'funde'|'comemora', t: number, fim: number, q: number, k: number, kNovo: number,
  *   membros: any[], base: any, n: number, px: number, py: number, nIni: number, nAtual: number, nAlvo: number, saidas: number,
- *   origem: number[][] }} Fusao
+ *   origem: number[][], combo?: number }} Fusao
  */
 
 /**
@@ -112,9 +116,13 @@ export function criarSoltar(R, o = {}) {
   }
 
   // ---------------------------------------------------------------- fusoes
-  /** Pode fundir agora: vivo, solto, fora da mira e de outra fusao. @param {any} s */
-  const livre = (s) => s.ativo && !s.preso && !s.dados.marcado && !s.dados.fundindo;
   const jogadorDe = (/** @type {any} */ s) => S.jogadores[(s && s.dados.pote) || 0] || S.jogadores[0];
+  /**
+   * Pode fundir agora: vivo, solto, fora da mira e de outra fusao, e dentro do pote (quem rolou
+   * por cima da borda e esta do lado de fora nao puxa ninguem pela parede).
+   * @param {any} s
+   */
+  const livre = (s) => s.ativo && !s.preso && !s.dados.marcado && !s.dados.fundindo && jogadorDe(s).pote.contem(s.cx, s.cy);
 
   /** Registro das missoes e da colecao (o perfil fica no main.js): so o jogador 1. */
   function registrar(J, fusoes, k, criou, combo) {
@@ -205,12 +213,13 @@ export function criarSoltar(R, o = {}) {
     return N ? [x / N, y / N, N] : [0, 0, 0];
   }
 
-  /** Fim do abraco: os membros viram um corpo so (funde) ou o super slime (segura). @param {Fusao} F */
+  /** Fim do abraco: os membros viram um corpo so que escoa ate o nivel novo. @param {Fusao} F */
   function juntar(F) {
     const m = S.mundo;
     const n = F.membros.length;
     F.n = n;
-    F.kNovo = n >= 3 && R.nivelGrupo ? R.nivelGrupo(S, F.k, n) : F.k;
+    // acima do ultimo nivel (tres 13, o coringa num 14) nasce o ultimo
+    F.kNovo = Math.min(R.maxNivel || Infinity, n >= 3 && R.nivelGrupo ? R.nivelGrupo(S, F.k, n) : F.k);
     // a base e o de baixo (como sempre); o ponto da costura, entre os dois, ou o centro do grupo
     const ord = F.membros.slice().sort((a, b) => (a.cy - b.cy) || (a.idx - b.idx));
     const base = ord[0];
@@ -225,25 +234,18 @@ export function criarSoltar(R, o = {}) {
     }
     // o save no meio da fusao guarda os membros de antes (ao voltar, a fusao se refaz)
     F.origem = ord.map((s) => [s.nivel, +s.cx.toFixed(2), +s.cy.toFixed(2), s.dados.prisma ? 1 : 0]);
-    F.nAlvo = R.particulas ? R.particulas(F.kNovo) : 0;
-    if (F.nAlvo > 0) {
-      m.fundir(base, ord.slice(1), { px: F.px, py: F.py, rampa: 0, rampaVel: FUSAO.rampa });
-      F.fase = 'funde';
-    } else {
-      // o super slime nao cabe num disco (790 particulas no bequer de 9,7 u): fica com a forma da uniao
-      m.fundir(base, ord.slice(1), { px: F.px, py: F.py, manterForma: true, rampa: FUSAO.mole, rampaVel: 0 });
-      F.fase = 'segura';
-      base.dados.treme = 1;
-    }
+    m.fundir(base, ord.slice(1), { px: F.px, py: F.py, rampa: 0, rampaVel: FUSAO.rampa });
+    F.fase = 'funde';
     m.reconstruir();
     F.base = base;
     F.membros = [base];
     base.dados.fundindo = F.id;
     F.nIni = F.nAtual = m.iniSl[base.idx + 1] - m.iniSl[base.idx];
+    F.nAlvo = R.particulas ? R.particulas(F.kNovo) : F.nIni;
     F.t = 0;
     F.q = 0;
     if (R.juntar) R.juntar(S, jogadorDe(base), base, F.kNovo, F.px, F.py);
-    eventos.push({ tipo: 'junta', x: F.px, y: F.py, cor: base.dados.hex, n, nivel: F.kNovo, pote: F.pote, segura: F.fase === 'segura' });
+    eventos.push({ tipo: 'junta', x: F.px, y: F.py, cor: base.dados.hex, n, nivel: F.kNovo, pote: F.pote });
   }
 
   /** Tira particulas da base ate `alvo` (as das pontas) e solta faiscas delas. @param {Fusao} F @param {number} alvo */
@@ -273,13 +275,43 @@ export function criarSoltar(R, o = {}) {
       m.reconstruir();
     }
     base.dados.fundindo = 0;
-    base.dados.treme = 0;
     tirar(F);
     const J = jogadorDe(base);
     const combo = J.pote.fundiu();
     const criou = /** @type {any} */ (R.concluir)(S, J, base, F.kNovo, base.cx, base.cy, combo, { n: F.n, nivel: F.k, saidas: F.saidas });
     // o grupo de 3 vale as 2 fusoes que ele substitui (as missoes nao ficam mais lentas)
     registrar(J, F.n - 1, F.kNovo, criou, combo);
+    // o ultimo nivel nasce, comemora e estoura (2026-10-18)
+    if (criou !== false && base.ativo && R.comemora && R.comemora(S, F.kNovo)) comemorar(base, F.n, combo);
+  }
+
+  /**
+   * O ultimo nivel comemora (FUSAO.comemora s: incha e o rosto treme) e estoura. Enquanto isso
+   * ele fica de fora da mira, do bot, do "Ufa!", da evolucao e do perigo, como quem funde.
+   * @param {any} base @param {number} [n] membros da fusao que o fez @param {number} [combo]
+   */
+  function comemorar(base, n = 2, combo = 1) {
+    /** @type {Fusao} */
+    const F = {
+      id: ++seqFusao, pote: base.dados.pote || 0, fase: 'comemora', t: 0, fim: FUSAO.comemora, q: 0, k: base.nivel, kNovo: base.nivel,
+      membros: [base], base, n, px: base.cx, py: base.cy, nIni: 0, nAtual: 0, nAlvo: 0, saidas: 0, origem: [], combo,
+    };
+    base.dados.fundindo = F.id;
+    base.dados.treme = 1;
+    base.dados.expr = 'feliz';
+    base.dados.exprT = FUSAO.comemora + 0.2;
+    S.fusoes.push(F);
+    eventos.push({ tipo: 'comemora', x: base.cx, y: base.cy, cor: base.dados.hex, pote: F.pote, nivel: base.nivel });
+  }
+
+  /** Fim da comemoracao: o modo estoura o slime (pontos, gosma, contador). @param {Fusao} F */
+  function estourar(F) {
+    const base = F.base;
+    tirar(F);
+    if (!base.ativo) return;
+    base.dados.fundindo = 0;
+    base.dados.treme = 0;
+    if (R.estourar) R.estourar(S, jogadorDe(base), base, { n: F.n, combo: F.combo || 1 });
   }
 
   /** Um quadro de uma fusao em andamento. @param {Fusao} F @param {number} dt */
@@ -306,12 +338,11 @@ export function criarSoltar(R, o = {}) {
       if (F.t >= FUSAO.funde) concluir(F);
       return;
     }
-    // segura: incha devagar e treme (empurroes alternados a cada 3 quadros)
-    const antes = 1 + FUSAO.incha * Math.min(1, (F.t - dt) / FUSAO.segura);
-    const agora = 1 + FUSAO.incha * Math.min(1, F.t / FUSAO.segura);
+    // comemora: incha devagar (o rosto treme no desenho, sem empurrar o corpo) e estoura
+    const antes = 1 + FUSAO.incha * Math.min(1, (F.t - dt) / FUSAO.comemora);
+    const agora = 1 + FUSAO.incha * Math.min(1, F.t / FUSAO.comemora);
     m.escalarForma(base, agora / antes);
-    if (F.q % 3 === 0) m.empurrar(((F.q / 3) & 1 ? 1 : -1) * FUSAO.treme, 0, base.idx);
-    if (F.t >= FUSAO.segura) concluir(F);
+    if (F.t >= FUSAO.comemora) estourar(F);
   }
 
   /** Um quadro das fusoes: recrutamento, pares novos e as fases. @param {number} dt */
@@ -342,11 +373,16 @@ export function criarSoltar(R, o = {}) {
       recrutar(F, pers);
     }
     for (const F of S.fusoes.slice()) avancarFusao(F, dt);
+    // o ultimo nivel que nasceu fora de uma fusao (tinta, partida salva) comemora e estoura tambem
+    if (R.comemora) {
+      for (const s of m.slimes) if (s.ativo && !s.preso && !s.dados.fundindo && !s.dados.marcado && R.comemora(S, s.nivel)) comemorar(s);
+    }
   }
 
   /** Fecha na hora todas as fusoes em andamento (fim da partida: o estalo entra nos pontos). */
   function concluirTodas() {
     for (const F of S.fusoes.slice()) {
+      if (F.fase === 'comemora') continue;
       if (F.fase === 'atrai') {
         F.membros = F.membros.filter((s) => s.ativo && s.dados.fundindo === F.id);
         if (F.membros.length < 2) { cancelar(F); continue; }
@@ -355,6 +391,8 @@ export function criarSoltar(R, o = {}) {
       if (!F.base.ativo) { tirar(F); continue; }
       concluir(F);
     }
+    // quem comemora (tambem o que acabou de nascer aqui) estoura na hora
+    for (const F of S.fusoes.slice()) estourar(F);
   }
 
   // ---------------------------------------------------------------- reforcos
@@ -692,7 +730,7 @@ export function criarSoltar(R, o = {}) {
           const [x, y] = centro(ms);
           let r = 0;
           for (const s of ms) r = Math.max(r, Math.sqrt((s.cx - x) * (s.cx - x) + (s.cy - y) * (s.cy - y)) + s.raio0);
-          const dur = F.fase === 'atrai' ? F.fim : F.fase === 'funde' ? FUSAO.funde : FUSAO.segura;
+          const dur = F.fase === 'atrai' ? F.fim : F.fase === 'funde' ? FUSAO.funde : FUSAO.comemora;
           return { x, y, r, fase: F.fase, p: Math.min(1, F.t / dur), cor: (F.base || F.membros[0]).dados.hex, n: F.fase === 'atrai' ? F.membros.length : F.n };
         }),
         // terremoto: deslocamento do pote agora (u)

@@ -266,7 +266,7 @@ test('o slime solto em cima da borda escorrega de volta para dentro (8 cestos)',
     const rot = `${C.id} lado ${lado} nivel ${nv}${alargar ? ' alargado' : ''}${chacoalhar ? ' chacoalhado' : ''}`;
     assert.ok(s.ativo, `${rot}: o slime sumiu`);
     assert.ok(s.cx > e && s.cx < d && s.topo < C.linha + 0.5, `${rot}: ficou fora (${s.cx.toFixed(2)}, ${s.cy.toFixed(2)})`);
-    assert.ok(!modo.eventos.some((ev) => ev.tipo === 'fora'), `${rot}: escapou do pote`);
+    assert.ok(!modo.eventos.some((ev) => ev.tipo === 'volta'), `${rot}: escapou do pote`);
   }
 });
 
@@ -311,7 +311,7 @@ test('Duelo: os potes nao se encostam (nem alargados) e cada um fica com o seu s
     const s1 = soltarEm(modo, -99, 1);
     for (let k = 0; k < 300; k++) modo.passo(1 / 60);
     assert.ok(s0.cx < 0 && s1.cx > 0, `${C.id}: um slime foi parar no pote do outro`);
-    assert.ok(!modo.eventos.some((ev) => ev.tipo === 'fora'), `${C.id}: escapou do pote`);
+    assert.ok(!modo.eventos.some((ev) => ev.tipo === 'volta'), `${C.id}: escapou do pote`);
   }
 });
 
@@ -331,9 +331,9 @@ test('Duelo: contra a CPU ha reforcos; no 2 jogadores nao (botoes escondidos, cl
   assert.ok(!dois.eventos.some((ev) => ev.tipo === 'pedirVideo'), 'nem pede video');
 });
 
-test('13 niveis: o 13 tem o tamanho que o 12 tinha, o 1 nao muda e os do meio encolhem pouco', async () => {
+test('14 niveis: o 13 tem o tamanho que o 12 tinha, o 1 nao muda, os do meio encolhem pouco e dois 14 cabem no bequer', async () => {
   const { NIVEIS, diametroNivel } = await import('../src/jogo/niveis.js');
-  assert.equal(NIVEIS.length, 13);
+  assert.equal(NIVEIS.length, 14);
   assert.equal(diametroNivel(1), 1.55);
   assert.ok(Math.abs(diametroNivel(13) - 1.55 * 1.155 ** 11) < 0.01, `nivel 13 com ${diametroNivel(13)}`);
   for (let k = 2; k <= 12; k++) {
@@ -341,26 +341,80 @@ test('13 niveis: o 13 tem o tamanho que o 12 tinha, o 1 nao muda e os do meio en
     const encolheu = 1 - diametroNivel(k) / antes;
     assert.ok(encolheu > 0.005 && encolheu < 0.13, `nivel ${k} encolheu ${(encolheu * 100).toFixed(1)}%`);
   }
+  // o 14 (2026-10-18): maior que o 13, mas dois cabem em 100% do bequer ate a linha
+  const d14 = diametroNivel(14);
+  assert.ok(d14 > diametroNivel(13), 'o 14 nao e maior que o 13');
+  const { cesto } = await import('../src/jogo/cestos.js');
+  const C = cesto('becher');
+  // area dentro das paredes (eixo menos a espessura) ate a linha, pela polilinha
+  const pts = C.linhas[0];
+  let area = 0;
+  const H = 0.02;
+  for (let y = -0.23 + 0.22 + H / 2; y < C.linha; y += H) {
+    const xs = [];
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const [ax, ay] = pts[i];
+      const [bx, by] = pts[i + 1];
+      if (ay === by || y < Math.min(ay, by) || y > Math.max(ay, by)) continue;
+      xs.push(ax + ((y - ay) * (bx - ax)) / (by - ay));
+    }
+    if (xs.length >= 2) area += (Math.max(...xs) - Math.min(...xs) - 0.44) * H;
+  }
+  const dois = (2 * Math.PI * d14 * d14) / 4;
+  assert.ok(dois <= area, `dois 14 ocupam ${(dois / area * 100).toFixed(0)}% do bequer`);
 });
 
-test('dois do ultimo nivel estouram sem registrar um nivel que nao existe', async () => {
+test('o 14 nasce de verdade (funil e descoberta), comemora e estoura como o super slime', async () => {
   const { criarModo } = await import(MODOS.merge);
   const { MAX_NIVEL } = await import('../src/jogo/niveis.js');
-  const modo = criarModo({ semente: 3, salvo: {}, toque: true });
+  const { FUSAO } = await import('../src/jogo/soltar.js');
+  const modo = criarModo({ semente: 3, salvo: {}, toque: true, inicio: { largura: 1 } });
   const S = modo.S;
   const J = S.jogadores[0];
+  J.maxNivel = MAX_NIVEL - 1;
   for (const x of [-1.6, 1.6]) {
-    const s = S.R.criar(S, J, { nivel: MAX_NIVEL }, x, 4.2, false);
+    const s = S.R.criar(S, J, { nivel: MAX_NIVEL - 1 }, x, 4.2, false);
     s.dados.pote = 0;
     s.dados.solto = -10;
   }
   const eventos = [];
-  for (let k = 0; k < 600 && !eventos.some((e) => e.tipo === 'estouro'); k++) {
+  for (let k = 0; k < 600 && !eventos.some((e) => e.tipo === 'super'); k++) {
     modo.passo(1 / 60);
     eventos.push(...modo.eventos.splice(0));
   }
-  assert.ok(eventos.some((e) => e.tipo === 'texto' && e.texto === 'perfeito'), 'os dois do topo nao estouraram');
+  assert.ok(eventos.some((e) => e.tipo === 'nivel' && e.n === MAX_NIVEL && e.acao === 'complete'), 'o 14 nao entrou no funil');
+  assert.ok(eventos.some((e) => e.tipo === 'registro' && e.chave === 'nivel' && e.valor === MAX_NIVEL), 'o 14 nao foi descoberto');
+  assert.ok(eventos.some((e) => e.tipo === 'comemora' && e.nivel === MAX_NIVEL), 'o 14 nao comemorou');
+  const i = eventos.findIndex((e) => e.tipo === 'comemora');
+  const j = eventos.findIndex((e) => e.tipo === 'super');
+  assert.ok(j > i && eventos.some((e) => e.tipo === 'estouro' && e.grande), 'o 14 nao estourou');
+  assert.equal(eventos[j].n, 1);
+  assert.equal(J.supers, 1);
+  assert.ok(!S.mundo.vivos().some((s) => s.nivel === MAX_NIVEL), 'o 14 ficou no pote');
   assert.ok(!eventos.some((e) => e.tipo === 'registro' && e.chave === 'nivel' && e.valor > MAX_NIVEL), 'registrou um nivel que nao existe');
+  assert.ok(FUSAO.comemora >= 1.5 && FUSAO.comemora <= 3);
+});
+
+test('o 14 que veio de fora de uma fusao (tinta, save) tambem comemora e estoura; o save guarda os super slimes', async () => {
+  const { criarModo } = await import(MODOS.merge);
+  const { MAX_NIVEL } = await import('../src/jogo/niveis.js');
+  const modo = criarModo({ semente: 3, salvo: {}, toque: true, inicio: { largura: 1 } });
+  const S = modo.S;
+  const J = S.jogadores[0];
+  J.supers = 4;
+  const s = S.R.criar(S, J, { nivel: MAX_NIVEL - 1 }, 0, 4.2, false);
+  s.dados.pote = 0;
+  J.premio = 'tinta';
+  modo.poder('tinta');
+  modo.apontar(s.cx, s.cy, 'baixo');
+  const eventos = [];
+  for (let k = 0; k < 300 && !eventos.some((e) => e.tipo === 'super'); k++) {
+    modo.passo(1 / 60);
+    eventos.push(...modo.eventos.splice(0));
+  }
+  assert.ok(eventos.some((e) => e.tipo === 'super' && e.n === 5), 'a tinta no 13 nao fez um super slime');
+  const salvo = JSON.parse(JSON.stringify(modo.salvar()));
+  assert.equal(criarModo({ semente: 3, salvo, toque: true }).S.jogadores[0].supers, 5);
 });
 
 test('a tesoura divide em dois do nivel de baixo, com a cor certa, que nao se juntam de novo', async () => {
@@ -391,7 +445,7 @@ test('a tesoura divide em dois do nivel de baixo, com a cor certa, que nao se ju
 
 test('niveis altos tem textura e nao viram lama (o arco-iris nao desbota)', async () => {
   const { NIVEIS } = await import('../src/jogo/niveis.js');
-  for (let k = 7; k <= 13; k++) assert.ok(NIVEIS[k - 1].textura > 0, `nivel ${k} sem textura`);
+  for (let k = 7; k <= NIVEIS.length; k++) assert.ok(NIVEIS[k - 1].textura > 0, `nivel ${k} sem textura`);
   const texturas = NIVEIS.slice(6).map((n) => n.textura);
   // vizinhos na escada nunca repetem a mesma textura
   for (let k = 1; k < texturas.length; k++) assert.notEqual(texturas[k], texturas[k - 1]);

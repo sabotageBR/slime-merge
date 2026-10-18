@@ -14,7 +14,7 @@
 //   ?raio=0.5&limiar=0.8   nucleo e limiar do campo do slime (ajuste do render)
 //   ?zoom=x0,y0,x1,y1  enquadra so esse retangulo do mundo (prints de detalhe)
 //   ?cesto=aquario&cenario=mar&objeto=kawaii   visual (src/jogo/cestos.js, render/cenarios.js, render/rostos.js)
-//   ?vitrine=1..5      Merge Lab com niveis no pote (1: 7 a 10 e o coringa; 2: 12; 3: 11; 4: 1 a 7; 5: 13)
+//   ?vitrine=1..6      Merge Lab com niveis no pote (1: 7 a 10 e o coringa; 2: 12; 3: 11; 4: 1 a 7; 5: 13; 6: 14)
 //   ?filme=120&cada=4  grava 120 quadros (4 passos de fisica entre eles) em <pre id="filme">
 //                      para tools/gif-modelos.mjs (deterministico, sem depender do rAF)
 //   ?bot=borda         o ?auto solta sempre em cima da borda, alternando os lados
@@ -81,7 +81,7 @@ export function lerDepuracao() {
     demoReforcos: q.has('demoReforcos'),
     skins: q.get('skins') || '',
     qualidade: q.has('qualidade') ? Math.max(0, Math.min(3, Number(q.get('qualidade')) | 0)) : -1,
-    revelar: Math.max(0, Math.min(13, num('revelar', 7) | 0)),
+    revelar: Math.max(0, Math.min(14, num('revelar', 7) | 0)),
     pressao: q.get('pressao') !== '0',
     evento: q.get('evento') || '',
     sons: Object.fromEntries((q.get('sons') || '').split(',').filter((p) => p.includes(':')).map((p) => p.split(':'))),

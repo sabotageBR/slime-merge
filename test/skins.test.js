@@ -74,7 +74,7 @@ test('cores do corpo: a 0 e a do nivel; as outras com C+M+Y >= 0,25', () => {
 test('catalogo: as 2 prontas por nivel escolhidas pelo usuario, iguais as candidatas, com o preco sugerido', () => {
   const escolhidas = ['bolhas', 'gotas', 'melancia', 'folhinhas', 'xadrez', 'florzinhas', 'morango', 'bengala', 'gomos', 'onca',
     'abelha', 'estrelinhas', 'chuva', 'trovao', 'mosaico', 'baloes', 'bolhasMar', 'ancoras', 'xadrezUva', 'morcegos', 'granulado',
-    'cupcake', 'nebulosa', 'constelacao', 'tesouro', 'diamantes'];
+    'cupcake', 'nebulosa', 'constelacao', 'tesouro', 'diamantes', 'trofeu', 'coroas'];
   const prontas = SKINS.filter((s) => s.id !== 'padrao');
   assert.deepEqual(prontas.map((s) => s.id).sort(), escolhidas.slice().sort());
   for (let k = 1; k <= MAX_NIVEL; k++) assert.equal(prontas.filter((s) => s.nivel === k).length, 2, `nivel ${k}`);

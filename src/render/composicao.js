@@ -145,6 +145,14 @@ vec3 textura(int t, vec2 L, vec3 base, float k, float tempo) {
     vec3 fogo = mix(paraLinear(vec3(1.0, 0.36, 0.05)), paraLinear(vec3(1.0, 0.86, 0.3)), brasa);
     c = mix(crosta, fogo, brasa);
     c += paraLinear(vec3(0.9, 0.25, 0.02)) * (1.0 - smoothstep(0.0, 0.18, r)) * 0.22;
+  } else if (t == 8) {
+    // ouro (o nivel 14, escolha do usuario em 2026-10-18, entre ouro, cristal, aurora e plasma): metal
+    // com faixas de brilho que passam e estrelinhas
+    float n = ruido(L * 0.9) * 0.5 + ruido(L * 2.3 + 5.0) * 0.5;
+    float faixa = 0.5 + 0.5 * sin((L.x * 0.8 + L.y * 1.1) * 2.2 + n * 3.0 - tempo * 1.6);
+    c = mix(paraLinear(vec3(0.62, 0.38, 0.05)), paraLinear(vec3(1.0, 0.84, 0.32)), smoothstep(0.1, 0.95, faixa));
+    c = mix(c, vec3(1.0, 0.97, 0.85), smoothstep(0.92, 1.0, faixa) * 0.8);
+    c = mix(c, vec3(1.0), clamp(brilho(L * 2.6 + 3.0, 0.55, 0.14, tempo), 0.0, 1.0));
   }
   return mix(base, c, k);
 }

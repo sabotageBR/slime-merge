@@ -195,3 +195,56 @@ Test").
   - **pendente:** aprovar os prints em `docs/visuais/`: `fusao-*` (par com combo, trio, super slime,
     terremoto), `humor-480x600.jpg` e `humor-pote-480x600.jpg`, `missil-*` (alvo grande e pequeno),
     `carregando.jpg` e `eventos-*`.
+- **Player Fit Test da 2.0.1** (17/10 21:56, 500 gameplays): **6m55s** (2.0.0: 5m30s; 1.2.0: 5m27s).
+  Histograma 65 · 73 · 49 · 49 · 36 · **228** (3m+ 62,6%, **5m+ 45,6%**; a 2.0.0 teve 83 · 108 · 60 · 56 ·
+  23 · 170, 5m+ 34%, igual à 1.2.0: o salto veio da revisão da 2.0.1, não da pressão sozinha). Game Events
+  (677 gameplays: 385 celular, 224 desktop e tablet):
+  - metas batidas: 5m+ ≥ 45%, 3m+ ≥ 58%, `tempo/10` 22,6% (≥ 20%), nível 10 na mediana no minuto 4,
+    nível 13 para 22% (148); faltaram média ≥ 7:00 (6:55), 1–2m ≤ 14% (14,6%), perda por minuto ≤ 14%
+    (16 · 14 · 15 · 14% do 1 ao 5) e `fps/0/m5` no celular ≤ 10% (**23%**);
+  - ritmo (mediana do minuto do nível novo): 9 m2 · 10 m4 · 11 m5 · 12 m7 · **13 m8**; depois do 13 não há
+    novidade (`tempo` 189 no m8 → 110 no m13 → 39 no m20);
+  - celular: do minuto 10 ao 20 perde 80% (88 → 18; o desktop, 68%); no minuto 5, física ≥ 16 ms em 34% e
+    fps < 30 em 23%; 76% caem para a qualidade baixa ou mínima no minuto 0;
+  - "Ufa!": em cada minuto do 11 ao 16, 35–49% de quem joga leva um (o pote enche de novo e de novo);
+  - eventos: coringas começam em 71%, pedido em 60% (91% cumpridos), terremoto 51%, gigante 44%, calor
+    38%, gelo 32%; `intervalo/evento/show` em 50%. Metajogo: menu ~10%, 35 cestos, nenhuma skin; vídeo 14%.
+- **Versão 2.0.2, depois do PFT da 2.0.1** (2026-10-18, pedido do usuário; plano em
+  `~/.claude/plans/analise-o-resultado-do-eager-duckling.md`; escolhas em `docs/autoria.md`):
+  - **slime atravessado na parede** (print do iPhone: um nível 11 meio para fora do béquer, pendurado
+    abaixo do fundo). A parede é uma cápsula de dois lados e não havia trava "dentro do pote". Causas,
+    pela caçada (`node tools/vazamento.mjs`): (1) **restaurar a partida** (o iOS descarta a aba em
+    segundo plano): o save só tinha o centro e o disco no centro de um slime achatado nascia atravessando
+    o fundo e as paredes (na 2.0.1, 10 episódios em 2 restaurações; o nível 12 com 35 partículas fora);
+    (2) um empurrão de contato maior que a parede num subpasso (um nível 10 lançado 6 u para cima quando
+    o slime de baixo evoluiu, e 10 partículas passaram na volta); (3) soltar o 8 ou o gigante em cima
+    da borda (nasciam espetados na guia); (4) fusão em grupo puxando um slime que já estava fora.
+    Correções: teste de travessia nas paredes (`mundo.js`), separação só na posição depois de partículas
+    novas, save com a forma de cada slime (~8,7 KB) e o pote aberto na hora ao restaurar, mira que recua
+    para o slime grande, fusão só dentro do pote, remendo do `redimensionar` preso dentro e a rede de
+    segurança do `pote.js` (poucas partículas fora voltam na hora; um pedaço grande por 0,4 s volta o
+    slime inteiro; telemetria `rede/volta/m<min>`). Caçada final (4 sementes × 8 min, restaurando aos
+    300 s): nenhuma travessia; 2 casos na borda (um slime fundindo, um nível 5 em cima da borda no
+    terremoto), que a rede resolveu. `test/parede.test.js` (7 testes);
+  - **olhos sempre abertos:** sem piscar (nem na tela de loading); feliz com brilho duplo olhando para
+    cima, amassado arregalado com boca torta, chorinho e choro marejados com sobrancelha triste, apático
+    com olheira olhando para baixo. Folha `docs/visuais/humor-480x600.jpg`;
+  - **nível 14** (8,0 u, 444 partículas; dois ocupam ~100% do béquer até a linha): nasce de verdade
+    (cartão, `level/14`, 25 gotas da descoberta), comemora ~2 s (incha, aura dourada, estrelas) e estoura
+    com os pontos do super slime (`pontosNivel(14)·2·n·combo`); 3 do 13 e o coringa no 13 fazem o 14; a
+    tinta no 13 e o 14 de um save também comemoram; no Duelo, o estouro manda 6 gosmas ao rival. Visual
+    escolhido: **ouro** (entre ouro, cristal, aurora e plasma, `docs/visuais/nivel14-comparar.jpg`); skins
+    Troféus e Coroas (Arco-íris neon e Confete de ouro ficaram nas candidatas);
+  - **novo alvo depois do 14:** super slimes da partida na pílula, 20 gotas cada e +20 ao bater o recorde
+    (`PREMIO_SUPER`), telemetria `super/<n>/m<min>`;
+  - **loading em camadas:** uma gota de cada nível cai do bico e vira uma camada ondulada daquela cor
+    (`docs/visuais/carregando.jpg` e `carregando-390x844.gif`);
+  - **HUD no retrato:** o placar sai do canto do botão da Poki (`docs/visuais/hud-poki-retrato.png`);
+  - verificado com `npm test` (176), `npm run menu`, `jogar 1 5`, `sdkcheck` (5 cenários), `telas`, a
+    caçada e os prints (`prints-humor`, `prints-carregando`, `prints-fusao --cenas=super`, `prints-skins`);
+  - aprovado pelo usuário ("Tudo aprovado"); `dist-poki/slime-merge-2.0.2.zip` (371 KB; 359 KB gzip) com a
+    thumb `slime-merge-2.0.2-thumb.png`; `sdkcheck` também na build (`dist/`) e a build aberta no Chrome sem
+    erro. Fica para o próximo teste a física do celular (34% acima de 16 ms no minuto 5);
+  - **metas do próximo teste:** média ≥ 7:30; 5m+ ≥ 50%; 1–2m ≤ 13%; `tempo/10` ≥ 26%; `tempo/15` ≥ 16%
+    (hoje 12%); `level/14` para ≥ 12%; `super/1` em ≥ 8%; `rede/volta` em ≤ 2% das partidas; `fps/0/m5` no
+    celular ≤ 15%.
