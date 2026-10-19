@@ -4,7 +4,7 @@
 // Logica pura: sem DOM, sem relogio, sem Math.random.
 
 import { criarMundo, RAMPA_VEL } from '../fisica/mundo.js';
-import { criarPote, COMBO_JANELA } from './pote.js';
+import { criarPote, COMBO_JANELA, ADER_T } from './pote.js';
 import { criarRng } from '../core/rng.js';
 import { difundir } from '../cor/difusao.js';
 import { sentir, pancada, PANCADA } from './humor.js';
@@ -616,6 +616,12 @@ export function criarSoltar(R, o = {}) {
             // quem levou a pancada (de outro nivel, embaixo) faz uma careta
             pancada(s, s.dados.queda || 0, encostados.get(s.idx) || [], (a, b) => !!R.fusao(S, a, b));
           }
+        }
+        if (s.ader > 0) {
+          // aderencia ao vidro (pote.soltar liga): sai no primeiro toque em outro slime
+          const idade = m.tempo - s.dados.solto;
+          if (encostados.has(s.idx) || idade >= ADER_T) s.ader = 0;
+          else if (idade > ADER_T - 1) s.ader = ADER_T - idade;
         }
         if (!s.preso) sentir(s, (encostados.get(s.idx) || []).length, dt);
       }

@@ -338,3 +338,26 @@ Pedidos com prints anotados do Merge Lab (plano em
   (a `#area` igual com todas as pílulas) e numa partida de ~225 s com o bot (escala constante).
 - **Build: versão 2.0.6** (`dist-poki/slime-merge-2.0.6.zip`, com a thumb), pedida pelo usuário ("gere a
   nova versao da poki"): 136,2 KB de áudio, 462 KB gzip.
+
+## 2026-10-18 (noite): o slime escorre pelo vidro
+- Pedido, com 4 prints de um vídeo (um slime verde solto em cima da borda direita do béquer, que fica nela
+  e depois cai solto no meio do pote): "quando jogar a slime na parede ela tem q escorrer pela parede".
+- **Causa:** a parede não tinha aderência nenhuma (numa parede vertical, nada empurra o slime contra ela, e o
+  atrito é zero), e a guia invisível da borda (a rampa de 30° que devolve para dentro quem pousa na borda)
+  o lançava longe do vidro. O nível 7 chegava a atravessar o pote.
+- **Agora:** o slime solto gruda no lado de dentro do vidro e desce por ele a no máximo 3,5 u/s, um pouco
+  mole (o lado do vidro fica para trás e deixa um "dedo" de gosma colado acima dele), até encostar em
+  outro slime; aí volta ao normal. Na borda, ele desce do lado de dentro, colado no vidro.
+- **Dureza:** a média (`ADER.mole` 0,5), escolhida pelo Claude entre firme (1), média e mole (0,3), que estão
+  lado a lado em `docs/visuais/parede-comparar-{borda,encosta,grande}.gif` (com o antes); trocar é um número.
+- **Armadilhas que a aderência abriu e foram fechadas:** a peça presa nascia em cima do slime grande ainda
+  na borda e o enganchava por uma partícula (agora ela não toca ninguém até ser solta); o slime ficava
+  pendurado na ponta da borda ou na aba de dentro da boca do aquário por uma partícula (a ponta não gruda,
+  o personagem não tem atrito numa partícula esticada longe do corpo, e a partícula do outro lado de uma
+  parede volta para o lado do corpo). Isso também acabou com os ~20 "Ufa!" por semente que a 2.0.6 já
+  tinha na varredura do aquário e do caldeirão.
+- **De olho:** a caçada (`tools/vazamento.mjs` estendida a 27 sementes × 5 min com o bot) achou slimes
+  lançados para fora do pote nas duas versões (4 episódios na 2.0.6, 8 agora; a rede devolve em 0,4 s). Os
+  lançamentos vêm de fusões grandes no meio da pilha (8 a 10 por semente de 5 min nas duas versões).
+- **Build: versão 2.0.7** (`dist-poki/slime-merge-2.0.7.zip`, com a thumb), pedida pelo usuário ("mande as
+  imagens e a build aqui"): 136,2 KB de áudio, 466 KB gzip.

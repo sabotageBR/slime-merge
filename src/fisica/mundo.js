@@ -59,6 +59,24 @@ const JANELA_SONO = 0.25; // s: o sono mede o deslocamento liquido nessa janela
 const PEN_ACORDA = 0.03; // u de penetracao que acorda um slime dormindo
 const ASSENTAR_QUADROS = 10; // quadros de separacao extra depois de particulas novas
 const ASSENTAR_PASSES = 6; // passes so de posicao em cada um deles
+const ESTICADA = 2.5; // raios do slime: no personagem, a particula mais longe do centro que isso nao tem atrito com a parede
+/**
+ * Aderencia ao vidro (slime com `ader` = 1, no lado `gruda` da parede; aderirParedes):
+ *   banda   u alem do toque em que a parede ainda puxa a particula
+ *   acel    o maximo que a parede puxa cada particula (u/s2)
+ *   puxa    fracao da folga ate o toque fechada por subpasso
+ *   arrasto fracao da velocidade tangente (relativa a parede) de cada particula encostada tirada por subpasso
+ *   cheio   particulas encostadas para o corpo grudar com a forca toda
+ *   acelN   o maximo que o vidro segura o corpo que se afasta (u/s2)
+ *   vel     velocidade maxima do corpo ao longo do vidro (u/s): o escorrer
+ *   acelT   o maximo que o vidro freia o corpo acima de `vel` (u/s2; > gravidade, senao nao freia)
+ *   giro    fracao do giro do corpo tirada por subpasso (rolar nao escorrega)
+ *   mole    rigidez (fracao do k) do slime grudado na parede de lado
+ *   teto    abaixo desta componente vertical da normal (vidro virado para baixo) nao gruda
+ *   chao    acima dela (fundo, aba da boca do aquario) tambem nao: escorrer e na parede de lado
+ *   vBorda  em cima da borda, a velocidade maxima do corpo para dentro do pote (u/s)
+ */
+export const ADER = Object.freeze({ banda: 0.2, acel: 200, puxa: 0.3, arrasto: 0.1, cheio: 3, acelN: 150, vel: 3.5, acelT: 150, giro: 0.1, mole: 0.5, teto: -0.25, chao: 0.7, vBorda: 1 });
 
 /**
  * @typedef {Object} Slime
@@ -98,6 +116,7 @@ const ASSENTAR_PASSES = 6; // passes so de posicao em cada um deles
  * @property {boolean} livre    sem contato com outros slimes e andando (a memoria so age assim)
  * @property {number[]|null} pigAlvo  cor nova da frente de transmutacao (src/cor/difusao.js)
  * @property {boolean} misturando     pigmento ainda desigual (nao dorme ate assentar a cor)
+ * @property {number} ader      0..1: gruda no lado `gruda` das paredes e escorrega devagar (0 = nao; o jogo liga na soltura)
  * @property {Record<string, any>} dados  livre para o modo de jogo
  */
 
@@ -204,7 +223,8 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
    * separado da base, que anda com (svx, svy) por st s ate (atx, aty) (terremoto). O contato usa
    * base + tremor; quem le a geometria do pote (mira, pouso, HUD) le a base, que nao treme.
    * @type {{ ax: number, ay: number, bx: number, by: number, r: number, vax: number, vay: number, vbx: number, vby: number, t: number,
-   *   tx: number, ty: number, svx: number, svy: number, st: number, atx: number, aty: number, oculta: boolean }[]}
+   *   tx: number, ty: number, svx: number, svy: number, st: number, atx: number, aty: number, oculta: boolean, gruda: number,
+   *   livreA: boolean, livreB: boolean }[]}
    */
   let paredes = [];
 
@@ -349,6 +369,7 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
     s.livre = true;
     s.pigAlvo = null;
     s.misturando = false;
+    s.ader = 0;
     s.raio0 = 0;
     s.dados = {};
   }
@@ -790,6 +811,7 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
     if (sujo) reconstruir();
     // cai de onde a mira esta agora (o toque rapido mira e solta no mesmo quadro; a peca
     // presa so chegaria ao alvo no proximo passo)
+    let sobre = false;
     for (let a = iniSl[s.idx]; a < iniSl[s.idx + 1]; a++) {
       const i = membros[a];
       x[i] = s.alvoX + s.cos * qx[i] - s.sin * qy[i];
@@ -798,8 +820,19 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
       py[i] = y[i];
       vx[i] = 0;
       vy[i] = vy0;
+      if (sobre) continue;
+      for (let j = 0; j < n; j++) {
+        if (sl[j] === s.idx) continue;
+        const dx = x[i] - x[j];
+        const dy = y[i] - y[j];
+        const r = rad[i] + rad[j];
+        if (dx * dx + dy * dy < r * r) { sobre = true; break; }
+      }
     }
     s.preso = false;
+    // a peca presa nao tocava ninguem: solta em cima de um slime, a sobreposicao sai so na
+    // posicao (sem virar velocidade e lancar os dois)
+    if (sobre) assentarNovas = ASSENTAR_QUADROS;
   }
 
   /** @param {Slime} s @param {number} ax @param {number} ay */
@@ -809,11 +842,21 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
   }
 
   /**
-   * @param {{ ax: number, ay: number, bx: number, by: number, r: number, oculta?: boolean }[]} caps
+   * @param {{ ax: number, ay: number, bx: number, by: number, r: number, oculta?: boolean, gruda?: number }[]} caps
    *   oculta: so colide, o render nao desenha (guia da borda); nao conta para o chao
+   *   gruda: lado em que o slime com `ader` gruda (1 = a esquerda de a para b, o de dentro do contorno
+   *   que vai do topo esquerdo ao topo direito; -1 = a direita; 0 = nenhum)
    */
   function definirParedes(caps) {
-    paredes = caps.map((c) => ({ ax: c.ax, ay: c.ay, bx: c.bx, by: c.by, r: c.r, vax: 0, vay: 0, vbx: 0, vby: 0, t: 0, tx: 0, ty: 0, svx: 0, svy: 0, st: 0, atx: 0, aty: 0, oculta: !!c.oculta }));
+    paredes = caps.map((c) => ({ ax: c.ax, ay: c.ay, bx: c.bx, by: c.by, r: c.r, vax: 0, vay: 0, vbx: 0, vby: 0, t: 0, tx: 0, ty: 0, svx: 0, svy: 0, st: 0, atx: 0, aty: 0, oculta: !!c.oculta, gruda: c.gruda || 0, livreA: false, livreB: false }));
+    // pontas livres das paredes que grudam (a ponta da borda): nenhuma outra comeca ou acaba ali
+    const junta = (px0, py0, eu) => paredes.some((o) => o !== eu && o.gruda
+      && ((Math.abs(o.ax - px0) < 1e-6 && Math.abs(o.ay - py0) < 1e-6) || (Math.abs(o.bx - px0) < 1e-6 && Math.abs(o.by - py0) < 1e-6)));
+    for (const p of paredes) {
+      if (!p.gruda) continue;
+      p.livreA = !junta(p.ax, p.ay, p);
+      p.livreB = !junta(p.bx, p.by, p);
+    }
     let menor = Infinity;
     for (const p of paredes) if (!p.oculta) menor = Math.min(menor, p.ay, p.by);
     mundo.chaoY = menor === Infinity ? 0 : menor;
@@ -1002,7 +1045,8 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
       const yi = y[i];
       const ri = rad[i];
       const si = sl[i];
-      const livreI = registrar && pl[i] === 0;
+      const presoI = pl[i] === 1;
+      const livreI = registrar && !presoI;
       for (let oy2 = cy - 1; oy2 <= cy + 1; oy2++) {
         if (oy2 < 0 || oy2 >= ncy) continue;
         for (let ox2 = cx - 1; ox2 <= cx + 1; ox2++) {
@@ -1025,6 +1069,9 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
               if (d2 < rp * rp) registrarPerto(si, sj);
             }
             if (pi && (fj & 1) === 1) continue;
+            // a peca presa nao toca ninguem (ainda nao esta no jogo): empurrada pela mira ou
+            // nascendo em cima de um slime parado na borda, ela o enganchava por uma particula
+            if (presoI || (fj & 2) !== 0) continue;
             const r = (ri + rj) * ALCANCE;
             if (d2 < r * r) {
               if (nPares * 2 + 2 > pares.length) {
@@ -1279,6 +1326,15 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
     if (!pAtrito) return;
     // atrito contra a parede (que pode estar andando)
     const s = slimes[sl[i]];
+    // no personagem (gelatina), a particula esticada longe do corpo (o resto pendurado embaixo da
+    // aba de dentro do aquario) nao tem atrito: o atrito a segurava ali e, sem ele, o corpo a puxa
+    // em volta da aba. Liquido e goo espalham longe do centro de proposito
+    if (s.mat.separar) {
+      const ex = xi - s.cx;
+      const ey = yi - s.cy;
+      const esticada = s.raio0 * ESTICADA;
+      if (ex * ex + ey * ey > esticada * esticada) return;
+    }
     const wvx = wp.vax + t * (wp.vbx - wp.vax) + wp.svx;
     const wvy = wp.vay + t * (wp.vby - wp.vay) + wp.svy;
     const rx = x[i] - px[i] - wvx * DT;
@@ -1540,6 +1596,213 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
     }
   }
 
+  /**
+   * Alguma particula do slime (membros ini..fim) encosta, ate ADER.banda alem do toque, na parede
+   * p? So nas pontas pedidas (pa: a, pb: b) ou, sem nenhuma, em qualquer lugar dela (a guia).
+   */
+  function naPontaDe(p, ax, ay, ex, ey, l2, ini, fim, pa, pb) {
+    for (let a = ini; a < fim; a++) {
+      const i = membros[a];
+      let t = ((x[i] - ax) * ex + (y[i] - ay) * ey) / l2;
+      if ((pa || pb) && !((pa && t <= 0) || (pb && t >= 1))) continue;
+      if (t < 0) t = 0; else if (t > 1) t = 1;
+      const dx = x[i] - ax - t * ex;
+      const dy = y[i] - ay - t * ey;
+      const longe = rad[i] + p.r + ADER.banda;
+      if (dx * dx + dy * dy < longe * longe) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Aderencia ao vidro (2026-10-18, video do usuario: o slime solto em cima da borda pulava para
+   * dentro e caia longe da parede; ele tem que escorrer por ela). So nos slimes com `ader` > 0 (o
+   * jogo liga na soltura), no lado `gruda` das paredes (o de dentro do pote; a guia da borda nao
+   * gruda) e so de frente para o segmento: puxar para a ponta da borda (um ponto) e um pino, e o
+   * slime ficava pendurado nela por uma particula; nas juntas de dentro, o segmento vizinho cobre.
+   * Vidro virado para baixo (a boca que fecha do aquario e do caldeirao) tambem nao segura.
+   * Em velocidade, depois de medir, em duas escalas:
+   *  - cada particula ate ADER.banda alem do toque volta para o vidro (aceleracao limitada) e as
+   *    encostadas arrastam um pouco: o lado do vidro achata e fica para tras, o slime estica;
+   *  - o corpo inteiro (igual em todas as particulas, sem torque): nao se afasta do vidro (o que
+   *    sai da borda com a guia empurrando para dentro fica nele), escorrega no maximo a ADER.vel,
+   *    com o giro freado (rolar nao escorrega), e amolece. A forca cresce com o contato ate
+   *    ADER.cheio particulas encostadas, para valer igual no nivel 1 e no 13, e so na parede de lado.
+   * Em cima da borda (encostado na ponta livre ou na guia), o corpo anda solto; so a velocidade
+   * para dentro do pote tem teto (ADER.vBorda).
+   * A velocidade e relativa a parede (que pode estar andando: alargar, tremor).
+   */
+  function aderirParedes() {
+    const idt = 1 / DT;
+    for (let k = 0; k < MAX_SLIMES; k++) {
+      const s = slimes[k];
+      if (!s.ativo || !(s.ader > 0) || s.dormindo || s.preso) continue;
+      const ini = iniSl[k];
+      const fim = iniSl[k + 1];
+      let nc = 0;
+      let naBorda = false;
+      // a ponta livre encostada: onde ela esta e a normal de dentro do vidro dela
+      let bx0 = 0;
+      let by0 = 0;
+      let bnx = 0;
+      let bny = 0;
+      let snx = 0;
+      let sny = 0;
+      let swx = 0;
+      let swy = 0;
+      for (let q = 0; q < paredes.length; q++) {
+        const p = paredes[q];
+        if (!p.gruda && !p.oculta) continue;
+        const ax = p.ax + p.tx;
+        const ay = p.ay + p.ty;
+        const ex = p.bx + p.tx - ax;
+        const ey = p.by + p.ty - ay;
+        const l2 = ex * ex + ey * ey;
+        if (l2 <= 0) continue;
+        if (!p.gruda) {
+          // a guia da borda
+          if (!naBorda && naPontaDe(p, ax, ay, ex, ey, l2, ini, fim, false, false)) naBorda = true;
+          continue;
+        }
+        if ((p.livreA || p.livreB) && naPontaDe(p, ax, ay, ex, ey, l2, ini, fim, p.livreA, p.livreB)) {
+          naBorda = true;
+          const el = Math.sqrt(l2);
+          bnx = (-ey / el) * p.gruda;
+          bny = (ex / el) * p.gruda;
+          bx0 = p.livreB ? ax + ex : ax;
+          by0 = p.livreB ? ay + ey : ay;
+        }
+        const wvx0 = p.vax + p.svx;
+        const wvy0 = p.vay + p.svy;
+        const dwx = p.vbx - p.vax;
+        const dwy = p.vby - p.vay;
+        for (let a = ini; a < fim; a++) {
+          const i = membros[a];
+          const xi = x[i];
+          const yi = y[i];
+          if ((ex * (yi - ay) - ey * (xi - ax)) * p.gruda <= 0) continue;
+          const t = ((xi - ax) * ex + (yi - ay) * ey) / l2;
+          if (t <= 0 || t >= 1) continue;
+          const dx = xi - ax - t * ex;
+          const dy = yi - ay - t * ey;
+          const d2 = dx * dx + dy * dy;
+          const lim = rad[i] + p.r;
+          const longe = lim + ADER.banda;
+          if (d2 >= longe * longe || d2 < 1e-18) continue;
+          const d = Math.sqrt(d2);
+          const nx = dx / d;
+          const ny = dy / d;
+          if (ny < ADER.teto || ny > ADER.chao) continue;
+          const g = d > lim ? d - lim : 0;
+          const w = s.ader * (1 - g / ADER.banda);
+          const wvx = wvx0 + t * dwx;
+          const wvy = wvy0 + t * dwy;
+          let rvx = vx[i] - wvx;
+          let rvy = vy[i] - wvy;
+          const vn = rvx * nx + rvy * ny;
+          const alvo = -ADER.puxa * g * idt;
+          if (vn > alvo) {
+            let dv = vn - alvo;
+            const mx = ADER.acel * w * DT;
+            if (dv > mx) dv = mx;
+            vx[i] -= dv * nx;
+            vy[i] -= dv * ny;
+            rvx -= dv * nx;
+            rvy -= dv * ny;
+          }
+          const vn2 = rvx * nx + rvy * ny;
+          const f = ADER.arrasto * w;
+          vx[i] -= f * (rvx - vn2 * nx);
+          vy[i] -= f * (rvy - vn2 * ny);
+          nc += w;
+          snx += w * nx;
+          sny += w * ny;
+          swx += w * wvx;
+          swy += w * wvy;
+        }
+      }
+      const nl = Math.sqrt(snx * snx + sny * sny);
+      if (fim - ini < 2 || (!naBorda && (nc <= 0 || nl < 1e-9))) continue;
+      // o corpo: centro de massa, velocidade e giro
+      let M = 0;
+      let cx = 0;
+      let cy = 0;
+      let vcx = 0;
+      let vcy = 0;
+      for (let a = ini; a < fim; a++) {
+        const i = membros[a];
+        const m = mas[i];
+        M += m;
+        cx += m * x[i];
+        cy += m * y[i];
+        vcx += m * vx[i];
+        vcy += m * vy[i];
+      }
+      cx /= M;
+      cy /= M;
+      vcx /= M;
+      vcy /= M;
+      let L = 0;
+      let I = 0;
+      for (let a = ini; a < fim; a++) {
+        const i = membros[a];
+        const rx = x[i] - cx;
+        const ry = y[i] - cy;
+        L += mas[i] * (rx * (vy[i] - vcy) - ry * (vx[i] - vcx));
+        I += mas[i] * (rx * rx + ry * ry);
+      }
+      if (naBorda) {
+        // em cima da borda, o corpo anda solto (segurado contra o vidro de dentro, ele nao saia
+        // dali; firme, nao fica pendurado nela como uma toalha). So a velocidade para dentro do
+        // pote fica no maximo a ADER.vBorda quando o centro ja passou da linha do vidro: a guia
+        // o lancava longe da parede
+        if (bx0 || by0 || bnx || bny) {
+          const vin = vcx * bnx + vcy * bny;
+          if ((cx - bx0) * bnx + (cy - by0) * bny > 0 && vin > ADER.vBorda) {
+            const dv = vin - ADER.vBorda < ADER.acelN * s.ader * DT ? vin - ADER.vBorda : ADER.acelN * s.ader * DT;
+            for (let a = ini; a < fim; a++) {
+              const i = membros[a];
+              vx[i] -= dv * bnx;
+              vy[i] -= dv * bny;
+            }
+          }
+        }
+        continue;
+      }
+      const nx = snx / nl;
+      const ny = sny / nl;
+      // so na parede de lado (cos2 do angulo com a horizontal): no fundo o corpo assenta solto
+      const c = (nc < ADER.cheio ? nc / ADER.cheio : 1) * nx * nx;
+      const rvx = vcx - swx / nc;
+      const rvy = vcy - swy / nc;
+      const vn = rvx * nx + rvy * ny;
+      let dvx = 0;
+      let dvy = 0;
+      if (vn > 0) {
+        const dn = vn < ADER.acelN * c * DT ? vn : ADER.acelN * c * DT;
+        dvx -= dn * nx;
+        dvy -= dn * ny;
+      }
+      const tx = rvx - vn * nx;
+      const ty = rvy - vn * ny;
+      const vt = Math.sqrt(tx * tx + ty * ty);
+      if (vt > ADER.vel) {
+        const dt2 = vt - ADER.vel < ADER.acelT * c * DT ? vt - ADER.vel : ADER.acelT * c * DT;
+        dvx -= (dt2 * tx) / vt;
+        dvy -= (dt2 * ty) / vt;
+      }
+      const wg = I > 1e-12 ? (ADER.giro * c * L) / I : 0;
+      for (let a = ini; a < fim; a++) {
+        const i = membros[a];
+        vx[i] += dvx + wg * (y[i] - cy);
+        vy[i] += dvy - wg * (x[i] - cx);
+      }
+      // grudado, fica mole (escorre em vez de deslizar duro); solto, endurece na rampa de sempre
+      const mole = 1 - (1 - ADER.mole) * c;
+      if (s.rampa > mole) s.rampa = mole;
+    }
+  }
+
   function subpasso() {
     if (sujo) reconstruir();
     const dt = DT;
@@ -1614,6 +1877,7 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
       vx[i] = (x[i] - px[i]) * idt;
       vy[i] = (y[i] - py[i]) * idt;
     }
+    aderirParedes();
     viscosidadeECoesao();
     // pos-estabilizacao: o que sobrou de sobreposicao sai so na posicao (sem virar velocidade)
     if (cfg.posEstab) {
@@ -1654,9 +1918,71 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
     passoN++;
   }
 
+  /**
+   * Particula enganchada: do outro lado de uma parede em relacao ao centro do proprio slime (a
+   * que ficou em cima da aba de dentro da boca do aquario com o corpo embaixo dela; o alvo da forma
+   * fica do outro lado e ela trepidava contra a parede para sempre). Volta para o lado do corpo,
+   * logo depois da parede, so na posicao. So olha as que estao a mais de um raio do centro (o de
+   * agora: o slime que a rede do pote recolocou ainda tem o centro do quadro anterior).
+   */
+  function desenganchar() {
+    for (let k = 0; k < MAX_SLIMES; k++) {
+      const s = slimes[k];
+      if (!s.ativo || s.preso || s.dormindo) continue;
+      const ini = iniSl[k];
+      const fim = iniSl[k + 1];
+      if (fim - ini < 2) continue;
+      let cx = 0;
+      let cy = 0;
+      for (let a = ini; a < fim; a++) { cx += x[membros[a]]; cy += y[membros[a]]; }
+      cx /= fim - ini;
+      cy /= fim - ini;
+      for (let a = ini; a < fim; a++) desengancharParticula(membros[a], cx, cy, s.raio0);
+    }
+  }
+
+  /** @param {number} i @param {number} cx @param {number} cy centro do slime @param {number} r raio dele */
+  function desengancharParticula(i, cx, cy, r) {
+    let dx = cx - x[i];
+    let dy = cy - y[i];
+    const d2 = dx * dx + dy * dy;
+    if (d2 <= r * r) return;
+    const d = Math.sqrt(d2);
+    dx /= d;
+    dy /= d;
+    // a parede cruzada mais perto da particula, no caminho ate o centro
+    let melhor = d;
+    let alvoX = 0;
+    let alvoY = 0;
+    for (let k = 0; k < paredes.length; k++) {
+      const p = paredes[k];
+      const ax = p.ax + p.tx;
+      const ay = p.ay + p.ty;
+      const ex = p.bx + p.tx - ax;
+      const ey = p.by + p.ty - ay;
+      const den = dx * ey - dy * ex;
+      if (den > -1e-12 && den < 1e-12) continue;
+      // particula + u * dir = a + v * e
+      const wx = ax - x[i];
+      const wy = ay - y[i];
+      const u = (wx * ey - wy * ex) / den;
+      const v = (wx * dy - wy * dx) / den;
+      if (u <= 0 || u >= melhor || v < 0 || v > 1) continue;
+      melhor = u;
+      const passo = u + rad[i] + p.r + 0.02;
+      alvoX = x[i] + dx * (passo < d ? passo : d);
+      alvoY = y[i] + dy * (passo < d ? passo : d);
+    }
+    if (melhor < d) {
+      x[i] = alvoX;
+      y[i] = alvoY;
+    }
+  }
+
   /** Pre-estabilizacao: separa sobreposicoes sem injetar velocidade (FLEX). */
   function preEstabilizar() {
     if (sujo) reconstruir();
+    if (paredes.length) desenganchar();
     construirPares();
     // particulas novas (redimensionar, recolocar) nascem por cima das vizinhas:
     // nos quadros seguintes a separacao roda mais vezes, so na posicao, com as paredes (a

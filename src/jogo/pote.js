@@ -40,6 +40,12 @@ const ENCOSTA = ESPESSURA + R_PART;
 export const REDE_T = 0.4;
 /** Ate esta fracao do slime fora, so as particulas de fora voltam (o resto do corpo fica). */
 const POUCAS = 0.15;
+/**
+ * Aderencia ao vidro (2026-10-18): o slime solto gruda no lado de dentro das paredes e escorrega
+ * devagar por elas (ADER no mundo.js) ate encostar em outro slime, por no maximo `ADER_T` s (o
+ * ultimo segundo vai soltando aos poucos).
+ */
+export const ADER_T = 6;
 
 /** Distancia do ponto ao segmento. */
 function distSeg(x, y, ax, ay, bx, by) {
@@ -93,11 +99,13 @@ export function criarPote({ mundo, cx = 0, cesto = 'becher', eventos, indice = 0
   }
   const idxParedes = [];
   const idxGuias = [];
-  const caps = mundo.paredes.map((p) => ({ ax: p.ax, ay: p.ay, bx: p.bx, by: p.by, r: p.r, oculta: p.oculta }));
-  for (const p of base) {
+  const caps = mundo.paredes.map((p) => ({ ax: p.ax, ay: p.ay, bx: p.bx, by: p.by, r: p.r, oculta: p.oculta, gruda: p.gruda }));
+  // o slime recem-solto gruda no lado de dentro do contorno (a esquerda de quem vai do topo
+  // esquerdo ao topo direito) e escorrega por ele (ADER no mundo.js)
+  base.forEach((p, k) => {
     idxParedes.push(caps.length);
-    caps.push({ ax: xDe(p.ax, false), ay: p.ay, bx: xDe(p.bx, false), by: p.by, r: p.r });
-  }
+    caps.push({ ax: xDe(p.ax, false), ay: p.ay, bx: xDe(p.bx, false), by: p.by, r: p.r, gruda: k < nContorno ? 1 : 0 });
+  });
   for (const k of [0, 1]) {
     idxGuias.push(caps.length);
     caps.push(guia(k, false));
@@ -405,6 +413,7 @@ export function criarPote({ mundo, cx = 0, cesto = 'becher', eventos, indice = 0
       const s = P.preso;
       mundo.soltar(s, -2);
       s.dados.solto = mundo.tempo;
+      s.ader = 1;
       P.preso = null;
       P.recarga = RECARGA;
       eventos.push({ tipo: 'gota', x: s.cx, y: s.cy, pote: indice, nivel: s.nivel });

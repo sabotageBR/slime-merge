@@ -129,6 +129,19 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
 - **Versão 2.0.6 (2026-10-18, depois da 2.0.5):** o pote não muda mais de tamanho quando a pílula da meta
   troca (a missão longa jogava a barra para uma segunda linha na paisagem e a câmera encolhia o pote ~8%);
   ver a convenção da `#area` abaixo.
+- **Versão 2.0.7: slime escorre pelo vidro (2026-10-18, depois da 2.0.6; pedido em `docs/autoria.md`):** o slime solto gruda
+  no lado de dentro das paredes e desce por elas a no máximo 3,5 u/s, mole e esticando (o "dedo" de gosma
+  acima dele), até encostar em outro slime (`ader`, ligado no `pote.soltar`, desligado no `soltar.js` no
+  primeiro toque ou em `ADER_T` s). Física em `aderirParedes` (constantes `ADER` no `mundo.js`): só no lado
+  `gruda` das paredes do contorno (`pote.js`), só de frente para o segmento (puxar para a ponta da borda é
+  um pino), nem em vidro virado para baixo ou para cima (`teto`, `chao`); em cima da borda o corpo anda
+  solto, só com teto na velocidade para dentro (`vBorda`). Junto: a **peça presa não toca ninguém** (nascia
+  em cima do slime ainda na borda e o enganchava; solta por cima, a sobreposição sai só na posição), o
+  **desenganchar** (partícula do outro lado de uma parede em relação ao centro do próprio slime volta para
+  o lado do corpo, no começo do quadro) e o personagem sem atrito na partícula esticada a mais de
+  `ESTICADA` raios do centro (a aba de dentro do aquário). Varredura (8 cestos × 2 lados × 3 posições ×
+  níveis 1–10, 3 sementes): 0 "Ufa!" (a 2.0.6 tinha ~20 por semente, no aquário e no caldeirão). Prints:
+  `node tools/prints-parede.mjs` (`docs/visuais/parede-*`, `parede-comparar-*`: antes, firme, média, mole).
 - Protótipos (Croma, Loja, Molde, lab) só por `?modelo=` ou pelo hub; o `tools/empacotar.mjs`
   apaga os arquivos deles e as linhas `// prototipo` do `main.js`.
 
@@ -148,7 +161,8 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
 ## Estrutura
 - `src/fisica/` (pura e **determinística**: só `+ - * /` e `sqrt`; ver Convenções): `mundo.js` (SoA, subpasso de 1/240 s, contato
   com escala de massa pela altura, shape matching + plasticidade + memória, coesão e XSPH em
-  velocidade, paredes-cápsula com tremor separado da base (`tremerParedes`), sono, contatos persistentes,
+  velocidade, paredes-cápsula com tremor separado da base (`tremerParedes`), aderência ao vidro
+  (`aderirParedes`, `ADER`, lado `gruda` das paredes), `desenganchar`, sono, contatos persistentes,
   fundir (um ou vários)/dividir/redimensionar, e o da fusão animada: `atrair`, `aparar`, `amolecer`,
   `pertoDe`, `refazerForma`, `escalarForma`, `rampaVel`),
   `forma.js` (disco em girassol, atribuição por anel e ângulo), `materiais.js`, `paredes.js`.
@@ -223,7 +237,7 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
 ## Comandos
 | Comando | O que faz |
 |---|---|
-| `npm test` | Física, cor, wrapper Poki, fronteiras, perfil, os modos com o bot, borda, míssil, pote estreito, telemetria de nível e do resgate, qualidade adaptativa, metas da partida, pressão do sem fim (`test/pressao.test.js`), fusão animada e tremor (`test/fusao.test.js`), humor (`test/humor.test.js`), parede (`test/parede.test.js`), áudio, sons, música e skins (186 testes, ~95 s) |
+| `npm test` | Física, cor, wrapper Poki, fronteiras, perfil, os modos com o bot, borda, míssil, pote estreito, telemetria de nível e do resgate, qualidade adaptativa, metas da partida, pressão do sem fim (`test/pressao.test.js`), fusão animada e tremor (`test/fusao.test.js`), humor (`test/humor.test.js`), parede (`test/parede.test.js`), escorrer pelo vidro (`test/escorrer.test.js`), áudio, sons, música e skins (192 testes, ~100 s) |
 | `node --test test/fisica.test.js` | Um arquivo só (`node:test`, sem dependências); `--test-name-pattern="Croma"` filtra pelo nome do teste |
 | `npm run menu` | Fluxo da build no Chrome headless: sequência, gotas no fim, dobrar, loja, missões, troca de modo, Loja › Skins e o editor (pintar, salvar, Esc). Prints em `.tmp/menu/`. `-- --tam=640x360` |
 | `npm run empacotar` | Build da Poki em `dist/` e zip em `dist-poki/` (sem protótipos; só os sons do `PADRAO`; recusa import quebrado, URL externa, `console.log`, `.map`, > 500 KB gzip e áudio > 150 KB); `-- --thumb` confere e anexa `marketing/thumb/slime-merge-1256.png` (sem ele é ensaio) |
@@ -242,6 +256,7 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
 | `node tools/quadros.mjs [--tam=1031x580] [--alvo=pequeno]` | Quadros e GIF do míssil da mira e da gosma na tela (laço pausado, `__slime.avancar(n)`) em `docs/visuais/missil-*` |
 | `node tools/prints-fusao.mjs [--tam=] [--cenas=par,trio,super,terremoto]` | GIFs e folha da fusão animada, do selo do combo, do super slime e do terremoto em `docs/visuais/fusao-*` |
 | `node tools/prints-humor.mjs` | Folha dos humores em cada estilo de personagem e um pote real em `docs/visuais/humor-*` |
+| `node tools/prints-parede.mjs [--tam=640x900] [--cenas=borda,encosta,grande] [--saida=parede]` | O slime solto em cima da borda, encostado no vidro e o grande, de perto (`?zoom`), em `docs/visuais/<saida>-*` (laço pausado, `__slime.avancar(n)`) |
 | `node tools/prints-carregando.mjs` | A tela de loading em 4 momentos, retrato e paisagem, em `docs/visuais/carregando.jpg`, e o GIF `carregando-390x844.gif` |
 | `node tools/vazamento.mjs [--sementes=3] [--min=5] [--restaurar=240] [--src=…]` | Caçada do slime atravessado na parede: o sem fim com o bot, partícula fora do pote a cada quadro (teste próprio), restaurando a partida no meio; `--src` roda outra cópia do `src` |
 | `npm run artifact` | Monta `.tmp/artifact/` (hub + `jogo-N.html` sem o SDK + `src/`) para publicar no claude.ai |
