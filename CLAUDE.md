@@ -141,7 +141,12 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
   o lado do corpo, no começo do quadro) e o personagem sem atrito na partícula esticada a mais de
   `ESTICADA` raios do centro (a aba de dentro do aquário). Varredura (8 cestos × 2 lados × 3 posições ×
   níveis 1–10, 3 sementes): 0 "Ufa!" (a 2.0.6 tinha ~20 por semente, no aquário e no caldeirão). Prints:
-  `node tools/prints-parede.mjs` (`docs/visuais/parede-*`, `parede-comparar-*`: antes, firme, média, mole).
+  `node tools/prints-parede.mjs` (`docs/visuais/parede-*`).
+- **Versão 2.0.8 (2026-10-18, depois da 2.0.7):** o slime escorre pelo vidro **quase em queda livre** (a 3,5 u/s o
+  usuário achou lento): no lugar do teto de velocidade, um freio de 7 u/s² (`ADER.freio`; gravidade 50), arrasto
+  por partícula 0,01 e, em cima da borda, até 3 u/s para dentro (`vBorda`). Do alto da borda ao meio do pote em
+  ~0,9 s a ~20 u/s (queda livre: ~0,85 s a ~23 u/s), colado no vidro. `docs/visuais/parede-comparar-*`: antes,
+  2.0.7 e 2.0.8.
 - Protótipos (Croma, Loja, Molde, lab) só por `?modelo=` ou pelo hub; o `tools/empacotar.mjs`
   apaga os arquivos deles e as linhas `// prototipo` do `main.js`.
 

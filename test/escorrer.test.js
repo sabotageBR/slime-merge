@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { criarModo } from '../src/jogo/modos/merge.js';
 import { CESTOS } from '../src/jogo/cestos.js';
-import { criarMundo, ADER } from '../src/fisica/mundo.js';
+import { criarMundo } from '../src/fisica/mundo.js';
 import { ADER_T } from '../src/jogo/pote.js';
 
 /** Pote largo; com `pilha`, tres slimes no fundo. */
@@ -60,7 +60,7 @@ function soltar({ modo, S, J, P, m }, k, lado, d) {
   return s;
 }
 
-test('solto em cima da borda do bequer, escorre colado no vidro de dentro (niveis 1 a 9, dois lados)', () => {
+test('solto em cima da borda do bequer, escorre colado no vidro de dentro, quase em queda livre (niveis 1 a 9, dois lados)', () => {
   for (const lado of [-1, 1]) {
     for (const k of [1, 3, 5, 7, 9]) {
       const c = pote();
@@ -76,11 +76,10 @@ test('solto em cima da borda do bequer, escorre colado no vidro de dentro (nivei
       }
       const rot = `lado ${lado} nivel ${k}`;
       assert.ok(dentro > 0 && dentro < 1.6, `${rot}: levou ${dentro.toFixed(2)} s para passar da linha`);
-      assert.ok(vs.length >= 20, `${rot}: so ${vs.length} quadros colado no vidro (pulou para longe dele)`);
-      // escorre: mais devagar que a queda (a chegada ao vidro ainda vem freando), sem parar
-      vs.sort((a, b) => a - b);
-      const med = vs[vs.length >> 1];
-      assert.ok(med > 1 && med < ADER.vel + 0.3, `${rot}: desceu o vidro a ${med.toFixed(2)} u/s (mediana)`);
+      assert.ok(vs.length >= 12, `${rot}: so ${vs.length} quadros colado no vidro (pulou para longe dele)`);
+      // escorre quase em queda livre (2026-10-18: a 3,5 u/s, o usuario achou lento demais)
+      const vmax = Math.max(...vs);
+      assert.ok(vmax > 14, `${rot}: desceu o vidro a no maximo ${vmax.toFixed(2)} u/s`);
       assert.ok(!modo.eventos.some((e) => e.tipo === 'resgate' || e.tipo === 'volta'), `${rot}: precisou do Ufa ou da rede`);
     }
   }

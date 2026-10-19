@@ -348,8 +348,8 @@ Pedidos com prints anotados do Merge Lab (plano em
 - **Agora:** o slime solto gruda no lado de dentro do vidro e desce por ele a no máximo 3,5 u/s, um pouco
   mole (o lado do vidro fica para trás e deixa um "dedo" de gosma colado acima dele), até encostar em
   outro slime; aí volta ao normal. Na borda, ele desce do lado de dentro, colado no vidro.
-- **Dureza:** a média (`ADER.mole` 0,5), escolhida pelo Claude entre firme (1), média e mole (0,3), que estão
-  lado a lado em `docs/visuais/parede-comparar-{borda,encosta,grande}.gif` (com o antes); trocar é um número.
+- **Dureza:** a média (`ADER.mole` 0,5), escolhida pelo Claude entre firme (1), média e mole (0,3), que foram
+  comparadas lado a lado (com o antes) nos GIFs da 2.0.7; trocar é um número.
 - **Armadilhas que a aderência abriu e foram fechadas:** a peça presa nascia em cima do slime grande ainda
   na borda e o enganchava por uma partícula (agora ela não toca ninguém até ser solta); o slime ficava
   pendurado na ponta da borda ou na aba de dentro da boca do aquário por uma partícula (a ponta não gruda,
@@ -361,3 +361,14 @@ Pedidos com prints anotados do Merge Lab (plano em
   lançamentos vêm de fusões grandes no meio da pilha (8 a 10 por semente de 5 min nas duas versões).
 - **Build: versão 2.0.7** (`dist-poki/slime-merge-2.0.7.zip`, com a thumb), pedida pelo usuário ("mande as
   imagens e a build aqui"): 136,2 KB de áudio, 466 KB gzip.
+
+## 2026-10-18 (noite): escorrer quase em queda livre (2.0.8)
+- Pedido, depois de ver os GIFs da 2.0.7: "Ta escorregando muito lento pela parede... aumente a valocidade,
+  quase a velocidade da queda livre" e "e gera a versao 2.0.8".
+- **Agora:** o vidro não tem mais teto de velocidade (eram 3,5 u/s); ele só freia o slime em 7 u/s² (a gravidade
+  é 50) e o arrasto das partículas encostadas caiu de 0,1 para 0,01. Em cima da borda, o slime sai para dentro
+  a até 3 u/s (era 1). Do alto da borda ao meio do pote: ~0,9 s a ~20 u/s (queda livre: ~0,85 s a ~23 u/s);
+  encostado no vidro, igual à queda livre (0,55 s). Continua colado no vidro o caminho todo.
+- **Conferido:** varredura dos 8 cestos em 3 sementes sem "Ufa!" (o tempo máximo acima da linha caiu de 1,9 para
+  1,4 s), a caçada de vazamento das 3 sementes padrão sem episódio, 192 testes.
+  `docs/visuais/parede-comparar-{borda,encosta,grande}.gif`: antes | 2.0.7 | 2.0.8.

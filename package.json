@@ -1,6 +1,6 @@
 {
   "name": "slime-merge",
-  "version": "2.0.7",
+  "version": "2.0.8",
   "private": true,
   "description": "Slime Merge: motor de slime (particulas + pigmento Kubelka-Munk) e 5 prototipos para a Poki (HTML + JavaScript puro).",
   "type": "module",

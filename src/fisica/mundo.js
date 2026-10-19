@@ -68,15 +68,14 @@ const ESTICADA = 2.5; // raios do slime: no personagem, a particula mais longe d
  *   arrasto fracao da velocidade tangente (relativa a parede) de cada particula encostada tirada por subpasso
  *   cheio   particulas encostadas para o corpo grudar com a forca toda
  *   acelN   o maximo que o vidro segura o corpo que se afasta (u/s2)
- *   vel     velocidade maxima do corpo ao longo do vidro (u/s): o escorrer
- *   acelT   o maximo que o vidro freia o corpo acima de `vel` (u/s2; > gravidade, senao nao freia)
+ *   freio   quanto o vidro freia o corpo que escorre (u/s2; a gravidade e 50: desce quase em queda livre)
  *   giro    fracao do giro do corpo tirada por subpasso (rolar nao escorrega)
  *   mole    rigidez (fracao do k) do slime grudado na parede de lado
  *   teto    abaixo desta componente vertical da normal (vidro virado para baixo) nao gruda
  *   chao    acima dela (fundo, aba da boca do aquario) tambem nao: escorrer e na parede de lado
  *   vBorda  em cima da borda, a velocidade maxima do corpo para dentro do pote (u/s)
  */
-export const ADER = Object.freeze({ banda: 0.2, acel: 200, puxa: 0.3, arrasto: 0.1, cheio: 3, acelN: 150, vel: 3.5, acelT: 150, giro: 0.1, mole: 0.5, teto: -0.25, chao: 0.7, vBorda: 1 });
+export const ADER = Object.freeze({ banda: 0.2, acel: 200, puxa: 0.3, arrasto: 0.01, cheio: 3, acelN: 150, freio: 7, giro: 0.1, mole: 0.5, teto: -0.25, chao: 0.7, vBorda: 3 });
 
 /**
  * @typedef {Object} Slime
@@ -1625,8 +1624,9 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
    *  - cada particula ate ADER.banda alem do toque volta para o vidro (aceleracao limitada) e as
    *    encostadas arrastam um pouco: o lado do vidro achata e fica para tras, o slime estica;
    *  - o corpo inteiro (igual em todas as particulas, sem torque): nao se afasta do vidro (o que
-   *    sai da borda com a guia empurrando para dentro fica nele), escorrega no maximo a ADER.vel,
-   *    com o giro freado (rolar nao escorrega), e amolece. A forca cresce com o contato ate
+   *    sai da borda com a guia empurrando para dentro fica nele), escorrega quase em queda livre
+   *    (ADER.freio; 2026-10-18: a 3,5 u/s, o usuario achou lento demais), com o giro freado (rolar
+   *    nao escorrega), e amolece. A forca cresce com o contato ate
    *    ADER.cheio particulas encostadas, para valer igual no nivel 1 e no 13, e so na parede de lado.
    * Em cima da borda (encostado na ponta livre ou na guia), o corpo anda solto; so a velocidade
    * para dentro do pote tem teto (ADER.vBorda).
@@ -1786,8 +1786,8 @@ export function criarMundo({ capacidade = 4096, semente = 1, limites = [-16, -8,
       const tx = rvx - vn * nx;
       const ty = rvy - vn * ny;
       const vt = Math.sqrt(tx * tx + ty * ty);
-      if (vt > ADER.vel) {
-        const dt2 = vt - ADER.vel < ADER.acelT * c * DT ? vt - ADER.vel : ADER.acelT * c * DT;
+      if (vt > 1e-9) {
+        const dt2 = vt < ADER.freio * c * DT ? vt : ADER.freio * c * DT;
         dvx -= (dt2 * tx) / vt;
         dvy -= (dt2 * ty) / vt;
       }
