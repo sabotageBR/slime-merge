@@ -81,7 +81,7 @@ for (const [W, H] of tamanhos) {
     await c.avaliar('__slime.abrirMenu("loja")');
     await clicar('.abaLoja[data-grupo="cenario"]');
     await clicar('#gradeLoja [data-item="mar"][data-acao="comprar"]');
-    if ((await c.avaliar('__slime.cena.visual ? __slime.cena.visual.cenario : "?"')) === 'jardim') falhas.push('o cenario nao trocou na hora');
+    if ((await c.avaliar('__slime.cena.visual ? __slime.cena.visual.cenario : "?"')) !== 'mar') falhas.push('o cenario nao trocou na hora');
     await foto('5-loja-cenario');
     await clicar('.aba[data-aba="missoes"]');
     await foto('6-missoes');

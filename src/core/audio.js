@@ -15,6 +15,8 @@
 //   contexto 80 ms depois (padrao do hexadrop: o onStart do SDK pode nao chegar).
 //   `voltarDoAnuncio()` devolve o mestre e retoma; cada retomada avisa `aoRetomar`.
 // - `definirMudo` cala efeitos e falas (sfx e voz); a musica tem o proprio `definirMusica`.
+// - `definirMudoPlataforma` cala tudo pelo mestre, por cima do mudo do jogador (o muteAudio da
+//   CrazyGames); o mudo do jogador continua guardado por baixo.
 // - Polifonia: no maximo MAX_VOZES sons ao mesmo tempo e `max` por chave (categoria).
 // Contexto, janela e agendador injetaveis (testes no Node com contexto falso).
 
@@ -68,6 +70,7 @@ export function criarAudio(opcoes = {}) {
   let musicaLigada = true;
   let mudoAnuncio = false;
   let abaOculta = false;
+  let mudoPlataforma = false;
   let agendados = 0;
   /** @type {{chave: string, fim: number}[]} */
   let tocando = [];
@@ -81,7 +84,7 @@ export function criarAudio(opcoes = {}) {
   /** @type {Set<(emAnuncio: boolean) => void>} */
   const aoAnuncioFns = new Set();
 
-  const alvoMestre = () => (mudoAnuncio || abaOculta ? 0 : ganhos.mestre);
+  const alvoMestre = () => (mudoAnuncio || abaOculta || mudoPlataforma ? 0 : ganhos.mestre);
   /** @param {NomeBarramento} n */
   const alvoBus = (n) => (n === 'musica' ? (musicaLigada ? ganhos.musica : 0) : mudo ? 0 : ganhos[n]);
 
@@ -185,7 +188,7 @@ export function criarAudio(opcoes = {}) {
   }
 
   function podeTocar() {
-    return !!ctx && destravado && !mudoAnuncio && !abaOculta && ctx.state === 'running';
+    return !!ctx && destravado && !mudoAnuncio && !abaOculta && !mudoPlataforma && ctx.state === 'running';
   }
 
   /**
@@ -344,8 +347,10 @@ export function criarAudio(opcoes = {}) {
     get mudo() { return mudo; },
     get musicaLigada() { return musicaLigada; },
     get destravado() { return destravado; },
-    /** true se nada deve sair agora (anuncio, aba oculta, ou mudo com a musica desligada) */
-    get calado() { return mudoAnuncio || abaOculta || (mudo && !musicaLigada); },
+    /** mudo pedido pela plataforma (muteAudio da CrazyGames) */
+    get mudoPlataforma() { return mudoPlataforma; },
+    /** true se nada deve sair agora (anuncio, aba oculta, plataforma, ou mudo com a musica desligada) */
+    get calado() { return mudoAnuncio || abaOculta || mudoPlataforma || (mudo && !musicaLigada); },
 
     /** @param {boolean} v cala efeitos e falas */
     definirMudo(v) {
@@ -353,6 +358,11 @@ export function criarAudio(opcoes = {}) {
       if (!ctx) return;
       levar(bus.sfx.gain, alvoBus('sfx'), 0.02);
       levar(bus.voz.gain, alvoBus('voz'), 0.02);
+    },
+    /** @param {boolean} v cala tudo (efeitos, falas e musica) pelo mestre; nao mexe no mudo do jogador */
+    definirMudoPlataforma(v) {
+      mudoPlataforma = !!v;
+      if (ctx && mestre) levar(mestre.gain, alvoMestre(), 0.03);
     },
     /** @param {boolean} v liga ou desliga a musica */
     definirMusica(v) {

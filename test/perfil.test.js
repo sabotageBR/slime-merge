@@ -1,7 +1,7 @@
 // Metajogo: uma moeda so, loja, sequencia diaria, missoes do dia, desafio e liga.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { criarPerfil, diasEntre, gotasDaPartida, LOJA, SEQUENCIA } from '../src/jogo/perfil.js';
+import { criarPerfil, diasEntre, gotasDaPartida, LOJA, SEQUENCIA, PRECO_REFORCO } from '../src/jogo/perfil.js';
 
 test('calendario: dias entre datas, inclusive virada de mes e de ano', () => {
   assert.equal(diasEntre('2026-10-14', '2026-10-15'), 1);
@@ -11,10 +11,34 @@ test('calendario: dias entre datas, inclusive virada de mes e de ano', () => {
   assert.equal(diasEntre('2026-10-14', '2026-10-14'), 0);
 });
 
-test('padrao: bequer, jardim e classico de graca e equipados', () => {
-  const p = criarPerfil({}, '2026-10-14');
-  assert.deepEqual(p.equipado, { cesto: 'becher', cenario: 'jardim', objeto: 'classico' });
+test('padrao: bequer, caderno e classico de graca e equipados; o jardim custa 150', () => {
+  const p = criarPerfil({}, '2026-10-19');
+  assert.deepEqual(p.equipado, { cesto: 'becher', cenario: 'caderno', objeto: 'classico' });
   for (const g of Object.keys(LOJA)) assert.equal(LOJA[g][0].preco, 0);
+  assert.equal(LOJA.cenario.find((i) => i.id === 'jardim').preco, 150);
+  assert.equal(p.comprar('cenario', 'jardim'), false);
+  p.ganhar(150);
+  assert.equal(p.comprar('cenario', 'jardim'), true);
+  assert.equal(p.gotas, 0);
+  assert.equal(p.equipado.cenario, 'jardim');
+});
+
+test('gastar: o +1 do reforco sai das gotas so com saldo', () => {
+  const p = criarPerfil({}, '2026-10-19');
+  assert.equal(p.gastar(PRECO_REFORCO), false);
+  p.ganhar(PRECO_REFORCO + 5);
+  assert.equal(p.gastar(PRECO_REFORCO), true);
+  assert.equal(p.gotas, 5);
+  assert.equal(p.gastar(0), false);
+  assert.equal(p.gastar(-3), false);
+  assert.equal(p.gotas, 5);
+});
+
+test('save de antes do caderno padrao: o jardim continua equipado e o caderno entra de graca', () => {
+  const p = criarPerfil({ possui: { cesto: ['becher'], cenario: ['jardim'], objeto: ['classico'] }, equipado: { cesto: 'becher', cenario: 'jardim', objeto: 'classico' } }, '2026-10-19');
+  assert.equal(p.equipado.cenario, 'jardim');
+  assert.equal(p.equipar('cenario', 'caderno'), true);
+  assert.equal(p.equipar('cenario', 'jardim'), true, 'nao perde o jardim');
 });
 
 test('loja: so compra com gotas suficientes, desconta e equipa', () => {

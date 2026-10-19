@@ -151,6 +151,28 @@ test('audio: o mudo cala efeitos e falas, nao a musica; calado so com os dois de
   assert.equal(a.calado, false);
 });
 
+test('audio: o mudo da plataforma cala tudo pelo mestre, por cima do mudo do jogador e do anuncio', async () => {
+  const m = montar();
+  await m.destravar();
+  const a = m.audio;
+  a.definirMudoPlataforma(true);
+  assert.equal(a.mudoPlataforma, true);
+  assert.equal(a.mestre.gain.final(), 0);
+  assert.equal(a.calado, true);
+  assert.equal(a.mudo, false, 'o mudo do jogador fica como estava');
+  const antes = m.ctx().inicios.length;
+  a.pouso();
+  assert.equal(a.tocarReceita('pingo', {}, { destino: 'musica' }), 0);
+  assert.equal(m.ctx().inicios.length, antes, 'nada agenda');
+  // o anuncio que termina nao devolve o som com a plataforma muda
+  a.mudoParaAnuncio();
+  a.voltarDoAnuncio();
+  assert.equal(a.mestre.gain.final(), 0);
+  a.definirMudoPlataforma(false);
+  assert.equal(a.mestre.gain.final(), GANHOS.mestre);
+  assert.equal(a.calado, false);
+});
+
 test('audio: aba oculta cala, suspende e nao agenda; ao voltar retoma', async () => {
   const m = montar();
   await m.destravar();

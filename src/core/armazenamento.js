@@ -74,3 +74,38 @@ export function criarArmazem({ prefixo = PREFIXO_PADRAO, obterLs = () => globalT
 
   return { ler, gravar };
 }
+
+/**
+ * Leva o progresso do localStorage para outra fonte (o modulo data da CrazyGames), uma vez: so as
+ * chaves do prefixo que a fonte ainda nao tem (quem jogou a build sem o modulo, no Basic Launch,
+ * nao perde o save). A CrazyGames pede isso ao trocar o save de um jogo ja publicado.
+ * @param {StorageMinimo} destino
+ * @param {{ prefixo?: string, obterLs?: () => any }} [opcoes]
+ * @returns {number} chaves copiadas
+ */
+export function migrarDoLocal(destino, { prefixo = PREFIXO_PADRAO, obterLs = () => globalThis.localStorage } = {}) {
+  const marca = prefixo + '_migrado';
+  let n = 0;
+  try {
+    if (destino.getItem(marca) !== null) return 0;
+    const ls = obterLs();
+    if (ls && ls !== destino && typeof ls.key === 'function') {
+      const chaves = [];
+      for (let i = 0; i < ls.length; i++) {
+        const k = ls.key(i);
+        if (typeof k === 'string' && k.startsWith(prefixo) && k !== marca) chaves.push(k);
+      }
+      for (const k of chaves) {
+        const v = ls.getItem(k);
+        if (v !== null && destino.getItem(k) === null) {
+          destino.setItem(k, v);
+          n++;
+        }
+      }
+    }
+    destino.setItem(marca, '1');
+  } catch {
+    /* sem localStorage ou fonte cheia: segue com o que tiver */
+  }
+  return n;
+}

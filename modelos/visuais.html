@@ -115,13 +115,13 @@ section { display: flex; flex-direction: column; gap: 14px; }
     <section id="cenarios" aria-labelledby="t-cenarios">
       <h2 id="t-cenarios">Cenários <small>8 lugares</small></h2>
       <div class="grade" data-grupo="cenario">
-        <button class="opcao" data-id="caderno"><img src="../docs/visuais/cenarios-caderno.jpg" alt="Papel quadriculado" loading="lazy"><i class="num">1</i><span class="txt"><b>Caderno</b><span>Papel quadriculado neutro: o slime é o destaque.</span></span></button>
+        <button class="opcao" data-id="caderno"><img src="../docs/visuais/cenarios-caderno.jpg" alt="Papel quadriculado" loading="lazy"><i class="num">1</i><i class="atual">escolhido</i><span class="txt"><b>Caderno</b><span>Papel quadriculado neutro: o slime é o destaque.</span></span></button>
         <button class="opcao" data-id="laboratorio"><img src="../docs/visuais/cenarios-laboratorio.jpg" alt="Laboratório com azulejos e prateleira de vidrarias" loading="lazy"><i class="num">2</i><span class="txt"><b>Laboratório</b><span>Azulejos, bancada e uma prateleira de vidrarias.</span></span></button>
         <button class="opcao" data-id="cozinha"><img src="../docs/visuais/cenarios-cozinha.jpg" alt="Cozinha com azulejo xadrez amarelo" loading="lazy"><i class="num">3</i><span class="txt"><b>Cozinha</b><span>Azulejo xadrez, janela e bancada de madeira.</span></span></button>
         <button class="opcao" data-id="mar"><img src="../docs/visuais/cenarios-mar.jpg" alt="Fundo do mar com algas e bolhas" loading="lazy"><i class="num">4</i><span class="txt"><b>Fundo do mar</b><span>Raios de luz, algas balançando e bolhas subindo.</span></span></button>
         <button class="opcao" data-id="espaco"><img src="../docs/visuais/cenarios-espaco.jpg" alt="Espaço com estrelas e planeta" loading="lazy"><i class="num">5</i><span class="txt"><b>Espaço</b><span>Estrelas piscando, planeta com anel e chão de crateras.</span></span></button>
         <button class="opcao" data-id="doceria"><img src="../docs/visuais/cenarios-doceria.jpg" alt="Doceria rosa com granulado" loading="lazy"><i class="num">6</i><span class="txt"><b>Doceria</b><span>Granulado, cobertura escorrendo e piso xadrez rosa.</span></span></button>
-        <button class="opcao" data-id="jardim"><img src="../docs/visuais/cenarios-jardim.jpg" alt="Jardim com nuvens e flores" loading="lazy"><i class="num">7</i><i class="atual">escolhido</i><span class="txt"><b>Jardim</b><span>Céu com nuvens passando, morros e flores na grama.</span></span></button>
+        <button class="opcao" data-id="jardim"><img src="../docs/visuais/cenarios-jardim.jpg" alt="Jardim com nuvens e flores" loading="lazy"><i class="num">7</i><span class="txt"><b>Jardim</b><span>Céu com nuvens passando, morros e flores na grama.</span></span></button>
         <button class="opcao" data-id="quarto"><img src="../docs/visuais/cenarios-quarto.jpg" alt="Quarto com papel de parede listrado" loading="lazy"><i class="num">8</i><span class="txt"><b>Quarto</b><span>Papel de parede listrado, quadro e mesa de madeira.</span></span></button>
       </div>
     </section>
@@ -160,7 +160,7 @@ section { display: flex; flex-direction: column; gap: 14px; }
 <script>
 (() => {
   const CHAVE = 'slime.visual';
-  const PADRAO = { cesto: 'becher', cenario: 'jardim', objeto: 'classico' };
+  const PADRAO = { cesto: 'becher', cenario: 'caderno', objeto: 'classico' };
   let escolha = { ...PADRAO };
   try { escolha = { ...PADRAO, ...(JSON.parse(localStorage.getItem(CHAVE) || '{}') || {}) }; } catch { /* sem armazenamento */ }
   const jogo = document.getElementById('jogo');

@@ -7,14 +7,18 @@ import { criarRng, hashTexto } from '../core/rng.js';
 import { SKINS, PRECO_MINHA, BASES, decodificar, codificar, imagemVazia } from './skins.js';
 import { MAX_NIVEL } from './niveis.js';
 
-/** Precos da loja (o padrao de cada grupo e de graca). */
+/**
+ * Precos da loja (o primeiro de cada grupo e o padrao, de graca). Cenario padrao: o caderno desde
+ * 2026-10-19 (era o jardim, que passou a custar os 150 gotas do caderno); quem ja tinha o jardim no
+ * save continua com ele e ganha o caderno.
+ */
 export const LOJA = {
   cesto: [
     { id: 'becher', preco: 0 }, { id: 'vime', preco: 200 }, { id: 'balde', preco: 250 }, { id: 'pote', preco: 300 },
     { id: 'vidro', preco: 300 }, { id: 'xicara', preco: 450 }, { id: 'caldeirao', preco: 600 }, { id: 'aquario', preco: 800 },
   ],
   cenario: [
-    { id: 'jardim', preco: 0 }, { id: 'caderno', preco: 150 }, { id: 'laboratorio', preco: 250 }, { id: 'cozinha', preco: 250 },
+    { id: 'caderno', preco: 0 }, { id: 'jardim', preco: 150 }, { id: 'laboratorio', preco: 250 }, { id: 'cozinha', preco: 250 },
     { id: 'quarto', preco: 300 }, { id: 'doceria', preco: 400 }, { id: 'mar', preco: 500 }, { id: 'espaco', preco: 700 },
   ],
   objeto: [
@@ -22,6 +26,12 @@ export const LOJA = {
     { id: 'bichinhos', preco: 400 }, { id: 'boneco', preco: 450 }, { id: 'chapeus', preco: 500 }, { id: 'monstrinhos', preco: 600 },
   ],
 };
+
+/**
+ * Gotas por +1 num reforco acabado: a alternativa ao video na oferta do meio da partida (regra da
+ * CrazyGames, escolha do usuario em 2026-10-19).
+ */
+export const PRECO_REFORCO = 40;
 
 /** Gotas pela descoberta de um nivel (a primeira vez que alguem chega nele). */
 export const PREMIO_DESCOBERTA = 25;
@@ -81,8 +91,8 @@ export function diasEntre(a, b) {
 export function criarPerfil(salvo, hoje) {
   const d = {
     gotas: 0,
-    possui: { cesto: ['becher'], cenario: ['jardim'], objeto: ['classico'] },
-    equipado: { cesto: 'becher', cenario: 'jardim', objeto: 'classico' },
+    possui: { cesto: ['becher'], cenario: ['caderno'], objeto: ['classico'] },
+    equipado: { cesto: 'becher', cenario: 'caderno', objeto: 'classico' },
     visto: 1, // maior nivel ja descoberto
     sequencia: { ultimo: '', dias: 0 },
     missoes: { dia: '', lista: [] },
@@ -214,6 +224,13 @@ export function criarPerfil(salvo, hoje) {
     },
     // ---- loja
     possui(grupo, id) { return d.possui[grupo].includes(id); },
+    /** Gasta gotas fora da loja (o +1 do reforco). @param {number} n @returns {boolean} pagou */
+    gastar(n) {
+      const v = Math.floor(n);
+      if (!(v > 0) || v > d.gotas) return false;
+      d.gotas -= v;
+      return true;
+    },
     preco(grupo, id) { const it = (LOJA[grupo] || []).find((x) => x.id === id); return it ? it.preco : Infinity; },
     /** @returns {boolean} comprou */
     comprar(grupo, id) {

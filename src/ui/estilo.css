@@ -62,15 +62,16 @@ body[data-orient="paisagem"] #base { flex-direction: column; justify-content: ce
 .placar .pontos b i { font-style: normal; }
 /* retrato (celular): o botao da Poki fica no canto de cima a esquerda (~53 x 38 px a ~20 px do topo;
    print do iPhone, 2026-10-18). O placar comeca depois dele, numa linha so, e o rotulo dos pontos
-   some (fica o numero; o recorde continua com o nome) */
-body[data-orient="retrato"] .placar { padding-left: 58px; padding-top: 2px; }
+   some (fica o numero; o recorde continua com o nome). Na CrazyGames nao ha botao por cima do jogo */
+body[data-orient="retrato"] .placar { padding-top: 2px; }
+body[data-plataforma="poki"][data-orient="retrato"] .placar { padding-left: 58px; }
 body[data-orient="retrato"] #topo, body[data-orient="retrato"] .placar > div { min-width: 0; }
 body[data-orient="retrato"] .placar b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 body[data-orient="retrato"] .placar .pontos b i { display: none; }
 /* telas estreitas (menos de 380 px): ao lado do botao nao cabe o numero; o placar desce para baixo dele */
 @media (max-width: 379px) {
-  body[data-orient="retrato"] .placar { padding-left: 0; padding-top: 50px; }
-  body[data-orient="retrato"] .placar .pontos b { font-size: 1.6em; }
+  body[data-plataforma="poki"][data-orient="retrato"] .placar { padding-left: 0; padding-top: 50px; }
+  body[data-plataforma="poki"][data-orient="retrato"] .placar .pontos b { font-size: 1.6em; }
 }
 .proximo {
   position: relative; width: 4.4em; height: 4.4em; border-radius: 0.9em; background: var(--turquesa);
@@ -189,6 +190,17 @@ body[data-orient="paisagem"] .evolucao { flex-wrap: wrap; max-width: 100%; }
 .acao.anuncio { background: var(--roxo); display: inline-flex; align-items: center; justify-content: center; gap: 0.4em; font-size: 1em; }
 .acao.anuncio .selo { font-style: normal; }
 body.sem-anuncio .anuncio { display: none !important; }
+/* oferta do reforco acabado (regras da CrazyGames): video, gotas e "agora nao" do mesmo tamanho,
+   fonte e cor, com o jogo pausado por baixo */
+#oferta .cartao { gap: 0.55em; }
+#oferta h2 { display: flex; align-items: center; justify-content: center; gap: 0.3em; }
+#oferta h2 svg { width: 1.3em; height: 1.3em; }
+#oferta .acao { display: inline-flex; align-items: center; justify-content: center; gap: 0.45em; }
+#oferta .acao .selo { font-style: normal; }
+#oferta .acao:disabled { opacity: 0.45; cursor: default; }
+#oferta .ofNota { margin-top: -0.35em; color: var(--tinta); opacity: 0.75; }
+/* anuncio pedido ou na tela: nada da interface responde (regra da CrazyGames) */
+body.em-anuncio::after { content: ''; position: fixed; inset: 0; z-index: 40; }
 .placarFim b { font-size: 2.4em; color: var(--azulTexto); -webkit-text-stroke: 0.12em #fff; paint-order: stroke fill; text-shadow: 0 0.06em 0 var(--tinta); }
 .placarFim small { display: block; opacity: 0.7; }
 #bSom .desligado { display: none; }

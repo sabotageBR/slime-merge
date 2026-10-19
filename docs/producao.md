@@ -303,3 +303,48 @@ Test").
     `tempo/15` ≥ 16%; `meta/combo-*` uma vez por partida; desktop `level/2` ≥ 85% de quem abre (78%);
     `super/2` ≥ 6%; `tempo/20` ≥ 10% (8,1%); física acima de 8 ms no minuto 5 do celular ≤ 15% (33%);
     `intervalo` e `ufa` com o Completed medido.
+- **Recusa da Poki** (2026-10-19, Web Fit Test e game review): "já temos muitos títulos parecidos nessa categoria,
+  e ela está ficando saturada". Sem KPIs nem crítica de execução; recomenda olhar o catálogo e uma direção mais
+  única. O levantamento do catálogo (13 clones de Suika: Watermelon Drop 674k votos, Merge Rot 563k, Cats Drop
+  317k...; Blob Drop e Jelly Fruit Merge já com estética "mole") e o das plataformas estão no cofre do Obsidian
+  (`~/git/em_tech/obsidian/POKI/30 Referência/`). Caminhos escolhidos pelo usuário: o Slime Merge na CrazyGames e
+  um conceito novo do motor para a Poki (fichas `40 Projetos/Loja de Slime.md` e `Molde.md` no cofre).
+- **Versão 2.0.9: build da CrazyGames** (2026-10-19; requisitos lidos em docs.crazygames.com no mesmo dia):
+  - `npm run empacotar -- --alvo=crazygames`: SDK v3 (`https://sdk.crazygames.com/crazygames-sdk-v3.js`) no lugar
+    do da Poki e o import do `main.js` trocado para `src/core/crazygames.js` (adaptador sobre o `criarPoki`: init +
+    `game.loadingStart`, `loadingStop`, `gameplayStart/Stop`, `ad.requestAd` com `adStarted/adFinished/adError`,
+    rewarded só no `adFinished`, `measure` vazio, ambiente `disabled` = sem SDK);
+  - **Basic Launch:** anúncios desligados pela plataforma e "botão de vídeo sem efeito" reprova, então a build sai
+    sem anúncios (`dist-crazygames/slime-merge-2.0.9-basic.zip`): `temAnuncios` falso, `body.sem-anuncio`, nenhum
+    pedido ao SDK; o erro `adsDisabledBasicLaunch` também desliga na sessão. `--anuncios` gera a do Full Launch;
+  - `settings.muteAudio` (exigido no Full Launch) cala o mestre por cima do mudo do jogador
+    (`audio.definirMudoPlataforma`, também no `addSettingsChangeListener`);
+  - HUD retrato sem o recuo de 58 px do botão da Poki (`body[data-plataforma]`); textos visíveis sem a marca Poki;
+  - o Basic Launch mede sessão média, D1 e conversão (jogar 1 min) em 7 dias e 500 plays (ou 21 dias); a
+    referência deles é "10+ min", "10–15% D1" e "80%+". Nossos 7m41s do PFT da Poki ficam abaixo do primeiro;
+  - **pendências do Full Launch:** módulo `data` para o progresso (hoje só `localStorage`); "o botão do rewarded
+    não pode aparecer na tela de gameplay ativa" (os reforços acabados com 🎬 ficam no pote); `happytime()` nos
+    marcos (opcional); capas no tamanho do portal;
+  - verificado com `npm test` (201), `sdkcheck` (5 cenários), `telas` e `menu` na build da Poki (recuo de 58 px
+    mantido), e as builds da CrazyGames no Chrome com o SDK de verdade: ambiente `local` (vídeo premiado depois
+    do aviso de 5 s, áudio mudo no meio e de volta no fim), fora do localhost com `?useLocalSdk=true` (Basic: sem
+    botões de vídeo) e no ambiente `disabled` (joga sem SDK), sem erros no console.
+- **Versão 2.0.10** (2026-10-19, pedido do usuário; `docs/autoria.md`): cenário padrão = caderno; o jardim custa
+  150 gotas na loja (o preço do caderno). Save antigo com o jardim fica com ele. Build da CrazyGames refeita.
+- **Versão 2.1.0: Full Launch da CrazyGames** (2026-10-19; escolhas em `docs/autoria.md`). Regras lidas em
+  docs.crazygames.com (ads, gameplay, technical, game-covers, sdk/data, sdk/user) e o que mudou por causa delas:
+  - "o botão do rewarded não pode ficar na tela de gameplay ativa" e "dê uma alternativa ao anúncio": a oferta
+    com pausa do reforço acabado (vídeo, 40 gotas, agora não; mesmo tamanho, fonte e cor, como a regra pede);
+  - "áudio mudo só quando o anúncio começa": `calarNoInicio: false` no wrapper; "interface travada durante o
+    anúncio": `body.em-anuncio`; "sem midgame em botão de navegação": sem intervalo ao trocar de modo pelo menu
+    (o de "jogar de novo" fica: é transição de partida);
+  - bloqueador: os vídeos somem com aviso na tela (sem popup) e o jogo segue igual;
+  - progresso ligado à conta: módulo `data` (toggle "Progress Save" no portal), com a cópia do save do
+    navegador; idioma do `systemInfo.locale`; `happytime` nos recordes;
+  - já cumpria: SDK e gameplayStart, cair direto no gameplay, sem botão de tela cheia, sem links externos,
+    inglês, física em passo fixo (mesma em qualquer taxa de quadros), legível em 800×450 e 1080×607;
+  - verificado: `npm test` (208), `sdkcheck`, `telas`, `menu`; no Chrome com o SDK v3 de verdade (ambiente
+    local) a oferta abre pausada, as gotas pagam o +1, Esc fecha, o vídeo premia no fim com o áudio mudo só
+    durante ele, o perfil vai para o `SDK.data` e o idioma segue o `locale`. O SDK local avisa no console quando
+    um `gameplayStop` vem menos de 1 s depois de um start (ele segura a chamada; não é erro do jogo);
+  - builds: `dist-crazygames/slime-merge-2.1.0.zip` (Full, com anúncios) e `-basic.zip` (sem anúncios).

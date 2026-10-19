@@ -372,3 +372,16 @@ Pedidos com prints anotados do Merge Lab (plano em
 - **Conferido:** varredura dos 8 cestos em 3 sementes sem "Ufa!" (o tempo máximo acima da linha caiu de 1,9 para
   1,4 s), a caçada de vazamento das 3 sementes padrão sem episódio, 192 testes.
   `docs/visuais/parede-comparar-{borda,encosta,grande}.gif`: antes | 2.0.7 | 2.0.8.
+
+## 2026-10-19: caderno como cenário padrão
+- Pedido do usuário: "coloca o cenário padrão do jogo como caderno e o mundo atual para comprar igual o caderno".
+  O caderno (papel quadriculado) passa a ser o padrão, de graça; o jardim (padrão desde 2026-10-14) vai para a
+  loja por 150 gotas, o preço que o caderno tinha. Quem já tinha o jardim no save continua com ele equipado e
+  ganha o caderno (`criarPerfil` garante o padrão de cada grupo). Versão 2.0.10, com a build da CrazyGames.
+
+## 2026-10-19: distribuição completa na CrazyGames
+- Pedido do usuário: "Eu quero a distribuição da crazy games full, com anúncios, etc...".
+- **Reforço acabado:** oferta com pausa (opção recomendada, escolhida): "🎬 Ver um vídeo", "💧 40 gotas" e
+  "Agora não", do mesmo tamanho e cor. Cumpre duas regras da CrazyGames: o pedido do vídeo fora da tela de
+  gameplay ativa e uma alternativa ao anúncio. Vale também na build da Poki.
+- **Capas e vídeos de prévia:** feitos junto com a build, como proposta para aprovar (`marketing/crazygames/`).

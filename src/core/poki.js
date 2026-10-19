@@ -1,6 +1,7 @@
 // Camada unica de contato com o SDK da Poki (copia de carimbador-maluco/src/core/poki.js,
 // que e o porte de hexadrop/src/poki.js).
-// Somente src/main.js importa este modulo (vigiado por test/estilo.test.js).
+// Somente src/main.js importa este modulo (vigiado por test/estilo.test.js); o core/crazygames.js
+// reaproveita o criarPoki com um adaptador do SDK da CrazyGames e tem a mesma interface.
 //
 // O script v2 e so um carregador: ele injeta o nucleo com onload, sem onerror nem prazo. Com um
 // bloqueador de anuncios, o nucleo nunca chega e as promessas do SDK ficam pendentes para sempre.
@@ -51,6 +52,8 @@ const limparCampo = (v) => String(v ?? '').replace(/[/^]/g, '-');
  * @property {Prazos} [prazos]
  * @property {(fn: () => void, ms: number) => any} [agendar]    setTimeout
  * @property {(id: any) => void} [cancelar]                     clearTimeout
+ * @property {boolean} [calarNoInicio]   onAdStart antes de pedir o anuncio (Poki); falso: so quando
+ *                                        ele comeca de verdade (CrazyGames), e o onAdEnd so se calou
  */
 
 /**
@@ -63,12 +66,20 @@ const limparCampo = (v) => String(v ?? '').replace(/[/^]/g, '-');
  * @property {(tamanho?: 'small'|'medium'|'large') => Promise<boolean>} rewardedBreak   true so com premio
  * @property {(categoria: string, oque: string, acao: string) => void} measure
  * @property {boolean} sdkPronto    so leitura
+ * @property {boolean} temAnuncios  so leitura: da para pedir anuncio (na Poki, o mesmo que sdkPronto)
  * @property {boolean} jaJogou      so leitura: houve gameplayStart nesta sessao
  * @property {boolean} emAnuncio    so leitura
  * @property {boolean} jogando      so leitura: entre gameplayStart e gameplayStop
  * @property {any} dispositivo      so leitura: getDeviceInfo(), se o SDK respondeu
  * @property {(() => void)|null} onAdStart   mudar o audio aqui (sincrono)
  * @property {(() => void)|null} onAdEnd
+ * @property {((mudo: boolean) => void)|null} onMudoPlataforma   a plataforma pede mudo (a Poki nunca chama)
+ * @property {(() => void)|null} onSemAnuncios   os anuncios acabaram de desligar (a Poki nunca chama)
+ * @property {() => Promise<any>} fonteDados   onde gravar o progresso (null: o armazenamento do navegador)
+ * @property {string} idioma        idioma da plataforma ('' na Poki: vale o do navegador)
+ * @property {boolean} bloqueador   a plataforma viu bloqueador de anuncios (sempre falso na Poki)
+ * @property {boolean} intervaloNaNavegacao   intervalo comercial ao trocar de modo pelo menu
+ * @property {() => void} festa     marco do jogador (recorde, super slime): happytime na CrazyGames
  */
 
 /**
@@ -80,6 +91,7 @@ export function criarPoki({
   prazos,
   agendar = (fn, ms) => globalThis.setTimeout(fn, ms),
   cancelar = (id) => globalThis.clearTimeout(id),
+  calarNoInicio = true,
 } = {}) {
   const limites = { ...PRAZOS_PADRAO, ...(prazos || {}) };
 
@@ -317,10 +329,16 @@ export function criarPoki({
   async function rodarAnuncio(chamada, reserva) {
     gameplayStop();
     emAnuncio = true;
-    avisar(poki.onAdStart);
-    const resultado = await esperarAnuncio(chamada, reserva);
+    let calou = false;
+    const calar = () => {
+      if (calou) return;
+      calou = true;
+      avisar(poki.onAdStart);
+    };
+    if (calarNoInicio) calar();
+    const resultado = await esperarAnuncio((aoIniciar) => chamada(() => { calar(); aoIniciar(); }), reserva);
     emAnuncio = false;
-    avisar(poki.onAdEnd);
+    if (calou) avisar(poki.onAdEnd);
     sincronizar();
     return resultado;
   }
@@ -380,15 +398,26 @@ export function criarPoki({
     /** Move a pilula da Poki (celular): topPercent e topPx. So com o SDK pronto. */
     movePill(topPercent, topPx) { if (pronto) chamar('movePill', topPercent, topPx); },
     get sdkPronto() { return pronto; },
+    get temAnuncios() { return pronto; },
     get jaJogou() { return jaJogou; },
     get emAnuncio() { return emAnuncio; },
     get jogando() { return jogando; },
     get dispositivo() { return dispositivo; },
     onAdStart: null,
     onAdEnd: null,
+    onMudoPlataforma: null,
+    onSemAnuncios: null,
+    fonteDados: () => Promise.resolve(null),
+    idioma: '',
+    bloqueador: false,
+    intervaloNaNavegacao: true,
+    festa() {},
   };
   return poki;
 }
 
 /** Instancia do jogo: usa globalThis.PokiSDK e setTimeout. */
 export const poki = criarPoki();
+
+/** Plataforma desta build (o HUD reserva o canto do botao da Poki so nela). */
+export const plataforma = 'poki';

@@ -4,7 +4,11 @@
 // console.log, .map e mais de 500 KB em gzip (a meta do plano; a regra da Poki e < 10 MB ate o
 // gameplay). A thumb ainda nao existe (vem com a producao do modelo escolhido): sem
 // --thumb, o empacotamento e so um ensaio.
-// Uso: node tools/empacotar.mjs [--thumb]
+// Uso: node tools/empacotar.mjs [--thumb] [--alvo=poki|crazygames] [--anuncios]
+// --alvo=crazygames (2026-10-19, depois da recusa da Poki): a mesma build com o SDK v3 da CrazyGames
+// no lugar do da Poki (o import do main.js passa para src/core/crazygames.js, de mesma interface), em
+// dist-crazygames/. Sai sem anuncios (Basic Launch: botao de video sem efeito reprova); --anuncios
+// liga para o Full Launch. Sem thumb: as capas da CrazyGames vao a parte, pelo portal.
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, extname } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -12,13 +16,30 @@ import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { RAIZ } from './servir.mjs';
 
+/** SDK (a unica URL externa) e pasta de saida de cada plataforma. */
+const ALVOS = {
+  poki: { sdk: 'https://game-cdn.poki.com/scripts/v2/poki-sdk.js', saida: 'dist-poki' },
+  crazygames: { sdk: 'https://sdk.crazygames.com/crazygames-sdk-v3.js', saida: 'dist-crazygames' },
+};
+const argAlvo = process.argv.find((a) => a.startsWith('--alvo='));
+const nomeAlvo = argAlvo ? argAlvo.slice(7) : 'poki';
+if (!ALVOS[nomeAlvo]) {
+  process.stdout.write(`alvo desconhecido: ${nomeAlvo} (${Object.keys(ALVOS).join(', ')})\n`);
+  process.exit(1);
+}
+const ALVO = ALVOS[nomeAlvo];
+const NA_CRAZY = nomeAlvo === 'crazygames';
+const COM_ANUNCIOS = process.argv.includes('--anuncios');
+
 const versao = JSON.parse(readFileSync(join(RAIZ, 'package.json'), 'utf8')).version;
 const dist = join(RAIZ, 'dist');
-const saida = join(RAIZ, 'dist-poki');
-const zip = join(saida, `slime-merge-${versao}.zip`);
-const PERMITIDA = 'https://game-cdn.poki.com/scripts/v2/poki-sdk.js';
+const saida = join(RAIZ, ALVO.saida);
+const nomeZip = `slime-merge-${versao}${NA_CRAZY && !COM_ANUNCIOS ? '-basic' : ''}`;
+const zip = join(saida, `${nomeZip}.zip`);
+const PERMITIDA = ALVO.sdk;
+const SDK_POKI = ALVOS.poki.sdk;
 const THUMB = join(RAIZ, 'marketing/thumb/slime-merge-1256.png');
-const COM_THUMB = process.argv.includes('--thumb');
+const COM_THUMB = process.argv.includes('--thumb') && !NA_CRAZY;
 const THUMB_MIN = 628;
 
 /** @param {string} d @returns {string[]} */
@@ -53,9 +74,31 @@ if (existsSync(pastaSons)) {
   }
 }
 const mainDist = join(dist, 'src/main.js');
-writeFileSync(mainDist, readFileSync(mainDist, 'utf8').split('\n').filter((l) => !/\/\/ prototipo\s*$/.test(l)).join('\n'));
+let mainTexto = readFileSync(mainDist, 'utf8').split('\n').filter((l) => !/\/\/ prototipo\s*$/.test(l)).join('\n');
+// plataforma: na CrazyGames, o SDK v3 no lugar do da Poki e o import do wrapper trocado; na Poki o
+// wrapper da CrazyGames sai
+const falhasAlvo = [];
+const crazyDist = join(dist, 'src/core/crazygames.js');
+if (NA_CRAZY) {
+  const importPoki = "from './core/poki.js';";
+  if (!mainTexto.includes(importPoki)) falhasAlvo.push('main.js sem o import do core/poki.js');
+  mainTexto = mainTexto.replace(importPoki, "from './core/crazygames.js';");
+  const htmlDist = join(dist, 'index.html');
+  const htmlTexto = readFileSync(htmlDist, 'utf8');
+  if (!htmlTexto.includes(SDK_POKI)) falhasAlvo.push('index.html sem a tag do SDK da Poki para trocar');
+  writeFileSync(htmlDist, htmlTexto.replace(SDK_POKI, PERMITIDA).replace('Unico script externo permitido pela Poki.', 'Unico script externo: o SDK v3 da CrazyGames.'));
+  if (!COM_ANUNCIOS) {
+    const crazyTexto = readFileSync(crazyDist, 'utf8');
+    const ligado = 'export const ANUNCIOS = true;';
+    if (!crazyTexto.includes(ligado)) falhasAlvo.push(`crazygames.js sem "${ligado}" para desligar`);
+    writeFileSync(crazyDist, crazyTexto.replace(ligado, 'export const ANUNCIOS = false;'));
+  }
+} else {
+  rmSync(crazyDist, { force: true });
+}
+writeFileSync(mainDist, mainTexto);
 
-const falhas = [];
+const falhas = [...falhasAlvo];
 const arquivos = listar(dist);
 // nenhum import pode apontar para um arquivo que saiu da build
 for (const p of arquivos.filter((x) => x.endsWith('.js'))) {
@@ -66,7 +109,7 @@ for (const p of arquivos.filter((x) => x.endsWith('.js'))) {
 }
 const html = readFileSync(join(dist, 'index.html'), 'utf8');
 if (!/viewport-fit=cover/.test(html)) falhas.push('index.html sem viewport-fit=cover');
-if (!html.includes(PERMITIDA)) falhas.push('index.html sem o SDK da Poki');
+if (!html.includes(PERMITIDA)) falhas.push(`index.html sem o SDK (${nomeAlvo})`);
 let bruto = 0;
 let gz = 0;
 for (const p of arquivos) {
@@ -117,9 +160,10 @@ if (teste.status !== 0 || !lista.includes('index.html')) {
 }
 const sha = createHash('sha256').update(readFileSync(zip)).digest('hex');
 const tam = statSync(zip).size;
-writeFileSync(join(saida, `slime-merge-${versao}.sha256`), `${sha}  slime-merge-${versao}.zip\n`);
-const thumbSaida = join(saida, `slime-merge-${versao}-thumb.png`);
+writeFileSync(join(saida, `${nomeZip}.sha256`), `${sha}  ${nomeZip}.zip\n`);
+const thumbSaida = join(saida, `${nomeZip}-thumb.png`);
 if (COM_THUMB) cpSync(THUMB, thumbSaida);
+process.stdout.write(`alvo: ${nomeAlvo}${NA_CRAZY ? (COM_ANUNCIOS ? ' (com anuncios)' : ' (Basic Launch, sem anuncios)') : ''}\n`);
 process.stdout.write(`build ok: ${arquivos.length} arquivos, ${(bruto / 1024).toFixed(0)} KB (${(gz / 1024).toFixed(0)} KB gzip)\n`);
 process.stdout.write(`${relative(RAIZ, zip)}: ${(tam / 1024).toFixed(0)} KB, sha256 ${sha}\n`);
 if (COM_THUMB) process.stdout.write(`${relative(RAIZ, thumbSaida)}: ${thumbLado}x${thumbLado}, ${(statSync(thumbSaida).size / 1024).toFixed(0)} KB\n`);

@@ -40,7 +40,7 @@ export const QUALIDADES = [
  */
 export function criarCena(el, o = {}) {
   const raioCampo = o.raio || RAIO_CAMPO;
-  const visual = { cenario: o.cenario || 'jardim', objeto: o.objeto || 'classico', cesto: o.cesto || 'becher' };
+  const visual = { cenario: o.cenario || 'caderno', objeto: o.objeto || 'classico', cesto: o.cesto || 'becher' };
   const limiar = o.limiar || LIMIAR;
   const ctxFundo = /** @type {CanvasRenderingContext2D} */ (el.fundo.getContext('2d'));
   const ctxTopo = /** @type {CanvasRenderingContext2D} */ (el.topo.getContext('2d'));

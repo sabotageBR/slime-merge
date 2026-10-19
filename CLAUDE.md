@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # Slime Merge
 
-Jogo HTML5 + JavaScript para a Poki. **Em produção desde 2026-10-14: "Merge Lab com opção de
+Jogo HTML5 + JavaScript, feito para a Poki. **Em produção desde 2026-10-14: "Merge Lab com opção de
 Duelo"** (escolha do usuário entre 5 protótipos; roteiro em `docs/producao.md`). O diferencial é o **motor de slime**: partículas PBD com shape matching
 plástico (o slime assume o formato do pote) e pigmento Kubelka-Munk espectral (a mistura de
 cor é física: azul + amarelo = verde, misturar demais dá lama). Mesmo molde do `../2048_cards`
@@ -147,6 +147,31 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
   por partícula 0,01 e, em cima da borda, até 3 u/s para dentro (`vBorda`). Do alto da borda ao meio do pote em
   ~0,9 s a ~20 u/s (queda livre: ~0,85 s a ~23 u/s), colado no vidro. `docs/visuais/parede-comparar-*`: antes,
   2.0.7 e 2.0.8.
+- **A Poki recusou o jogo em 2026-10-19** no Web Fit Test e game review: categoria saturada (soltar e fundir,
+  13 clones de Suika no catálogo), sem citar KPIs. Registro no cofre do Obsidian (`~/git/em_tech/obsidian/POKI/`:
+  `40 Projetos/Slime Merge.md`, levantamento do catálogo e das plataformas em `30 Referência/`).
+- **Versão 2.0.9: build da CrazyGames (2026-10-19):** `npm run empacotar -- --alvo=crazygames` troca o SDK da Poki
+  pelo SDK v3 da CrazyGames só na build (o import do `main.js` passa para `src/core/crazygames.js`, que reaproveita
+  o `criarPoki` com um adaptador e tem a mesma interface; ambiente `disabled` = sem SDK; `measure` vazio;
+  `settings.muteAudio` cala o mestre por `audio.definirMudoPlataforma`). Sai em `dist-crazygames/slime-merge-<v>-basic.zip`
+  **sem anúncios** (`ANUNCIOS` falso: no Basic Launch botão de vídeo sem efeito reprova; o erro
+  `adsDisabledBasicLaunch` também desliga na sessão) e com `--anuncios` em `slime-merge-<v>.zip` (Full Launch). O
+  `main.js` pergunta `poki.temAnuncios` (na Poki, o mesmo que `sdkPronto`) e põe `body[data-plataforma]`; o recuo
+  de 58 px do botão da Poki no HUD retrato só vale com `data-plataforma="poki"`. Pendências do Full Launch em
+  `docs/producao.md`.
+- **Versão 2.0.10 (2026-10-19):** o cenário padrão é o **caderno**; o jardim vai para a loja por 150 gotas
+  (`LOJA.cenario` no `perfil.js`, escolha em `docs/autoria.md`).
+- **Versão 2.1.0: Full Launch da CrazyGames (2026-10-19; regras de docs.crazygames.com no mesmo dia):**
+  - **oferta do reforço acabado** (escolha do usuário): tocar no reforço com 0 pausa o jogo e abre `#oferta`
+    (`hud.oferta`): "🎬 Ver um vídeo", "💧 40" (`PRECO_REFORCO`, `perfil.gastar`) e "Agora não", os três do
+    mesmo tamanho, fonte e cor; Esc = "agora não". Vale nas duas builds (o evento do modo continua `pedirVideo`);
+  - wrapper: o áudio cala só no `adStarted` (`criarPoki({ calarNoInicio: false })`, e o `onAdEnd` só se calou),
+    `hasAdblock()`/erro `adblock` = `bloqueador` (vídeos somem com o aviso `videoBloqueado`, `onSemAnuncios`),
+    progresso no módulo `data` do SDK (`poki.fonteDados()`: o `main.js` espera o init com top-level await,
+    sonda grava/lê; `migrarDoLocal` copia o save antigo uma vez), idioma de `user.systemInfo.locale`
+    (`poki.idioma`), `happytime` no recorde e no recorde de super slimes (`poki.festa()`), sem intervalo ao trocar
+    de modo pelo menu (`poki.intervaloNaNavegacao`), e `body.em-anuncio` trava a interface durante o anúncio;
+  - **no portal:** ligar o toggle "Progress Save" (sem ele o módulo `data` não grava e o jogo cai no do navegador).
 - Protótipos (Croma, Loja, Molde, lab) só por `?modelo=` ou pelo hub; o `tools/empacotar.mjs`
   apaga os arquivos deles e as linhas `// prototipo` do `main.js`.
 
@@ -186,7 +211,8 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
   personagem; `desenharAtras` para orelhas/chifres/folha). O `main.js` lê `?cesto=&cenario=&objeto=`
   (local), `window.__slimeVisual`, a escolha do Estúdio em `slime.visual` (só quando abre por
   `?modelo=`/hub) ou o que o jogador equipou na loja (perfil). **Padrão escolhido pelo usuário
-  (2026-10-14): béquer, jardim, clássico.** As paredes de Loja/Molde/lab seguem o estilo do cesto.
+  (2026-10-14): béquer, jardim, clássico; desde 2026-10-19 o cenário padrão é o caderno, e o jardim custa 150 gotas
+  na loja (o preço do caderno; quem já tinha o jardim no save fica com ele).** As paredes de Loja/Molde/lab seguem o estilo do cesto.
 - `src/jogo/`: `soltar.js` (motor dos jogos de soltar: 1 ou 2 jogadores, fila, reforços,
   fusões animadas e em grupo, resgate nos 3 primeiros minutos ou sempre com `resgatarSempre`, bot), `pote.js` (mira, preso, perigo, combo,
   chacoalhar, alargar, tremor, rede de segurança e geometria: `contem`, `lugar`, `prenderPontos`), `niveis.js`, `perfil.js`, `missoes.js` (metas da partida em cadeia, no
@@ -209,8 +235,9 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
   canvases empilhados (`cFundo` papel/pote, `cSlime` WebGL2, `cTopo` rostos/VFX; `cTela` por cima
   do HUD); HUD e menu em DOM. Textos de evento são chaves de `src/i18n/textos.js` (EN padrão;
   PT/ES pelo navegador).
-- `src/core/`: `poki.js`, `armazenamento.js`, `depuracao.js`, `haptico.js`, `rng.js` (copiados
-  do 2048_cards), `audio.js` (barramentos sfx/voz/música, compressor, mudo do anúncio), `laco.js`,
+- `src/core/`: `poki.js`, `crazygames.js` (o SDK v3 da CrazyGames com a interface do `poki.js`; só na build
+  `--alvo=crazygames`), `armazenamento.js`, `depuracao.js`, `haptico.js`, `rng.js` (copiados
+  do 2048_cards), `audio.js` (barramentos sfx/voz/música, compressor, mudo do anúncio e da plataforma), `laco.js`,
   `entrada.js`. `src/som/`: `catalogo.js` (categorias × variantes; `PADRAO` = escolha do usuário
   de 2026-10-15, sem música e com o locutor de voz de slime; `LEGADO`),
   `receitas.js` (síntese), `falas.js` (balbucio e a lista das falas do jogo), `sons.js` (`tocar`/`falar`,
@@ -220,7 +247,8 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
   `src/ui/`: `hud.js`, `menu.js`, `icones.js` (ícones dos reforços em SVG e Path2D),
   `editor.js`/`editor.css` (editor de pixel das skins), `miniaturas.js`, `estilo.css`, fontes,
   `loja/*.webp` (miniaturas da loja: `node tools/prints-visuais.mjs --miniaturas`).
-- `src/main.js` liga tudo e é o **único** que importa `core/poki.js`.
+- `src/main.js` liga tudo e é o **único** que importa `core/poki.js` (além do `core/crazygames.js`, que reaproveita
+  o `criarPoki`).
 
 ## Convenções
 - Código e comentários em português, comentários em ASCII; 2 espaços, aspas simples, ponto e
@@ -236,16 +264,16 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
   por `core/rng.js` com semente); `src/fisica/` também sem `Math.sin/cos/pow/exp...` nem `**`
   (determinismo entre V8 e JSC); `localStorage` só em `core/armazenamento.js` (prefixo
   `slime.`); a URL só em `core/depuracao.js`; nada de `console.log/info/debug`; a única URL
-  externa é a do SDK da Poki; `src/` não importa `modelos/` nem `tools/`.
+  externa é a do SDK da Poki (a do SDK v3 da CrazyGames só entra na build `--alvo=crazygames`); `src/` não importa `modelos/` nem `tools/`.
 - Toda proposta visual vai como imagem ou protótipo jogável.
 
 ## Comandos
 | Comando | O que faz |
 |---|---|
-| `npm test` | Física, cor, wrapper Poki, fronteiras, perfil, os modos com o bot, borda, míssil, pote estreito, telemetria de nível e do resgate, qualidade adaptativa, metas da partida, pressão do sem fim (`test/pressao.test.js`), fusão animada e tremor (`test/fusao.test.js`), humor (`test/humor.test.js`), parede (`test/parede.test.js`), escorrer pelo vidro (`test/escorrer.test.js`), áudio, sons, música e skins (192 testes, ~100 s) |
+| `npm test` | Física, cor, wrapper Poki, fronteiras, perfil, os modos com o bot, borda, míssil, pote estreito, telemetria de nível e do resgate, qualidade adaptativa, metas da partida, pressão do sem fim (`test/pressao.test.js`), fusão animada e tremor (`test/fusao.test.js`), humor (`test/humor.test.js`), parede (`test/parede.test.js`), escorrer pelo vidro (`test/escorrer.test.js`), áudio, sons, música, skins, o wrapper da CrazyGames (`test/crazygames.test.js`) e o armazenamento (`test/armazenamento.test.js`) (208 testes, ~100 s) |
 | `node --test test/fisica.test.js` | Um arquivo só (`node:test`, sem dependências); `--test-name-pattern="Croma"` filtra pelo nome do teste |
 | `npm run menu` | Fluxo da build no Chrome headless: sequência, gotas no fim, dobrar, loja, missões, troca de modo, Loja › Skins e o editor (pintar, salvar, Esc). Prints em `.tmp/menu/`. `-- --tam=640x360` |
-| `npm run empacotar` | Build da Poki em `dist/` e zip em `dist-poki/` (sem protótipos; só os sons do `PADRAO`; recusa import quebrado, URL externa, `console.log`, `.map`, > 500 KB gzip e áudio > 150 KB); `-- --thumb` confere e anexa `marketing/thumb/slime-merge-1256.png` (sem ele é ensaio) |
+| `npm run empacotar` | Build da Poki em `dist/` e zip em `dist-poki/` (sem protótipos; só os sons do `PADRAO`; recusa import quebrado, URL externa, `console.log`, `.map`, > 500 KB gzip e áudio > 150 KB); `-- --thumb` confere e anexa `marketing/thumb/slime-merge-1256.png` (sem ele é ensaio); `-- --alvo=crazygames` gera a build da CrazyGames em `dist-crazygames/` (sem anúncios, `-basic`; `--anuncios` para o Full Launch) |
 | `npm run thumb` | Opções de thumb da Poki (`tools/thumb.html`: física e render do jogo) em `marketing/thumb/`, com tiles e a régua (#83FFE7, tarja, opaca); `-- --final` grava a escolhida (`ESCOLHIDA` em `tools/thumb.mjs`) em `slime-merge-{1256,628}` |
 | `npm run servir` | `http://127.0.0.1:5370/` (jogo) e `/modelos/` (hub de avaliação); `-- --lan` mostra o endereço para o celular |
 | `npm run jogar` | Joga os modelos em tempo real (Chrome headless pelo DevTools Protocol, `tools/cdp.mjs`): gestos, pausa, mudo, reforço, fim, revive, jogar de novo. `-- 1 4 --tam=1031x580` |

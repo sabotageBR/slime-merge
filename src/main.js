@@ -1,13 +1,14 @@
 // Liga tudo: SDK da Poki, cena, laco, entrada, HUD, menu, perfil (metajogo) e o modo de jogo.
-// Unico modulo que importa core/poki.js (vigiado por test/estilo.test.js).
+// Unico modulo que importa core/poki.js (vigiado por test/estilo.test.js); na build da CrazyGames o
+// empacotar troca o import para core/crazygames.js, que tem a mesma interface.
 // A build abre direto no Merge Lab sem fim; o menu (pausa) troca para o Desafio do dia, o
 // Duelo contra a CPU e 2 jogadores. Os prototipos da avaliacao (Croma, Loja, Molde, lab) so
 // abrem por ?modelo= em localhost ou pelas paginas do hub (window.__slimeModelo) e nao entram
 // na build da Poki (tools/empacotar.mjs tira as linhas marcadas com "prototipo").
 
-import { poki } from './core/poki.js';
+import { poki, plataforma } from './core/poki.js';
 import { lerDepuracao } from './core/depuracao.js';
-import { criarArmazem } from './core/armazenamento.js';
+import { criarArmazem, migrarDoLocal } from './core/armazenamento.js';
 import { criarAudio } from './core/audio.js';
 import { criarSons } from './som/sons.js';
 import { COMBOS } from './som/falas.js';
@@ -18,7 +19,7 @@ import { vibrar } from './core/haptico.js';
 import { criarCena, QUALIDADES } from './render/cena.js';
 import { criarHud } from './ui/hud.js';
 import { criarMenu } from './ui/menu.js';
-import { criarPerfil, gotasDaPartida, PREMIO_DESCOBERTA } from './jogo/perfil.js';
+import { criarPerfil, gotasDaPartida, PREMIO_DESCOBERTA, PRECO_REFORCO } from './jogo/perfil.js';
 import { GOTAS_PEDIDO } from './jogo/pressao.js';
 import { MAX_NIVEL } from './jogo/niveis.js';
 import { criarMissoes } from './jogo/missoes.js';
@@ -42,13 +43,20 @@ const MODULOS = {
 const DO_MODELO = { 1: 'semfim', 5: 'duelo' };
 
 const dep = lerDepuracao();
-const armazem = criarArmazem();
+// na CrazyGames o progresso vai para o modulo data do SDK (nuvem para quem tem conta): o jogo espera o
+// init (ate 4 s, com a tela de loading) antes de ler o save, e copia o save antigo do navegador uma
+// vez. Na Poki a fonte e a do navegador e nada espera
+const fonteDados = await poki.fonteDados();
+if (fonteDados) migrarDoLocal(fonteDados);
+const armazem = criarArmazem(fonteDados ? { obterLs: () => fonteDados } : undefined);
 const audio = criarAudio();
-const idioma = escolherIdioma(dep.lang);
+const idioma = escolherIdioma(dep.lang || poki.idioma);
 const T = textos(idioma);
 const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 const fmtNumero = (n) => numero(n, idioma);
 const toque = window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false;
+// o canto do botao da Poki no HUD retrato so existe na build da Poki (estilo.css)
+document.body.dataset.plataforma = plataforma;
 
 const J = {
   modo: /** @type {any} */ (null),
@@ -146,7 +154,7 @@ const escolhaHub = pedido ? armazem.ler('escolha', {}) || {} : {};
 if (prototipo) document.body.classList.add('prototipo');
 
 // visual: parametro local > pagina do hub > Estudio de visuais (so no hub) > o que o jogador
-// equipou na loja (padrao: bequer, jardim, classico, escolhidos pelo usuario em 2026-10-14)
+// equipou na loja (padrao: bequer, caderno, classico; o caderno no lugar do jardim desde 2026-10-19)
 const visualGlobal = /** @type {any} */ (globalThis).__slimeVisual || {};
 const visualEstudio = pedido ? armazem.ler('visual', {}) || {} : {};
 // sons: a escolha do Estudio de sons (modelos/sons.html grava slime.sons) so vale quando a
@@ -363,6 +371,9 @@ function alternarPausa(origem = 'pausa') {
     abrirMenu(undefined, origem);
   } else if (J.estado === 'pausa') {
     continuar();
+  } else if (J.estado === 'oferta') {
+    // ESC (ou P) na oferta do reforco = "agora nao"
+    hud.fecharOferta();
   } else if (J.estado === 'menuFim') {
     // do menu aberto pelo fim, ESC volta a tela de fim
     hud.menu(false);
@@ -396,7 +407,8 @@ async function entrarModo(chave) {
   hud.fim(false);
   J.estado = 'trocando';
   laco.pausar(true);
-  if (!dep.semAnuncio) await anuncio('commercial');
+  // a CrazyGames nao aceita intervalo em botao de navegacao (menu, loja): so na Poki
+  if (!dep.semAnuncio && poki.intervaloNaNavegacao) await anuncio('commercial');
   await carregarModo(chave);
   J.estado = 'jogando';
   laco.pausar(false);
@@ -535,7 +547,7 @@ function tratarEventos() {
         const r = perfil.superSlime(e.n);
         perfilSujo = true;
         if (r.gotas) contarGotas(r.gotas, 900);
-        if (r.recorde && e.n > 1) { sons.tocar('missao'); sons.falar('parabens'); }
+        if (r.recorde && e.n > 1) { sons.tocar('missao'); sons.falar('parabens'); poki.festa(); }
         if (J.chave === 'semfim') poki.measure('super', e.n > 10 ? '10+' : String(e.n), 'm' + J.minutos);
         break;
       }
@@ -590,6 +602,7 @@ function tratarEventos() {
         // o sem fim passou o recorde de antes da partida (uma vez; a partida nao acaba para dizer)
         hud.aviso(T.novoRecorde);
         sons.falar('uhuu');
+        poki.festa();
         break;
       case 'escada':
         // o piso das gotas subiu (do nivel 9 em diante) e os pequenos evoluiram
@@ -624,7 +637,7 @@ function tratarEventos() {
         // pausa natural do modo (troca de pedido/fase; no sem fim, o fim de um evento a partir do 3o):
         // o intervalo comercial pode vir aqui, com ESPACO_ANUNCIO s de jogo desde o anterior
         if (e.origem === 'evento' && (!J.tocou || J.estado !== 'jogando' || J.tempoJogo - J.ultimoAnuncio < ESPACO_ANUNCIO)) break;
-        if (!dep.semAnuncio && poki.sdkPronto) {
+        if (!dep.semAnuncio && poki.temAnuncios) {
           // progresso (era intervalo/<origem>/show): o complete so com SEGUIU s de jogo depois
           if (e.origem) acompanhar('intervalo', e.origem);
           poki.gameplayStop();
@@ -794,16 +807,33 @@ function quaseLa(e) {
   return q;
 }
 
-/** Reforco acabado: o video (rewarded) devolve um. */
+/**
+ * Reforco acabado: o jogo pausa e oferece +1 pelo video (rewarded) ou por PRECO_REFORCO gotas, com
+ * "agora nao" do mesmo tamanho (regras da CrazyGames: o pedido do video fora da tela de gameplay
+ * ativa e uma alternativa ao anuncio; escolha do usuario em 2026-10-19).
+ */
 async function pedirVideo(id) {
-  if (J.estado !== 'jogando' || document.body.classList.contains('sem-anuncio')) return;
-  if (!poki.sdkPronto && !dep.local) return;
-  // o ultimo falhou (sem anuncio ou fechado antes do fim): o botao fica apagado por um tempo
-  if (J.tempoJogo < J.videoEspera) { hud.aviso(T.semVideo); return; }
-  const ok = await anuncio('rewarded');
-  poki.measure('video', 'poder-' + id, ok ? 'ok' : 'fail');
-  if (!ok) J.videoEspera = J.tempoJogo + ESPERA_VIDEO;
-  if (ok && J.modo && J.modo.darPoder) J.modo.darPoder(id);
+  if (J.estado !== 'jogando') return;
+  J.estado = 'oferta';
+  laco.pausar(true);
+  poki.gameplayStop();
+  const temVideo = !document.body.classList.contains('sem-anuncio') && (poki.temAnuncios || dep.local);
+  // o ultimo falhou (sem anuncio ou fechado antes do fim): o video fica apagado por um tempo
+  const espera = temVideo && J.tempoJogo < J.videoEspera;
+  const escolha = await hud.oferta({ id, video: temVideo && !espera, espera, bloqueado: poki.bloqueador, preco: PRECO_REFORCO, gotas: perfil.gotas });
+  poki.measure('oferta', 'poder-' + id, escolha);
+  J.estado = 'jogando';
+  if (escolha === 'video') {
+    const ok = await anuncio('rewarded');
+    poki.measure('video', 'poder-' + id, ok ? 'ok' : 'fail');
+    if (!ok) { J.videoEspera = J.tempoJogo + ESPERA_VIDEO; hud.aviso(poki.bloqueador ? T.videoBloqueado : T.semVideo); }
+    if (ok && J.modo && J.modo.darPoder) J.modo.darPoder(id);
+  } else if (escolha === 'gotas' && perfil.gastar(PRECO_REFORCO)) {
+    gravarPerfil();
+    hud.gotas(perfil.gotas, fmtNumero);
+    if (J.modo && J.modo.darPoder) J.modo.darPoder(id);
+  }
+  if (J.estado === 'jogando') laco.pausar(false);
   if (J.tocou && J.estado === 'jogando') poki.gameplayStart();
 }
 
@@ -906,20 +936,27 @@ async function dobrar() {
   hud.ganhoFim(J.ganho, false);
 }
 
-/** Anuncio pela Poki; em localhost, um anuncio simulado de 3 s (premio so com true). */
+/**
+ * Anuncio pela plataforma; em localhost, um anuncio simulado de 3 s (premio so com true). Se a
+ * plataforma desligar os anuncios no caminho (Basic Launch da CrazyGames), os botoes de video somem.
+ */
 async function anuncio(tipo) {
   const antes = J.estado;
   J.estado = 'anuncio';
   laco.pausar(true);
+  // a CrazyGames pede a interface travada enquanto o anuncio e pedido ou mostrado
+  document.body.classList.add('em-anuncio');
   let ok = false;
   if (tipo === 'commercial') J.ultimoAnuncio = J.tempoJogo;
-  if (poki.sdkPronto) {
+  if (poki.temAnuncios) {
     ok = tipo === 'rewarded' ? await poki.rewardedBreak() : (await poki.commercialBreak(), false);
+    if (!poki.temAnuncios) document.body.classList.add('sem-anuncio');
   } else if (dep.local && tipo === 'rewarded') {
     audio.mudoParaAnuncio();
     ok = await hud.anuncioLocal(3);
     audio.voltarDoAnuncio();
   }
+  document.body.classList.remove('em-anuncio');
   laco.pausar(false);
   J.estado = antes === 'anuncio' ? 'jogando' : antes;
   return ok;
@@ -927,6 +964,14 @@ async function anuncio(tipo) {
 
 poki.onAdStart = () => audio.mudoParaAnuncio();
 poki.onAdEnd = () => audio.voltarDoAnuncio();
+poki.onMudoPlataforma = (mudo) => audio.definirMudoPlataforma(mudo);
+// os anuncios desligaram no caminho (Basic Launch, bloqueador): os botoes de video somem, com aviso
+// quando foi o bloqueador (a CrazyGames pede o motivo na tela, sem popup)
+poki.onSemAnuncios = () => {
+  if (dep.local) return;
+  document.body.classList.add('sem-anuncio');
+  if (poki.bloqueador) hud.aviso(T.videoBloqueado);
+};
 /**
  * Em que tela o jogador estava quando a pagina sumiu (a 1a vez; quase sempre e a saida). Melhor
  * esforco: a pagina pode morrer antes do envio. So o visibilitychange pegava ~100 das ~450 saidas
@@ -1156,7 +1201,7 @@ async function iniciar() {
   try { window.focus(); } catch { /* sem permissao de foco: o primeiro clique foca */ }
   if (qualidade.nivel > 0) cena.definirQualidade(qualidade.nivel);
   await carregarModo(inicial);
-  pronto.then(() => { if (!poki.sdkPronto && !dep.local) document.body.classList.add('sem-anuncio'); });
+  pronto.then(() => { if (!poki.temAnuncios && !dep.local) document.body.classList.add('sem-anuncio'); });
   // sequencia diaria: o premio do dia entra ao abrir, com um aviso que nao interrompe o jogo
   const dia = perfil.checkin();
   if (dia.premio) {

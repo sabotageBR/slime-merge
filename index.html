@@ -151,6 +151,17 @@
 </div>
 <!-- editor de pixel da skin Minha (src/ui/editor.js), aberto pela Loja -->
 <div id="telaEditor" hidden></div>
+<!-- reforco acabado: o jogo pausa e oferece +1 pelo video ou por gotas (src/ui/hud.js oferta) -->
+<div id="oferta" class="tela" hidden>
+  <div class="cartao">
+    <h2 id="ofTitulo">+1</h2>
+    <button class="acao clara" id="ofVideo"><i class="selo" aria-hidden="true">🎬</i><span data-t="oferta.video">Watch a video</span></button>
+    <small class="ofNota" id="ofNota" hidden></small>
+    <button class="acao clara" id="ofGotas"><i class="selo" aria-hidden="true">💧</i><b id="ofPreco">40</b></button>
+    <small class="ofNota" id="ofFalta" hidden></small>
+    <button class="acao clara" id="ofNao" data-t="oferta.nao">Not now</button>
+  </div>
+</div>
 <div id="anuncio" class="tela" hidden><div class="cartao"><span>Ad (local test)</span><b id="anNum">3</b></div></div>
 <div id="depuracao" hidden></div>
 <script type="module" src="src/main.js"></script>

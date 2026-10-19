@@ -6,6 +6,7 @@
 import { hexDaMistura } from '../cor/km.js';
 import { PALETA } from '../jogo/skins.js';
 import { svgIcone, ICONE_MISSAO } from './icones.js';
+import { formatar } from '../i18n/textos.js';
 
 /** Premios de marco (o 5o espaco): placa dourada. */
 const PREMIOS = ['calor', 'gelo', 'tesoura', 'tinta'];
@@ -96,7 +97,24 @@ export function criarHud(doc, T) {
     fimTitulo: $('fimTitulo'), reviver: $('bReviver'), anuncio: $('anuncio'), anNum: $('anNum'), dep: $('depuracao'),
     gotas: $('gotas'), aviso: $('aviso'), fimGanho: $('fimGanho'), fimGotas: $('fimGotas'), dobrar: $('bDobrar'), continuar: $('bContinuar'),
     revelacao: $('revelacao'), dica: $('dica'), fimQuase: $('fimQuase'), lojaFim: $('bLojaFim'),
+    oferta: $('oferta'), ofTitulo: $('ofTitulo'), ofVideo: /** @type {HTMLButtonElement} */ ($('ofVideo')), ofNota: $('ofNota'),
+    ofGotas: /** @type {HTMLButtonElement} */ ($('ofGotas')), ofPreco: $('ofPreco'), ofFalta: $('ofFalta'), ofNao: $('ofNao'),
   };
+  /** @type {((escolha: 'video'|'gotas'|'nao') => void)|null} */
+  let fecharOferta = null;
+  /** @param {'video'|'gotas'|'nao'} escolha */
+  const escolherOferta = (escolha) => {
+    if (!fecharOferta) return;
+    const f = fecharOferta;
+    fecharOferta = null;
+    el.oferta.hidden = true;
+    f(escolha);
+  };
+  if (el.oferta) {
+    el.ofVideo.addEventListener('click', () => escolherOferta('video'));
+    el.ofGotas.addEventListener('click', () => escolherOferta('gotas'));
+    el.ofNao.addEventListener('click', () => escolherOferta('nao'));
+  }
   for (const n of doc.querySelectorAll('[data-t]')) {
     const k = /** @type {HTMLElement} */ (n).dataset.t || '';
     if (T[k]) n.textContent = T[k];
@@ -457,6 +475,32 @@ export function criarHud(doc, T) {
       el.dobrar.hidden = !dobrar;
     },
     /** Anuncio simulado (so em localhost): contagem de 3 s, premio sempre. */
+    /**
+     * Reforco acabado: +1 pelo video ou por gotas, com "agora nao" (o jogo fica pausado por baixo).
+     * Resolve com a escolha; sem video (Basic Launch, bloqueador, espera) o botao some ou apaga.
+     * @param {{ id: string, video: boolean, espera: boolean, bloqueado: boolean, preco: number, gotas: number }} o
+     * @returns {Promise<'video'|'gotas'|'nao'>}
+     */
+    oferta(o) {
+      escolherOferta('nao');
+      el.ofTitulo.innerHTML = '';
+      const t = doc.createElement('span');
+      t.textContent = formatar(T['oferta.titulo'], { nome: T['poder.' + o.id + '.curto'] || T['poder.' + o.id] || o.id });
+      el.ofTitulo.insertAdjacentHTML('beforeend', icone(o.id));
+      el.ofTitulo.appendChild(t);
+      el.ofVideo.hidden = !o.video && !o.espera;
+      el.ofVideo.disabled = !o.video;
+      el.ofNota.hidden = !(o.espera || o.bloqueado);
+      el.ofNota.textContent = o.bloqueado ? T.videoBloqueado : T.semVideo;
+      el.ofPreco.textContent = String(o.preco);
+      el.ofGotas.disabled = o.gotas < o.preco;
+      el.ofFalta.hidden = o.gotas >= o.preco;
+      el.ofFalta.textContent = formatar(T['oferta.falta'], { n: Math.max(0, o.preco - o.gotas) });
+      el.oferta.hidden = false;
+      return new Promise((ok) => { fecharOferta = ok; });
+    },
+    /** Fecha a oferta aberta como "agora nao" (Esc, pausa). */
+    fecharOferta() { escolherOferta('nao'); },
     anuncioLocal(seg) {
       return new Promise((ok) => {
         el.anuncio.hidden = false;

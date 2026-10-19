@@ -23,7 +23,8 @@ test('sem console.log/info/debug no jogo', () => {
 
 test('so src/main.js importa o SDK da Poki', () => {
   for (const p of src) {
-    if (rel(p) === 'src/main.js' || rel(p) === 'src/core/poki.js') continue;
+    // o wrapper da CrazyGames reaproveita o criarPoki (e so entra na build dela)
+    if (rel(p) === 'src/main.js' || rel(p) === 'src/core/poki.js' || rel(p) === 'src/core/crazygames.js') continue;
     assert.ok(!/core\/poki\.js|\.\/poki\.js/.test(ler(p)), rel(p));
   }
 });
