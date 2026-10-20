@@ -54,6 +54,33 @@ for (const m of lista) {
       await c.segurar(bx, by, 2500);
       const [cx, cy] = await tela(c, 0, 2);
       await c.arrastar(cx, cy + 120, cx - 60, cy + 120, 8, 500);
+    } else if (m === 'volei') {
+      await c.tecla('KeyD', 500);
+      await c.tecla('KeyW');
+      const [x0, y0] = await tela(c, -10, 2);
+      const [x1] = await tela(c, -4, 2);
+      await c.arrastar(x0, y0, x1, y0, 10, 500);
+      await c.tecla('ArrowLeft', 300);
+    } else if (m === 'vitral') {
+      const b = await c.avaliar('(() => { const b = __slime.J.modo.visual().bicos[2]; return [b.x, b.y]; })()');
+      const [bx, by] = await tela(c, b[0], b[1]);
+      await c.segurar(bx, by, 1200);
+      await c.tecla('Digit1', 400);
+      await espera(1500);
+      await c.tecla('Enter');
+    } else if (m === 'janela' || m === 'garra') {
+      await espera(m === 'janela' ? 2500 : 300);
+      const [x0, y0] = await tela(c, -2, 0);
+      await c.arrastar(W / 2 - 60, H / 2, W / 2 + 60, H / 2 + 4, 10, 600);
+      await c.tecla('ArrowLeft', 400);
+      if (m === 'garra') await c.tecla('Space');
+      void x0; void y0;
+    } else if (m === 'aperta') {
+      const s0 = await c.avaliar('(() => { const s = __slime.J.modo.mundo.vivos().sort((a, b) => b.n - a.n)[0]; return [s.cx, s.cy]; })()');
+      const [sx, sy] = await tela(c, s0[0], s0[1]);
+      await c.arrastar(sx, sy, sx, sy - 160, 14, 700);
+      await espera(600);
+      await c.arrastar(sx, sy - 40, sx + 200, sy - 80, 6, 120);
     } else {
       const [x, y] = await tela(c, -7, 5);
       await c.clicar(x, y);

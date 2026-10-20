@@ -31,7 +31,8 @@ export async function shot(porta, query, tam, saida, espera = 3000, dom = false)
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [query, tam, saida, espera] = process.argv.slice(2);
-  const porta = 5372;
+  // PORTA no ambiente: prints em paralelo (um servidor por processo)
+  const porta = Number(process.env.PORTA) || 5372;
   const fechar = await servir(porta);
   if (saida === '-') {
     const dom = await shot(porta, query, tam, '', Number(espera) || 3000, true);

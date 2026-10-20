@@ -17,6 +17,8 @@
     "gifs": "node tools/gif-modelos.mjs",
     "visuais": "node tools/prints-visuais.mjs",
     "artifact": "node tools/artifact-modelos.mjs",
-    "empacotar": "node tools/empacotar.mjs"
+    "empacotar": "node tools/empacotar.mjs",
+    "portais": "node tools/portais.mjs",
+    "portais:check": "node tools/portaischeck.mjs"
   }
 }

@@ -190,6 +190,8 @@ body[data-orient="paisagem"] .evolucao { flex-wrap: wrap; max-width: 100%; }
 .acao.anuncio { background: var(--roxo); display: inline-flex; align-items: center; justify-content: center; gap: 0.4em; font-size: 1em; }
 .acao.anuncio .selo { font-style: normal; }
 body.sem-anuncio .anuncio { display: none !important; }
+/* A Playgama proibe o "+1 vida" por video oferecido a cada derrota (regra 6.3): o reviver sai so la. */
+body[data-plataforma='playgama'] #bReviver { display: none !important; }
 /* oferta do reforco acabado (regras da CrazyGames): video, gotas e "agora nao" do mesmo tamanho,
    fonte e cor, com o jogo pausado por baixo */
 #oferta .cartao { gap: 0.55em; }

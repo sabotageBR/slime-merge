@@ -1,0 +1,23 @@
+/* So dos prototipos (o main.js carrega quando abre por ?modelo=; o empacotar apaga da build). */
+
+/* modo largo (a quadra do Volei de Gosma): na paisagem as colunas laterais encolhem e o mundo
+   16:9 fica com quase toda a largura; placar e botoes ficam nas pontas */
+body.largo[data-orient="paisagem"] #hud {
+  grid-template-columns: minmax(92px, 11%) minmax(0, 1fr) minmax(92px, 11%);
+}
+body.largo[data-orient="paisagem"] #topo .proximo { display: none; }
+
+/* metas e albuns dos prototipos dentro da pilula da #meta (altura fixa: a camera nao respira) */
+.pedido.proto { min-height: 2.6em; align-items: center; gap: 0.5em; }
+.pedido.proto .sub { font-weight: 600; opacity: 0.75; font-size: 0.8em; }
+.pedido.proto .estrelas { letter-spacing: 0.05em; }
+
+/* contador vazio (os protototipos nao contam usos): sem a bolinha branca no canto */
+.poder .conta:empty { display: none; }
+/* muitas ferramentas (Aperta-Gosma: 8): grade 2 x 4 na paisagem e 4 x 2 no retrato */
+body.prototipo[data-orient="paisagem"] #base:has(> .poder:nth-child(6)) {
+  display: grid; grid-template-columns: repeat(2, auto); justify-content: center; align-content: center; gap: 0.4em 1em;
+}
+body.prototipo:not([data-orient="paisagem"]) #base:has(> .poder:nth-child(7)) {
+  display: grid; grid-template-columns: repeat(4, auto); justify-content: center; gap: 0.4em clamp(10px, 3vmin, 20px);
+}

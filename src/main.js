@@ -38,6 +38,11 @@ const MODULOS = {
   2: () => import('./jogo/modos/croma.js'), // prototipo
   3: () => import('./jogo/modos/loja.js'), // prototipo
   4: () => import('./jogo/modos/molde.js'), // prototipo
+  volei: () => import('./jogo/modos/volei.js'), // prototipo
+  vitral: () => import('./jogo/modos/vitral.js'), // prototipo
+  janela: () => import('./jogo/modos/janela.js'), // prototipo
+  garra: () => import('./jogo/modos/garra.js'), // prototipo
+  aperta: () => import('./jogo/modos/aperta.js'), // prototipo
 };
 /** ?modelo=N dos prototipos que viraram modos da build */
 const DO_MODELO = { 1: 'semfim', 5: 'duelo' };
@@ -63,6 +68,8 @@ const J = {
   chave: '', // semfim | desafio | duelo | duelo2 | prototipo (lab, 2, 3, 4)
   cesto: '', // cesto com que o modo foi criado (trocar na loja vale na proxima partida)
   estado: 'carregando', // carregando | jogando | pausa | fim | menuFim | anuncio | trocando
+  pausaDoPortal: false, // a pausa veio do portal: ela volta sozinha quando ele devolver o jogo
+  pausaDaAba: false, // a pausa veio da aba escondida (portais): ela volta sozinha quando a aba voltar
   t: 0,
   tocou: false,
   carregou: false,
@@ -106,6 +113,8 @@ const TROCA_META = 8;
 const TIPOS_META = ['fusao', 'combo', 'poder'];
 /** s de jogo ativo entre dois intervalos nas pausas naturais do sem fim (o fim de um evento). */
 const ESPACO_ANUNCIO = 150;
+/** Nos portais, a volta da aba deixa o menu de pausa este tempo na tela antes de retomar sozinha. */
+const VOLTA_DA_ABA_MS = 800;
 /** s de jogo sem pedir outro video premiado depois de um que falhou (61 falhas em 8 partidas na 2.0.2) */
 const ESPERA_VIDEO = 30;
 /** demonstracao para quem nao toca: s parado antes de cada gota e quantas (com a da abertura) */
@@ -152,6 +161,7 @@ const prototipo = !['semfim', 'desafio', 'duelo', 'duelo2'].includes(inicial);
 // Poki nao ha pedido: nada muda.
 const escolhaHub = pedido ? armazem.ler('escolha', {}) || {} : {};
 if (prototipo) document.body.classList.add('prototipo');
+if (prototipo) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = new URL('./ui/prototipos.css', import.meta.url).href; document.head.append(l); } // prototipo
 
 // visual: parametro local > pagina do hub > Estudio de visuais (so no hub) > o que o jogador
 // equipou na loja (padrao: bequer, caderno, classico; o caderno no lugar do jardim desde 2026-10-19)
@@ -301,6 +311,7 @@ const donoDoDedo = new Map();
 criarEntrada(window, {
   primeiroGesto: () => audio.iniciar(),
   multi: () => J.chave === 'duelo2',
+  multi: () => J.chave === 'duelo2' || !!(J.modo && J.modo.multi), // prototipo
   ponteiro(fase, px, py, e) {
     J.ocioso = 0;
     if (J.estado !== 'jogando' || !J.modo) return;
@@ -309,6 +320,7 @@ criarEntrada(window, {
     const p = cena.paraMundo(px, py);
     if (!p) return;
     let quem = 0;
+    if (J.modo.multi) { if (fase === 'baixo') donoDoDedo.set(e.pointerId, p[0] < 0 ? 0 : 1); quem = donoDoDedo.has(e.pointerId) ? donoDoDedo.get(e.pointerId) : p[0] < 0 ? 0 : 1; if (fase === 'cima') donoDoDedo.delete(e.pointerId); } // prototipo
     if (J.chave === 'duelo2') {
       if (fase === 'baixo') donoDoDedo.set(e.pointerId, p[0] < 0 ? 0 : 1);
       quem = donoDoDedo.has(e.pointerId) ? donoDoDedo.get(e.pointerId) : p[0] < 0 ? 0 : 1;
@@ -384,6 +396,8 @@ function alternarPausa(origem = 'pausa') {
 
 function continuar() {
   if (J.editor) return;
+  J.pausaDoPortal = false;
+  J.pausaDaAba = false;
   hud.menu(false);
   menu.liberar();
   musica.abaixar(1);
@@ -469,6 +483,7 @@ async function carregarModo(chave, nova = false) {
   const cfg = configModo(chave, nova);
   J.modo = mod.criarModo(cfg);
   J.chave = chave;
+  document.body.classList.toggle('largo', !!J.modo.largo); // prototipo
   J.cesto = cfg.cesto;
   // o sem fim paga as gotas ao longo da partida: a partida que volta lembra o que ja pagou
   J.pagos = chave === 'semfim' && cfg.salvo && cfg.salvo.partida ? cfg.salvo.pagos || 0 : 0;
@@ -637,11 +652,14 @@ function tratarEventos() {
         // pausa natural do modo (troca de pedido/fase; no sem fim, o fim de um evento a partir do 3o):
         // o intervalo comercial pode vir aqui, com ESPACO_ANUNCIO s de jogo desde o anterior
         if (e.origem === 'evento' && (!J.tocou || J.estado !== 'jogando' || J.tempoJogo - J.ultimoAnuncio < ESPACO_ANUNCIO)) break;
-        if (!dep.semAnuncio && poki.temAnuncios) {
+        // cada portal tem a sua regra (core/portal.js): a Y8 so aceita o intervalo que vem de um
+        // clique, a GamePix proibe o que vem do tempo, a Yandex aceita o do tempo com 2 s de aviso
+        if (!dep.semAnuncio && poki.temAnuncios && poki.intervaloNoJogo(e.origem)) {
           // progresso (era intervalo/<origem>/show): o complete so com SEGUIU s de jogo depois
           if (e.origem) acompanhar('intervalo', e.origem);
           poki.gameplayStop();
-          anuncio('commercial').then(() => { if (J.tocou && J.estado === 'jogando') poki.gameplayStart(); });
+          const aviso = poki.intervaloNoJogo(e.origem) === 'aviso' ? avisarAnuncio() : Promise.resolve();
+          aviso.then(() => anuncio('commercial')).then(() => { if (J.tocou && J.estado === 'jogando') poki.gameplayStart(); });
         }
         break;
       case 'som':
@@ -817,7 +835,7 @@ async function pedirVideo(id) {
   J.estado = 'oferta';
   laco.pausar(true);
   poki.gameplayStop();
-  const temVideo = !document.body.classList.contains('sem-anuncio') && (poki.temAnuncios || dep.local);
+  const temVideo = !document.body.classList.contains('sem-anuncio') && (poki.temVideo || dep.local);
   // o ultimo falhou (sem anuncio ou fechado antes do fim): o video fica apagado por um tempo
   const espera = temVideo && J.tempoJogo < J.videoEspera;
   const escolha = await hud.oferta({ id, video: temVideo && !espera, espera, bloqueado: poki.bloqueador, preco: PRECO_REFORCO, gotas: perfil.gotas });
@@ -857,6 +875,7 @@ function pagarFim(e) {
   let partida = 0;
   let extra = 0;
   if (J.chave === 'duelo2') return { total: 0, dobravel: 0 };
+  if (J.modo && J.modo.semGotas) return { total: 0, dobravel: 0 }; // prototipo
   if (J.chave === 'duelo') {
     if (e.venceu) { partida = perfil.venceuDuelo(); registrar('duelo', 1); }
     else partida = perfil.ganhar(Math.floor(gotasDaPartida(pts) / 2));
@@ -937,6 +956,18 @@ async function dobrar() {
 }
 
 /**
+ * O aviso antes do intervalo que vem do tempo de jogo (Yandex, requisito 4.4: "Ad in 2... 1", com o
+ * jogo parado): o laco para e a contagem passa no aviso do alto, um segundo por numero.
+ */
+async function avisarAnuncio() {
+  laco.pausar(true);
+  for (const n of [2, 1]) {
+    hud.avisoJa(formatar(T.anuncioEm, { n }), 1000);
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+}
+
+/**
  * Anuncio pela plataforma; em localhost, um anuncio simulado de 3 s (premio so com true). Se a
  * plataforma desligar os anuncios no caminho (Basic Launch da CrazyGames), os botoes de video somem.
  */
@@ -950,7 +981,7 @@ async function anuncio(tipo) {
   if (tipo === 'commercial') J.ultimoAnuncio = J.tempoJogo;
   if (poki.temAnuncios) {
     ok = tipo === 'rewarded' ? await poki.rewardedBreak() : (await poki.commercialBreak(), false);
-    if (!poki.temAnuncios) document.body.classList.add('sem-anuncio');
+    if (!poki.temVideo) document.body.classList.add('sem-anuncio');
   } else if (dep.local && tipo === 'rewarded') {
     audio.mudoParaAnuncio();
     ok = await hud.anuncioLocal(3);
@@ -965,6 +996,21 @@ async function anuncio(tipo) {
 poki.onAdStart = () => audio.mudoParaAnuncio();
 poki.onAdEnd = () => audio.voltarDoAnuncio();
 poki.onMudoPlataforma = (mudo) => audio.definirMudoPlataforma(mudo);
+// o portal pausou o jogo fora de um anuncio (o botao de pausa do site, o menu dele por cima): a pausa
+// do jogo, com o menu - tem que se ver: congelado sem menu, o pote parado parecia rodando no Testing
+// Toolkit da GamePix. Na volta o menu fecha e o jogo segue sozinho, como os portais esperam. O som e
+// do mudo da plataforma. Se a pausa ja era do jogador, ela continua.
+poki.onPausaPlataforma = (pausado) => {
+  if (pausado) {
+    if (J.estado !== 'jogando') return;
+    alternarPausa('plataforma');
+    J.pausaDoPortal = J.estado === 'pausa';
+    return;
+  }
+  if (!J.pausaDoPortal) return;
+  J.pausaDoPortal = false;
+  if (J.estado === 'pausa') continuar();
+};
 // os anuncios desligaram no caminho (Basic Launch, bloqueador): os botoes de video somem, com aviso
 // quando foi o bloqueador (a CrazyGames pede o motivo na tela, sem popup)
 poki.onSemAnuncios = () => {
@@ -984,7 +1030,20 @@ function medirSaida() {
 }
 document.addEventListener('visibilitychange', () => {
   audio.pausarAba(document.hidden);
-  if (!document.hidden) return;
+  if (!document.hidden) {
+    // nos portais a pausa da aba fica um instante com o menu na tela e o jogo retoma sozinho (o
+    // "Open Tab" do Testing Toolkit da GamePix pergunta se o jogo pausou e voltou)
+    if (J.pausaDaAba) {
+      J.pausaDaAba = false;
+      setTimeout(() => { if (!document.hidden && J.estado === 'pausa') continuar(); }, VOLTA_DA_ABA_MS);
+    }
+    return;
+  }
+  // nos portais a aba escondida abre a pausa; a do jogador continua sendo dele
+  if (poki.pausaNaAba && J.estado === 'jogando') {
+    alternarPausa('aba');
+    J.pausaDaAba = J.estado === 'pausa';
+  }
   salvar();
   medirSaida();
 });
@@ -1201,7 +1260,7 @@ async function iniciar() {
   try { window.focus(); } catch { /* sem permissao de foco: o primeiro clique foca */ }
   if (qualidade.nivel > 0) cena.definirQualidade(qualidade.nivel);
   await carregarModo(inicial);
-  pronto.then(() => { if (!poki.temAnuncios && !dep.local) document.body.classList.add('sem-anuncio'); });
+  pronto.then(() => { if (!poki.temVideo && !dep.local) document.body.classList.add('sem-anuncio'); });
   // sequencia diaria: o premio do dia entra ao abrir, com um aviso que nao interrompe o jogo
   const dia = perfil.checkin();
   if (dia.premio) {

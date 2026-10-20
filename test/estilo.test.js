@@ -23,15 +23,16 @@ test('sem console.log/info/debug no jogo', () => {
 
 test('so src/main.js importa o SDK da Poki', () => {
   for (const p of src) {
-    // o wrapper da CrazyGames reaproveita o criarPoki (e so entra na build dela)
-    if (rel(p) === 'src/main.js' || rel(p) === 'src/core/poki.js' || rel(p) === 'src/core/crazygames.js') continue;
+    // o wrapper da CrazyGames e o dos portais reaproveitam o criarPoki (e so entram nas builds deles)
+    if (['src/main.js', 'src/core/poki.js', 'src/core/crazygames.js', 'src/core/portal.js'].includes(rel(p))) continue;
     assert.ok(!/core\/poki\.js|\.\/poki\.js/.test(ler(p)), rel(p));
   }
 });
 
 test('so o armazenamento toca o localStorage', () => {
   for (const p of src) {
-    if (rel(p) === 'src/core/armazenamento.js') continue;
+    // o GamePix.localStorage e o armazenamento do SDK da GamePix, nao o do navegador
+    if (rel(p) === 'src/core/armazenamento.js' || rel(p) === 'src/core/portais/gamepix.js') continue;
     assert.ok(!/localStorage/.test(ler(p)), rel(p));
   }
 });
@@ -63,9 +64,14 @@ test('src/ nao importa modelos/ nem tools/', () => {
 
 test('unica URL externa e a do SDK da Poki', () => {
   const permitida = 'https://game-cdn.poki.com/scripts/v2/poki-sdk.js';
+  // o SDK que le as opcoes da janela ao chegar entra pelo modulo do portal (so na build dele)
+  const doPortal = {
+    'src/core/portais/gamedistribution.js': 'https://html5.api.gamedistribution.com/main.min.js',
+    'src/core/portais/gamemonetize.js': 'https://api.gamemonetize.com/sdk.js',
+  };
   for (const p of [...src, join(raiz, 'index.html')]) {
     const urls = ler(p).match(/https?:\/\/[^\s"'`)<>]+/g) || [];
-    for (const u of urls) assert.equal(u, permitida, `${rel(p)}: ${u}`);
+    for (const u of urls) assert.equal(u, doPortal[rel(p)] || permitida, `${rel(p)}: ${u}`);
   }
   assert.ok(ler(join(raiz, 'index.html')).includes(permitida));
 });

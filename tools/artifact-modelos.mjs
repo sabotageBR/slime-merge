@@ -5,17 +5,26 @@
 //                   claude.ai nao ha Poki; o wrapper segue sem anuncios);
 //   src/**, modelos/*.gif e as fontes.
 // Imprime o mapa de arquivos (JSON) para o campo `files` do publish.
-// Uso: node tools/artifact-modelos.mjs
-import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+// Uso: node tools/artifact-modelos.mjs [--hub=gosma]
+//   --hub=gosma: o hub dos 5 prototipos de gosma (modelos/gosma.html, 2026-10-19) em .tmp/artifact-gosma/,
+//   so com os jogos dele (sem os estudios de visuais, sons e skins)
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { RAIZ } from './servir.mjs';
 
-const pasta = join(RAIZ, '.tmp/artifact');
+const HUBS = {
+  modelos: { pasta: '.tmp/artifact', pagina: 'modelos/index.html', modelos: ['lab', '1', '2', '3', '4', '5'], estudios: true },
+  gosma: { pasta: '.tmp/artifact-gosma', pagina: 'modelos/gosma.html', modelos: ['volei', 'vitral', 'janela', 'garra', 'aperta'], estudios: false },
+};
+const pedido = (process.argv.find((a) => a.startsWith('--hub=')) || '--hub=modelos').slice(6);
+const HUB = HUBS[pedido];
+if (!HUB) throw new Error(`hub desconhecido: ${pedido}`);
+const pasta = join(RAIZ, HUB.pasta);
 rmSync(pasta, { recursive: true, force: true });
 mkdirSync(pasta, { recursive: true });
-const MODELOS = ['lab', '1', '2', '3', '4', '5'];
+const MODELOS = HUB.modelos;
 
-let h = readFileSync(join(RAIZ, 'modelos/index.html'), 'utf8');
+let h = readFileSync(join(RAIZ, HUB.pagina), 'utf8');
 h = h.replace(/<!doctype html>\s*/i, '')
   .replace(/<html[^>]*>\s*/i, '').replace(/<\/html>\s*/i, '')
   .replace(/<head>\s*/i, '').replace(/<\/head>\s*/i, '')
@@ -29,7 +38,7 @@ writeFileSync(join(pasta, 'index.html'), h);
 
 // paginas de escolha (com o proprio doctype): estudio de visuais, escolhas de 2026-10-15 e os
 // estudios de sons e de skins; prints em visuais/, jogo em jogo-1.html, modulos em src/
-for (const pagina of ['visuais', 'escolhas', 'sons', 'skins']) {
+for (const pagina of HUB.estudios ? ['visuais', 'escolhas', 'sons', 'skins'] : []) {
   let v;
   try { v = readFileSync(join(RAIZ, `modelos/${pagina}.html`), 'utf8'); } catch { continue; }
   v = v.replace(/\.\.\/docs\/visuais\//g, 'visuais/')
@@ -41,12 +50,14 @@ for (const pagina of ['visuais', 'escolhas', 'sons', 'skins']) {
   writeFileSync(join(pasta, `${pagina}.html`), v);
 }
 // modulos das paginas que ficam em modelos/: no Artifact moram na raiz, ao lado de src/
-for (const extra of ['skins-candidatas.js']) {
+for (const extra of HUB.estudios ? ['skins-candidatas.js'] : []) {
   try { writeFileSync(join(pasta, extra), readFileSync(join(RAIZ, 'modelos', extra), 'utf8').replace(/'\.\.\/src\//g, "'./src/")); } catch { /* ainda nao existe */ }
 }
-try { cpSync(join(RAIZ, 'docs/skins'), join(pasta, 'skins'), { recursive: true }); } catch { /* sem prints de skins */ }
-mkdirSync(join(pasta, 'visuais'), { recursive: true });
-for (const f of readdirSync(join(RAIZ, 'docs/visuais'))) cpSync(join(RAIZ, 'docs/visuais', f), join(pasta, 'visuais', f));
+if (HUB.estudios) {
+  try { cpSync(join(RAIZ, 'docs/skins'), join(pasta, 'skins'), { recursive: true }); } catch { /* sem prints de skins */ }
+  mkdirSync(join(pasta, 'visuais'), { recursive: true });
+  for (const f of readdirSync(join(RAIZ, 'docs/visuais'))) cpSync(join(RAIZ, 'docs/visuais', f), join(pasta, 'visuais', f));
+}
 
 const jogo = readFileSync(join(RAIZ, 'index.html'), 'utf8');
 const semSdk = jogo.replace(/<!-- Unico script externo permitido pela Poki. -->\s*<script src="https:\/\/game-cdn\.poki\.com\/scripts\/v2\/poki-sdk\.js"><\/script>\s*/, '');
@@ -57,7 +68,14 @@ for (const m of MODELOS) {
 }
 cpSync(join(RAIZ, 'src'), join(pasta, 'src'), { recursive: true });
 mkdirSync(join(pasta, 'modelos'), { recursive: true });
-for (const m of MODELOS) cpSync(join(RAIZ, `docs/modelos/${m}.gif`), join(pasta, `modelos/${m}.gif`));
+// filme de cada modelo: o GIF (hub antigo) ou o MP4 com a capa (hub de gosma); pelo menos um
+for (const m of MODELOS) {
+  let achados = ['gif', 'mp4', 'jpg'].filter((ext) => existsSync(join(RAIZ, `docs/modelos/${m}.${ext}`)));
+  // o hub de gosma usa o video: o GIF fica de fora (pesa ~7 MB a mais)
+  if (!HUB.estudios && achados.includes('mp4')) achados = achados.filter((ext) => ext !== 'gif');
+  if (!achados.some((ext) => ext !== 'jpg')) throw new Error(`sem docs/modelos/${m}.gif nem .mp4 (rode npm run gifs -- ${m})`);
+  for (const ext of achados) cpSync(join(RAIZ, `docs/modelos/${m}.${ext}`), join(pasta, `modelos/${m}.${ext}`));
+}
 for (const f of ['fredoka-latin-700-normal.woff2', 'fredoka-latin-600-normal.woff2']) cpSync(join(RAIZ, 'src/ui/fontes', f), join(pasta, f));
 
 /** @param {string} d @returns {string[]} */

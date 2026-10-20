@@ -10,7 +10,10 @@
 // requirements/game-covers, lidas em 2026-10-19): 16:9 1920x1080, 2:3 800x1200 e 1:1 800x800,
 // visual consistente; sem borda; nenhum texto alem do titulo; sem icone nem logo de loja.
 //   ?w=1920&h=1080   tamanho em px (a janela do Chrome deve ter w x h); o arranjo sai da proporcao
-//   ?semtitulo       sem o titulo (conferencia da cena)
+//   ?semtitulo       sem o titulo: deitada, a pilha de perto na tela inteira (a GameDistribution
+//                    reprova capa com grande area vazia); em pe, a cena de sempre sem o titulo
+//   ?caixa=x0,y0,x1,y1  so essa caixa do mundo, na tela inteira e sem titulo (o icone dos portais:
+//                    a pilha de perto; tools/portais.mjs)
 import { criarMundo } from '../src/fisica/mundo.js';
 import { criarPote } from '../src/jogo/pote.js';
 import { NIVEIS, particulasNivel, nivel, diametroNivel } from '../src/jogo/niveis.js';
@@ -29,7 +32,8 @@ import { LIMIAR, RAIO_CAMPO } from '../src/render/cena.js';
 const q = new URLSearchParams(location.search);
 const W = Math.max(64, parseInt(q.get('w') || '1920', 10));
 const H = Math.max(64, parseInt(q.get('h') || '1080', 10));
-const TITULO = !q.has('semtitulo');
+const CAIXA_PEDIDA = q.get('caixa') ? q.get('caixa').split(',').map(Number) : null;
+const TITULO = !q.has('semtitulo') && !CAIXA_PEDIDA;
 const HEX = NIVEIS.map((n) => hexDaMistura(n.pig));
 const DT = 1 / 60;
 
@@ -100,7 +104,18 @@ rodar(0.12);
 const CAIXA = [-5.7, -0.75, 5.35, Math.max(13.2, gota.topo + 1.4)];
 const ar = W / H;
 let rBequer, rTitulo, linhas;
-if (ar > 1.3) {
+/** A caixa do mundo enquadrada: a pedida, a pilha de perto (deitada sem titulo) ou o cesto inteiro. */
+let caixa = CAIXA_PEDIDA || CAIXA;
+if (CAIXA_PEDIDA || (!TITULO && ar > 1.3)) {
+  rBequer = { x: 0, y: 0, w: W, h: H };
+  rTitulo = rBequer;
+  linhas = [];
+  if (!CAIXA_PEDIDA) {
+    // a largura do bequer inteira; a altura da proporcao, de cima da gota que cai para baixo
+    const y1 = gota.topo + 0.9;
+    caixa = [-5.7, y1 - 11.4 / ar, 5.7, y1];
+  }
+} else if (ar > 1.3) {
   // paisagem: o titulo em duas linhas a esquerda, o bequer a direita
   rBequer = { x: W * 0.5, y: H * 0.05, w: W * 0.46, h: H * 0.93 };
   rTitulo = { x: W * 0.04, y: H * 0.18, w: W * 0.46, h: H * 0.64 };
@@ -116,7 +131,7 @@ if (ar > 1.3) {
   rBequer = { x: W * 0.06, y: H * 0.255, w: W * 0.88, h: H * 0.73 };
   linhas = ['Slime Merge'];
 }
-const cam = enquadrar(CAIXA, rBequer);
+const cam = enquadrar(caixa, rBequer);
 
 // ------------------------------------------------------------ fundo: o caderno
 /** O papel quadriculado do jogo, com uma luz suave atras do bequer e os cantos mais fundos. */

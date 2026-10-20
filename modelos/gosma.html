@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cinco Jogos de Gosma</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800&display=swap">
+<style>
+/* Hub dos 5 prototipos de gosma (2026-10-19), no mesmo caderno quadriculado do modelos/index.html:
+   cada jogo e uma ficha colada no papel, com o video do bot jogando a esquerda e a analise a direita. Um mundo visual so (o do
+   jogo): papel claro, tinta preta grossa, turquesa dos botoes. */
+:root {
+  --papel: #f3f2ee;
+  --grade: rgba(40, 60, 90, 0.085);
+  --tinta: #17161c;
+  --tinta-suave: #4a4855;
+  --ficha: #ffffff;
+  --turquesa: #5fd9cf;
+  --turquesa-2: #3fbfb5;
+  --laranja: #ff8a2a;
+  --azul: #2a62d6;
+  --verde-ok: #2f9e5a;
+  --vermelho-risco: #d2453c;
+  --display: 'Fredoka', 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --texto: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: light;
+}
+@font-face { font-family: 'Fredoka'; src: url('fredoka-latin-700-normal.woff2') format('woff2'), url('../src/ui/fontes/fredoka-latin-700-normal.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Fredoka'; src: url('fredoka-latin-600-normal.woff2') format('woff2'), url('../src/ui/fontes/fredoka-latin-600-normal.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+* { box-sizing: border-box; }
+body {
+  margin: 0; color: var(--tinta); font-family: var(--texto); font-size: 16px; line-height: 1.55;
+  background-color: var(--papel);
+  background-image: linear-gradient(var(--grade) 1.5px, transparent 1.5px), linear-gradient(90deg, var(--grade) 1.5px, transparent 1.5px);
+  background-size: 28px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+}
+.folha { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 34px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; line-height: 1.1; }
+h1 { font-size: clamp(2.1rem, 6vw, 3.4rem); color: #fff; -webkit-text-stroke: 0.16em var(--tinta); paint-order: stroke fill; letter-spacing: 0.01em; }
+h1 em { font-style: normal; color: var(--turquesa); }
+.topo { display: flex; flex-direction: column; gap: 14px; }
+.lead { font-size: 1.08rem; max-width: 64ch; margin: 0; color: var(--tinta-suave); }
+.lead b { color: var(--tinta); }
+.fatos { display: flex; flex-wrap: wrap; gap: 10px; padding: 0; margin: 4px 0 0; list-style: none; }
+.fatos li { font-family: var(--display); font-weight: 600; font-size: 0.92rem; background: var(--ficha); border: 2.5px solid var(--tinta); border-radius: 999px; padding: 4px 12px; box-shadow: 0 3px 0 var(--tinta); }
+.fatos li b { color: var(--azul); }
+
+.ficha {
+  display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 26px; align-items: start;
+  background: var(--ficha); border: 3px solid var(--tinta); border-radius: 22px; box-shadow: 0 5px 0 var(--tinta); padding: 22px;
+}
+.ficha .tela { display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
+.ficha .tela img, .ficha .tela video { width: 100%; max-width: 100%; height: auto; display: block; border: 3px solid var(--tinta); border-radius: 16px; background: var(--papel); }
+.corpo { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.rotulo { font-family: var(--display); font-weight: 600; font-size: 0.82rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tinta-suave); }
+.titulo { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.titulo h2 { font-size: clamp(1.7rem, 4vw, 2.2rem); }
+.numero { font-family: var(--display); font-weight: 700; width: 2.1rem; height: 2.1rem; flex: none; border-radius: 50%; display: grid; place-items: center;
+  border: 2.5px solid var(--tinta); background: var(--turquesa); color: #fff; -webkit-text-stroke: 0.12em var(--tinta); paint-order: stroke fill; font-size: 1.15rem; align-self: center; }
+.pitch { font-size: 1.12rem; font-weight: 700; margin: 0; max-width: 60ch; }
+.blocos { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px 22px; }
+.bloco { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.bloco ul { margin: 0; padding-left: 1.15em; display: flex; flex-direction: column; gap: 4px; }
+.bloco p { margin: 0; }
+.bloco.bom h3 { color: var(--verde-ok); }
+.bloco.risco h3 { color: var(--vermelho-risco); }
+.bloco h3 { font-size: 1.02rem; }
+.teclas { font-size: 0.93rem; color: var(--tinta-suave); }
+kbd { font-family: var(--display); font-weight: 600; font-size: 0.85em; border: 2px solid var(--tinta); border-bottom-width: 4px; border-radius: 7px; padding: 0 6px; background: #fff; color: var(--tinta); white-space: nowrap; }
+.jogar {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; font-family: var(--display); font-weight: 700; font-size: 1.2rem;
+  color: #fff; background: var(--laranja); border: 3px solid var(--tinta); border-radius: 16px; padding: 10px 18px; box-shadow: 0 4px 0 var(--tinta);
+  -webkit-text-stroke: 0.1em var(--tinta); paint-order: stroke fill; min-height: 48px;
+}
+.jogar:hover { transform: translateY(-1px); }
+.jogar:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--tinta); }
+.jogar:focus-visible, a:focus-visible { outline: 3px dashed var(--azul); outline-offset: 3px; }
+.medido { font-size: 0.9rem; color: var(--tinta-suave); border-top: 2px dashed rgba(23, 22, 28, 0.25); padding-top: 10px; margin: 0; }
+
+.lab { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 360px); gap: 24px; align-items: center;
+  background: repeating-linear-gradient(135deg, var(--turquesa) 0 18px, var(--turquesa-2) 18px 36px); border: 3px solid var(--tinta); border-radius: 22px; padding: 22px; box-shadow: 0 5px 0 var(--tinta); }
+.lab .caixa { background: var(--ficha); border: 3px solid var(--tinta); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.lab img { width: 100%; max-width: 100%; border: 3px solid var(--tinta); border-radius: 16px; background: var(--papel); display: block; }
+.lab h2 { font-size: 1.6rem; }
+.visuais { display: flex; flex-direction: column; gap: 4px; text-decoration: none; color: var(--tinta); background: var(--laranja);
+  border: 3px solid var(--tinta); border-radius: 22px; box-shadow: 0 5px 0 var(--tinta); padding: 18px 22px; }
+.visuais b { font-family: var(--display); font-size: 1.7rem; color: #fff; -webkit-text-stroke: 0.14em var(--tinta); paint-order: stroke fill; }
+.visuais .rotulo { color: var(--tinta); }
+.visuais:focus-visible { outline: 3px dashed var(--azul); outline-offset: 3px; }
+.visuais.escolhas { background: var(--turquesa, #5fd9cf); }
+.nota { background: var(--ficha); border: 3px dashed var(--tinta); border-radius: 18px; padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; }
+.nota p { margin: 0; max-width: 70ch; }
+@media (max-width: 760px) {
+  .ficha, .lab { grid-template-columns: minmax(0, 1fr); padding: 16px; gap: 18px; }
+  .ficha .tela img, .ficha .tela video { max-width: 300px; margin: 0 auto; }
+  .ficha.largo .tela video { max-width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .jogar:hover, .jogar:active { transform: none; } }
+
+.ficha.largo { grid-template-columns: minmax(0, 1fr); }
+.ficha.largo .tela { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.ficha.largo .tela video { flex: 1 1 420px; min-width: 0; }
+.ficha.largo .tela .jogar { flex: 0 0 auto; }
+.origem { font-size: 0.92rem; color: var(--tinta-suave); margin: 0; }
+.origem a, .nota a { color: var(--azul); font-weight: 700; }
+.numero.larga { width: auto; padding: 0 0.45rem; border-radius: 999px; font-size: 1rem; }
+</style>
+</head>
+<body>
+<main class="folha">
+  <header class="topo">
+    <span class="rotulo">Protótipos jogáveis · 2026-10-19 · motor do Slime Merge</span>
+    <h1>Cinco jogos de <em>gosma</em></h1>
+    <p class="lead">A Poki recusou o Slime Merge pela <b>categoria</b> (soltar e fundir), não pelo slime: o Player Fit Test tinha dado 7m41s. Estes cinco protótipos usam o <b>mesmo motor</b>, com partículas que amassam e tomam forma, cor que mistura como tinta e rostos que reagem. Os loops são outros: esporte, pintura, corrida, coleção e brinquedo. Cada ficha mostra o bot jogando. Toque em <b>Jogar</b> para testar no celular ou no computador.</p>
+    <ul class="fatos">
+      <li>O mesmo motor, com física <b>determinística</b></li>
+      <li>Build da Poki e da CrazyGames <b>intocada</b></li>
+      <li><b>180 a 1.100</b> partículas por jogo</li>
+      <li>Física de <b>0,2 a 1,1 ms</b> por quadro (desktop)</li>
+    </ul>
+    <p class="origem">As cinco ideias vêm da página <a href="https://claude.ai/artifact/RfBHtgSW5gQ59pMfvd8awo" target="_blank" rel="noopener">Vinte Ideias de Slime</a> (#44, #46, #52, #54 e #58), na ordem em que você pediu.</p>
+  </header>
+
+  <article class="ficha largo" id="volei">
+    <div class="tela"><video src="../docs/modelos/volei.mp4" poster="../docs/modelos/volei.jpg" autoplay muted loop playsinline width="640" height="360" aria-label="Vôlei de Gosma: dois slimes meia-lua na praia batendo numa bola"></video><a class="jogar" href="../index.html?modelo=volei" data-jogo="volei">Jogar o Vôlei</a></div>
+    <div class="corpo">
+      <div class="titulo"><span class="numero larga">#58</span><h2>Vôlei de Gosma</h2></div>
+      <p class="pitch">Dois slimes meia-lua, uma bola e a rede. O slime amassa em cada toque, e o amassado muda o ângulo da bola.</p>
+      <div class="blocos">
+        <div class="bloco"><h3>Como joga</h3><ul>
+          <li>Partida até 7. O saque cai sobre quem perdeu o ponto, e cada lado tem 3 toques.</li>
+          <li>Torneio contra 3 CPUs com personalidade: Gota (lenta e distraída), Geleia (equilibrada) e Rei Gosma (rápido, corta e mira longe de você). Vencer avança, e o progresso fica salvo.</li>
+          <li>O botão 2P põe duas pessoas no mesmo teclado, ou cada uma numa metade da tela.</li>
+        </ul></div>
+        <div class="bloco"><h3>Do motor</h3><p>A bola é rígida e bate nas partículas: o slime afunda, achata e volta balançando. Os rostos olham a bola, fazem careta no toque forte e choram no ponto perdido. O dois jogadores vem do Duelo.</p></div>
+        <div class="bloco bom"><h3>O que avaliar</h3><p>Se o amassado dá a sensação de controle (tocar com a borda manda a bola mais longe), e se o torneio puxa a próxima partida.</p></div>
+        <div class="bloco risco"><h3>Risco</h3><p>Partida simples demais cansa sem quadras e skins, que ficaram fora. No celular em pé a quadra fica pequena; deitado, ela ocupa a tela.</p></div>
+      </div>
+      <p class="teclas">Contra a CPU: <kbd>A</kbd> <kbd>D</kbd> ou <kbd>←</kbd> <kbd>→</kbd> anda · <kbd>W</kbd>, <kbd>↑</kbd> ou <kbd>espaço</kbd> pula · 2P: <kbd>A</kbd> <kbd>D</kbd> <kbd>W</kbd> e <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> · Toque: arraste e toque para pular</p>
+      <p class="medido">Medido: 180 partículas e 0,2 ms de física por quadro. O bot ganha da Gota por 7–2 e da Geleia por cerca de 7–5; o Rei Gosma vence o bot. Ralis de 4 a 7 s.</p>
+    </div>
+  </article>
+
+  <article class="ficha" id="vitral">
+    <div class="tela"><video src="../docs/modelos/vitral.mp4" poster="../docs/modelos/vitral.jpg" autoplay muted loop playsinline width="300" height="538" aria-label="Vitral de Gelatina: a última peça enche e o vitral acende"></video><a class="jogar" href="../index.html?modelo=vitral" data-jogo="vitral">Jogar o Vitral</a></div>
+    <div class="corpo">
+      <div class="titulo"><span class="numero larga">#54</span><h2>Vitral de Gelatina</h2></div>
+      <p class="pitch">Pingue ciano, magenta, amarelo e branco no copo até chegar ao tom da peça e despeje. O slime toma a forma da peça e acende quando a cor bate.</p>
+      <div class="blocos">
+        <div class="bloco"><h3>Como joga</h3><ul>
+          <li>São 3 vitrais em sequência: Sol (5 peças), Flor (7) e Peixe (8).</li>
+          <li>A peça vazia mostra a cor-alvo clarinha. A pílula mostra o alvo, a cor do copo, o medidor e as estrelas.</li>
+          <li>O copo define a proporção, não a quantidade: a peça enche com gotas que caem e se juntam.</li>
+          <li>Com ΔE até 9 a peça acende. A nota é de 3, 2 ou 1 estrela (ΔE até 4, 9 e 16), e a peça apagada pode ser derretida e refeita. O vitral pronto vira um medalhão na parede.</li>
+        </ul></div>
+        <div class="bloco"><h3>Do motor</h3><p>A cor é Kubelka-Munk, a mesma do Croma. O goo toma a forma da peça como no Molde, e a nota por distância de cor vem da Loja de Slime.</p></div>
+        <div class="bloco bom"><h3>O que avaliar</h3><p>Se a peça acendendo e o vitral pronto encantam o público calmo que joga de colorir, e se uma peça a cada ~20 s tem bom ritmo.</p></div>
+        <div class="bloco risco"><h3>Risco</h3><p>Divide trabalho com a Loja e o Molde. Cada vitral é desenhado à mão, com uma parede de colisão por peça.</p></div>
+      </div>
+      <p class="teclas">Tocar ou segurar o bico · <kbd>1</kbd> a <kbd>4</kbd> pingam · tocar na peça escolhe e despeja · <kbd>Enter</kbd> despeja · <kbd>Backspace</kbd> esvazia · <kbd>←</kbd> <kbd>→</kbd> trocam a peça</p>
+      <p class="medido">Medido: cerca de 1.000 partículas com o vitral quase cheio e 0,8 ms de física (as peças prontas dormem). O bot fecha o Sol em ~31 s.</p>
+    </div>
+  </article>
+
+  <article class="ficha" id="janela">
+    <div class="tela"><video src="../docs/modelos/janela.mp4" poster="../docs/modelos/janela.jpg" autoplay muted loop playsinline width="300" height="538" aria-label="Corrida na Janela: quatro slimes descendo um vidro molhado com adesivos"></video><a class="jogar" href="../index.html?modelo=janela" data-jogo="janela">Jogar a Corrida</a></div>
+    <div class="corpo">
+      <div class="titulo"><span class="numero larga">#52</span><h2>Corrida na Janela</h2></div>
+      <p class="pitch">Dia de chuva: seu slime escorre pelo vidro contra 3 rivais, engole gotas para ficar pesado e rápido e desvia dos adesivos.</p>
+      <div class="blocos">
+        <div class="bloco"><h3>Como joga</h3><ul>
+          <li>Corridas de ~30 s num campeonato de 3, com 10, 6, 3 e 1 pontos. As janelas são de fim de tarde, noite de neon e manhã cinza.</li>
+          <li>Quanto maior o slime, mais rápido ele desce e mais devagar vira. Grande demais, ele espreme no atalho estreito.</li>
+          <li>Há gotas d'água e gotas coloridas, que mudam a cor dele. Os pontos secos freiam, e o rastro molhado dá vácuo a quem vem atrás.</li>
+          <li>Os rivais são o Bolota (guloso), a Dona Calma (cautelosa) e o Faísca (sai rápido e cansa). Na trombada, todos fazem careta.</li>
+        </ul></div>
+        <div class="bloco"><h3>Do motor</h3><p>O escorrer pelo vidro da 2.0.8 é o jogo inteiro. Engolir a gota é uma fusão, e a cor mistura de verdade.</p></div>
+        <div class="bloco bom"><h3>O que avaliar</h3><p>Se a escolha entre crescer e passar no atalho dá decisão a cada segundo, e se o campeonato de 3 corridas segura até o fim.</p></div>
+        <div class="bloco risco"><h3>Risco</h3><p>Uma corrida 2D vertical pode parecer pequena perto das de 3D. O drama vem dos rivais com rosto e das trombadas.</p></div>
+      </div>
+      <p class="teclas">Arraste para o lado · <kbd>←</kbd> <kbd>→</kbd> ou <kbd>A</kbd> <kbd>D</kbd> · <kbd>Enter</kbd> segue no resumo</p>
+      <p class="medido">Medido: cerca de 450 partículas e 0,7 a 1,1 ms de física. Em 10 sementes, as corridas duram de 23 a 37 s, e os vencedores variam.</p>
+    </div>
+  </article>
+
+  <article class="ficha" id="garra">
+    <div class="tela"><video src="../docs/modelos/garra.mp4" poster="../docs/modelos/garra.jpg" autoplay muted loop playsinline width="300" height="538" aria-label="Garra de Squishy: a garra pega um squishy listrado, leva até a rampa e sai o cartão de prêmio"></video><a class="jogar" href="../index.html?modelo=garra" data-jogo="garra">Jogar a Garra</a></div>
+    <div class="corpo">
+      <div class="titulo"><span class="numero larga">#44</span><h2>Garra de Squishy</h2></div>
+      <p class="pitch">Uma máquina de garra cheia de squishies de gelatina. A garra é física: o squishy amassa nas pinças, pode escorregar no caminho e gruda no vidro.</p>
+      <div class="blocos">
+        <div class="bloco"><h3>Como joga</h3><ul>
+          <li>Mire arrastando e aperte Pegar. A garra desce, fecha, sobe e leva até a rampa. Depois de 10 s ela desce sozinha.</li>
+          <li>O álbum tem 12 squishies: 8 comuns, 3 raros com estampa e 1 lendário de ouro. O repetido vira ficha.</li>
+          <li>São 10 fichas, uma por tentativa. Com 0, aparece a recarga grátis de +5. A máquina reabastece quando sobram menos de 6.</li>
+        </ul></div>
+        <div class="bloco"><h3>Do motor</h3><p>O corpo mole amassa e volta devagar, como um squishy. O vidro da 2.0.7 faz o squishy grudar e escorrer, os rostos olham a garra e as estampas são as texturas do shader.</p></div>
+        <div class="bloco bom"><h3>O que avaliar</h3><p>Se a pegada parece justa (depende da mira, não da sorte) e se o álbum puxa a próxima ficha.</p></div>
+        <div class="bloco risco"><h3>Risco</h3><p>Garra lembra aposta. Por isso as fichas saem só de jogar, nunca de compra, e a pegada é física, sem sorteio escondido. As máquinas temáticas ficaram fora.</p></div>
+      </div>
+      <p class="teclas">Arrastar ou <kbd>←</kbd> <kbd>→</kbd> / <kbd>A</kbd> <kbd>D</kbd> mira · <kbd>espaço</kbd>, <kbd>Enter</kbd> ou o botão Pegar desce a garra</p>
+      <p class="medido">Medido: cerca de 540 partículas e 0,6 a 0,8 ms de física. O bot pega 35% das tentativas (34 de 96 em 8 sementes); errando a mira por 1,7 u, cai para 2%.</p>
+    </div>
+  </article>
+
+  <article class="ficha" id="aperta">
+    <div class="tela"><video src="../docs/modelos/aperta.mp4" poster="../docs/modelos/aperta.jpg" autoplay muted loop playsinline width="300" height="538" aria-label="Aperta-Gosma: um slime de bolinhas esticado, grudado no vidro e martelado"></video><a class="jogar" href="../index.html?modelo=aperta" data-jogo="aperta">Jogar o Aperta-Gosma</a></div>
+    <div class="corpo">
+      <div class="titulo"><span class="numero larga">#46</span><h2>Aperta-Gosma</h2></div>
+      <p class="pitch">Um slime antiestresse e 8 ferramentas: estique, arremesse no vidro, congele, derreta, corte, cole, martele, exploda e pinte. Ele reage com caretas.</p>
+      <div class="blocos">
+        <div class="bloco"><h3>Como joga</h3><ul>
+          <li>A mão puxa e estica o slime, que vira puxa-puxa. Arremessado, ele gruda no vidro e escorre. A mão também cutuca e faz cócegas.</li>
+          <li>Gelo e calor mudam a cor e a dureza dele. A tesoura corta pela linha, a cola junta os pedaços, o míssil espirra gosma na tela e a tinta deixa manchas.</li>
+          <li>São 14 metas curtas, uma por vez, desde o primeiro segundo, e um álbum de 10 caretas.</li>
+        </ul></div>
+        <div class="bloco"><h3>Do motor</h3><p>É a ideia mais pronta. As 5 caretas da pancada, o míssil com a gosma na tela, o calor, o gelo, a tesoura, a tinta e o vidro já existiam.</p></div>
+        <div class="bloco bom"><h3>O que avaliar</h3><p>Se as metas e o álbum de caretas seguram depois da graça do primeiro minuto.</p></div>
+        <div class="bloco risco"><h3>Risco</h3><p>O Kick The Buddy foi a 10 mil e caiu para 1 mil: brinquedo sem meta perde o jogador. Faltam arenas e skins para a volta no dia seguinte.</p></div>
+      </div>
+      <p class="teclas">Arrastar e soltar · toque curto cutuca · <kbd>1</kbd> a <kbd>8</kbd> escolhem a ferramenta</p>
+      <p class="medido">Medido: 229 partículas e 0,3 ms de física. Em 90 s o bot usa as 8 ferramentas e cumpre 9 metas, sem nenhuma partícula sair da caixa.</p>
+    </div>
+  </article>
+
+  <aside class="nota">
+    <h2>O que ainda não está nos protótipos</h2>
+    <p>Quadras e skins do vôlei, peças com glitter e vitrais temáticos, janelas temáticas extras, máquinas temáticas da garra, arenas do Aperta-Gosma e os textos em inglês e espanhol (tudo está em português). Os cinco rodam sem anúncios e guardam o progresso neste navegador.</p>
+    <p>No computador, também abrem pelo <code>npm run servir</code> do <code>slime_merge</code>, em <code>/modelos/gosma.html</code>. A build da Poki e a da CrazyGames saem iguais às de antes, porque os protótipos ficam fora delas.</p>
+  </aside>
+</main>
+</body>
+</html>

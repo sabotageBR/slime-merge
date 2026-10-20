@@ -244,6 +244,7 @@ export function criarHud(doc, T) {
         el.base.appendChild(b);
         poderes.set(p.id, b);
       }
+      if (modo.botoes) for (const [id, b] of poderes) { const d = modo.botoes[id]; if (!d) continue; if (d.svg) b.insertAdjacentHTML('afterbegin', d.svg); if (d.nome) { b.insertAdjacentHTML('beforeend', `<i class="nome" aria-hidden="true">${d.nome}</i>`); b.title = d.nome; } } // prototipo
       // o 5o espaco existe desde o inicio (tracejado com "?"): os botoes nao pulam quando o premio chega
       if ((h.poderes || []).some((p) => PREMIOS.includes(p.id))) {
         const v = doc.createElement('button');
@@ -405,6 +406,20 @@ export function criarHud(doc, T) {
     aviso(texto) {
       avisos.push(texto);
       if (!avisoId) proximoAviso();
+    },
+    /**
+     * Aviso que nao espera a fila (a contagem antes do anuncio, que tem hora certa): entra na hora,
+     * por cima do que estiver na tela, e a fila segue `ms` depois.
+     * @param {string} texto @param {number} ms
+     */
+    avisoJa(texto, ms) {
+      clearTimeout(avisoId);
+      el.aviso.textContent = texto;
+      el.aviso.hidden = false;
+      el.aviso.classList.remove('entra');
+      void el.aviso.offsetWidth;
+      el.aviso.classList.add('entra');
+      avisoId = /** @type {any} */ (setTimeout(proximoAviso, ms));
     },
     /**
      * Slime novo descoberto: cartao com a bolinha do nivel por 2,6 s (nao bloqueia o toque).

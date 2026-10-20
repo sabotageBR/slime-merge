@@ -172,6 +172,25 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
     (`poki.idioma`), `happytime` no recorde e no recorde de super slimes (`poki.festa()`), sem intervalo ao trocar
     de modo pelo menu (`poki.intervaloNaNavegacao`), e `body.em-anuncio` trava a interface durante o anúncio;
   - **no portal:** ligar o toggle "Progress Save" (sem ele o módulo `data` não grava e o jogo cai no do navegador).
+- **Portais de distribuição (2026-10-20): Y8, Playgama, Yandex Games, GameMonetize, GameDistribution e
+  GamePix.** `npm run empacotar -- --alvo=<portal>` troca o import do `main.js` para
+  `src/core/portais/<portal>.js` (sobre `src/core/portal.js`, que reaproveita o `criarPoki` como o
+  `crazygames.js`), põe o SDK do portal no HTML (GD e GameMonetize carregam pelo módulo, depois das opções
+  que leem), tira os outros wrappers da build e grava os ids do painel de `marketing/portais/ids.json`
+  (`export const IDS = {};`); sai em `dist-portais/slime-merge-<portal>-<v>.zip` (`-sem-id` sem os ids).
+  Regras por portal (fontes em `marketing/portais/<portal>/ficha.md`):
+  - intervalo (`intervaloNoJogo(origem)`): o do fim de evento do sem fim, que vem do tempo, só com o aviso
+    "Ad in 2… 1" na Yandex e na Playgama (`avisarAnuncio`, `hud.avisoJa`) e nenhum nos outros; as pausas
+    naturais dos modos, menos na Y8 (lá só de clique); a troca de modo pelo menu e o "jogar de novo", em todos;
+  - GameMonetize sem vídeo premiado (`temVideo` falso: `body.sem-anuncio`); GameDistribution com pre-roll no
+    `fonteDados` (`porta.preparar`); Playgama com o save no `bridge.storage` (`nuvemSincrona`) e sem o
+    "reviver" por vídeo (regra 6.3, estilo.css);
+  - pausa do portal (`onPausaPlataforma(pausado)`): o menu de pausa, e a volta fecha e segue sozinha; aba
+    escondida (`pausaNaAba`): o menu, que fica 0,8 s na volta e retoma sozinho (`J.pausaDaAba`). O Testing
+    Toolkit da GamePix cobrou as duas. GamePix: ganchos em `GamePix.on.*` e `GamePix.*` antes do `loaded()`.
+  `npm run portais` faz os 6 zips e o material de `marketing/portais/<portal>/` (capas pelo
+  `tools/capas-crazy.html` em qualquer proporção, com `?semtitulo` e `?caixa=`; telas do jogo em inglês;
+  vídeos); `npm run portais:check` roda os 6 com o SDK falso de cada um (porta 5399, depuração 9398).
 - Protótipos (Croma, Loja, Molde, lab) só por `?modelo=` ou pelo hub; o `tools/empacotar.mjs`
   apaga os arquivos deles e as linhas `// prototipo` do `main.js`.
 
@@ -187,6 +206,31 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
 4. **Molde** (`molde.js`): puzzle de encher moldes por fases.
 5. **Duelo** (`duelo.js`): dois potes, gosma cinza para o rival, CPU ou 2 jogadores.
 - `?modelo=lab`: laboratório do material (gelatina, goo e líquido lado a lado).
+
+## Os 5 protótipos de gosma (2026-10-19; `?modelo=<chave>`, fora da build)
+Depois da recusa da Poki, o usuário escolheu 5 ideias da página "Vinte Ideias de Slime"
+(`~/git/em_tech/ideias/ideias-slime/`, #41–#60) para virar protótipo no motor de verdade. Cada um tem o modo em
+`src/jogo/modos/<chave>.js`, os desenhos em `src/render/prototipos/<chave>.js` e o teste em `test/<chave>.test.js`:
+- `volei` (#58 Vôlei de Gosma): meia-lua por `criarSlime({ pontos })` com mola de forma; a bola é um círculo rígido do
+  modo que bate nas partículas; até 7, 3 toques por lado (`TOQUES`), torneio de 3 CPUs, 2P (`multi`), `largo`.
+- `vitral` (#54 Vitral de Gelatina): peças = `polilinha` fechadas ocultas (hastes em T encurtadas: travessia);
+  o copo define a proporção e a peça enche com gotas de goo quentes até 93%; acende com ΔE ≤ 9; Sol, Flor, Peixe.
+  `?vitrine=11..17` para prints.
+- `janela` (#52 Corrida na Janela): 4 corredores com velocidade-limite pelo tamanho, gotas `preso` engolidas por
+  `fundir`, adesivos, pontos secos, rastro com vácuo, campeonato de 3; câmera com o campo móvel.
+- `garra` (#44 Garra de Squishy): pinças = paredes com `moverParede` e mola de força limitada (`GARRA.aperto`); o
+  solto gruda no vidro (escorre a ~3 u/s, freado no modo); álbum de 12, fichas.
+- `aperta` (#46 Aperta-Gosma): 8 ferramentas (mão com puxa-puxa ancorado, martelo, gelo, calor, tesoura, cola, míssil,
+  tinta), 14 metas curtas e álbum de 10 caretas.
+- **Ganchos (todos em linhas `// prototipo`, que o `empacotar` tira de todo `.js` da build):** `modo.desenho.{cenario,
+  fundo, topo}` e `modo.campoMovel` no `render/cena.js` (o campo fica parado numa janela local e
+  `src/render/prototipos/campo-movel.js` desloca o mundo); `modo.botoes` (SVG e nome dos botões) no `ui/hud.js`;
+  `modo.multi`, `modo.largo` (`body.largo`), `modo.semGotas` e o CSS `src/ui/prototipos.css` no `main.js`. A build
+  da Poki e a da CrazyGames saíram com o mesmo sha256 de antes (conferido em 2026-10-19).
+- Nenhum modo de protótipo expõe `S`: o `main.js` lê `J.modo.S.jogadores` como o do motor de soltar (use `estado`).
+- Hub: `modelos/gosma.html` (vídeos `docs/modelos/<chave>.mp4`); Artifact privado
+  https://claude.ai/artifact/91wrofvtdS63hHED4joHQV (republicar: `npm run artifact -- --hub=gosma`, copiar
+  `.tmp/artifact-gosma/` para dentro do diretório de trabalho e publicar o `index.html` com `root` nela).
 
 ## Estrutura
 - `src/fisica/` (pura e **determinística**: só `+ - * /` e `sqrt`; ver Convenções): `mundo.js` (SoA, subpasso de 1/240 s, contato
@@ -270,17 +314,18 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
 ## Comandos
 | Comando | O que faz |
 |---|---|
-| `npm test` | Física, cor, wrapper Poki, fronteiras, perfil, os modos com o bot, borda, míssil, pote estreito, telemetria de nível e do resgate, qualidade adaptativa, metas da partida, pressão do sem fim (`test/pressao.test.js`), fusão animada e tremor (`test/fusao.test.js`), humor (`test/humor.test.js`), parede (`test/parede.test.js`), escorrer pelo vidro (`test/escorrer.test.js`), áudio, sons, música, skins, o wrapper da CrazyGames (`test/crazygames.test.js`) e o armazenamento (`test/armazenamento.test.js`) (208 testes, ~100 s) |
+| `npm test` | Física, cor, wrapper Poki, fronteiras, perfil, os modos com o bot, borda, míssil, pote estreito, telemetria de nível e do resgate, qualidade adaptativa, metas da partida, pressão do sem fim (`test/pressao.test.js`), fusão animada e tremor (`test/fusao.test.js`), humor (`test/humor.test.js`), parede (`test/parede.test.js`), escorrer pelo vidro (`test/escorrer.test.js`), áudio, sons, música, skins, o wrapper da CrazyGames (`test/crazygames.test.js`) e o armazenamento (`test/armazenamento.test.js`), o campo móvel e os 5 protótipos de gosma (`test/{volei,vitral,janela,garra,aperta}.test.js`) (237 testes, ~100 s) |
 | `node --test test/fisica.test.js` | Um arquivo só (`node:test`, sem dependências); `--test-name-pattern="Croma"` filtra pelo nome do teste |
 | `npm run menu` | Fluxo da build no Chrome headless: sequência, gotas no fim, dobrar, loja, missões, troca de modo, Loja › Skins e o editor (pintar, salvar, Esc). Prints em `.tmp/menu/`. `-- --tam=640x360` |
-| `npm run empacotar` | Build da Poki em `dist/` e zip em `dist-poki/` (sem protótipos; só os sons do `PADRAO`; recusa import quebrado, URL externa, `console.log`, `.map`, > 500 KB gzip e áudio > 150 KB); `-- --thumb` confere e anexa `marketing/thumb/slime-merge-1256.png` (sem ele é ensaio); `-- --alvo=crazygames` gera a build da CrazyGames em `dist-crazygames/` (sem anúncios, `-basic`; `--anuncios` para o Full Launch) |
+| `npm run empacotar` | Build da Poki em `dist/` e zip em `dist-poki/` (sem protótipos; só os sons do `PADRAO`; recusa import quebrado, URL externa, `console.log`, `.map`, > 500 KB gzip e áudio > 150 KB); `-- --thumb` confere e anexa `marketing/thumb/slime-merge-1256.png` (sem ele é ensaio); `-- --alvo=crazygames` gera a build da CrazyGames em `dist-crazygames/` (sem anúncios, `-basic`; `--anuncios` para o Full Launch); `-- --alvo=<portal>` a de um portal de distribuição em `dist-portais/`; `-- --ensaio` monta e confere `dist/` sem zip |
+| `npm run portais` | Os 6 zips dos portais e o material em `marketing/portais/<portal>/` (`-- --so=builds\|arte`, `-- --portal=y8,yandex`); `npm run portais:check`: os 6 builds com o SDK falso de cada portal |
 | `npm run thumb` | Opções de thumb da Poki (`tools/thumb.html`: física e render do jogo) em `marketing/thumb/`, com tiles e a régua (#83FFE7, tarja, opaca); `-- --final` grava a escolhida (`ESCOLHIDA` em `tools/thumb.mjs`) em `slime-merge-{1256,628}` |
 | `npm run servir` | `http://127.0.0.1:5370/` (jogo) e `/modelos/` (hub de avaliação); `-- --lan` mostra o endereço para o celular |
-| `npm run jogar` | Joga os modelos em tempo real (Chrome headless pelo DevTools Protocol, `tools/cdp.mjs`): gestos, pausa, mudo, reforço, fim, revive, jogar de novo. `-- 1 4 --tam=1031x580` |
+| `npm run jogar` | Joga os modelos em tempo real (Chrome headless pelo DevTools Protocol, `tools/cdp.mjs`): gestos, pausa, mudo, reforço, fim, revive, jogar de novo. `-- 1 4 --tam=1031x580`; os de gosma: `-- volei vitral janela garra aperta` |
 | `npm run sdkcheck` | Banco do SDK da Poki em 5 cenários (`tools/sdkcheck.html`, ganchos `window.__slimeTeste`) |
 | `npm run telas` | Iframe com altura/largura 0, escondido e girado |
 | `npm run bancada` | ms de física, cor e campo com ~1.600 partículas; `-- --fim[=min]`: o sem fim com o bot, ms por quadro e partículas por minuto (o custo do fim de jogo) |
-| `npm run gifs` | GIFs e capas dos modelos em `docs/modelos/` (filme determinístico `?filme=N&cada=K`) |
+| `npm run gifs` | GIFs, MP4 e capas dos modelos em `docs/modelos/` (filme determinístico `?filme=N&cada=K`); o `ROTEIRO` dos de gosma tem `tam` e `extra` próprios (`-- volei vitral janela garra aperta`) |
 | `npm run visuais -- [cestos\|cenarios\|objetos]` | Prints das alternativas de visual em `docs/visuais/` (mesma partida para comparar) |
 | `node tools/prints-reforcos.mjs` | Botões de reforço (colados no pote) em 3 tamanhos, no Duelo e a folha de ícones (`tools/icones.html`) em `docs/visuais/` |
 | `node tools/sons.mjs baixar\|listar\|converter\|medir` | Pacotes CC0 da Kenney para `src/som/arquivos/` (MP3 mono 56 kbps, loudnorm, atraso medido) e `LICENCAS.txt` |
@@ -292,8 +337,8 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
 | `node tools/prints-parede.mjs [--tam=640x900] [--cenas=borda,encosta,grande] [--saida=parede]` | O slime solto em cima da borda, encostado no vidro e o grande, de perto (`?zoom`), em `docs/visuais/<saida>-*` (laço pausado, `__slime.avancar(n)`) |
 | `node tools/prints-carregando.mjs` | A tela de loading em 4 momentos, retrato e paisagem, em `docs/visuais/carregando.jpg`, e o GIF `carregando-390x844.gif` |
 | `node tools/vazamento.mjs [--sementes=3] [--min=5] [--restaurar=240] [--src=…]` | Caçada do slime atravessado na parede: o sem fim com o bot, partícula fora do pote a cada quadro (teste próprio), restaurando a partida no meio; `--src` roda outra cópia do `src` |
-| `npm run artifact` | Monta `.tmp/artifact/` (hub + `jogo-N.html` sem o SDK + `src/`) para publicar no claude.ai |
-| `node tools/shot.mjs "<query>" LxA saida.png [ms]` | Print no Chrome headless (WebGL2 funciona). Ex.: `"modelo=1&semente=3&auto=800&passos=1800"` |
+| `npm run artifact` | Monta `.tmp/artifact/` (hub + `jogo-N.html` sem o SDK + `src/`) para publicar no claude.ai; `-- --hub=gosma` monta `.tmp/artifact-gosma/` com os 5 protótipos de gosma |
+| `node tools/shot.mjs "<query>" LxA saida.png [ms]` | Print no Chrome headless (WebGL2 funciona). Ex.: `"modelo=1&semente=3&auto=800&passos=1800"`; `PORTA=` muda a porta (prints em paralelo) |
 | `node tools/pigmentos.mjs` | Regera `src/cor/pigmentos.js` e imprime o relatório de misturas |
 
 **Parâmetros de teste** (só localhost/rede local, `src/core/depuracao.js`): `?modelo=`, `?debug` (no lab:

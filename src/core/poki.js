@@ -67,6 +67,8 @@ const limparCampo = (v) => String(v ?? '').replace(/[/^]/g, '-');
  * @property {(categoria: string, oque: string, acao: string) => void} measure
  * @property {boolean} sdkPronto    so leitura
  * @property {boolean} temAnuncios  so leitura: da para pedir anuncio (na Poki, o mesmo que sdkPronto)
+ * @property {boolean} temVideo     so leitura: ha video premiado (o mesmo que temAnuncios, menos na
+ *                                  GameMonetize, que so tem o intersticial)
  * @property {boolean} jaJogou      so leitura: houve gameplayStart nesta sessao
  * @property {boolean} emAnuncio    so leitura
  * @property {boolean} jogando      so leitura: entre gameplayStart e gameplayStop
@@ -75,10 +77,14 @@ const limparCampo = (v) => String(v ?? '').replace(/[/^]/g, '-');
  * @property {(() => void)|null} onAdEnd
  * @property {((mudo: boolean) => void)|null} onMudoPlataforma   a plataforma pede mudo (a Poki nunca chama)
  * @property {(() => void)|null} onSemAnuncios   os anuncios acabaram de desligar (a Poki nunca chama)
+ * @property {((pausado: boolean) => void)|null} onPausaPlataforma   o portal pausou (true) ou devolveu (false) o jogo fora de um anuncio (a Poki nunca chama)
  * @property {() => Promise<any>} fonteDados   onde gravar o progresso (null: o armazenamento do navegador)
  * @property {string} idioma        idioma da plataforma ('' na Poki: vale o do navegador)
  * @property {boolean} bloqueador   a plataforma viu bloqueador de anuncios (sempre falso na Poki)
  * @property {boolean} intervaloNaNavegacao   intervalo comercial ao trocar de modo pelo menu
+ * @property {boolean} pausaNaAba   a aba escondida abre a pausa e a volta retoma (os portais; a Poki e a CrazyGames nao)
+ * @property {(origem: string) => boolean|'aviso'} intervaloNoJogo   intervalo na pausa natural de um
+ *                                  modo (`origem` do evento): sim, nao, ou so depois de 2 s de aviso
  * @property {() => void} festa     marco do jogador (recorde, super slime): happytime na CrazyGames
  */
 
@@ -399,6 +405,8 @@ export function criarPoki({
     movePill(topPercent, topPx) { if (pronto) chamar('movePill', topPercent, topPx); },
     get sdkPronto() { return pronto; },
     get temAnuncios() { return pronto; },
+    // le temAnuncios pela instancia: a CrazyGames e os portais trocam aquele getter
+    get temVideo() { return poki.temAnuncios; },
     get jaJogou() { return jaJogou; },
     get emAnuncio() { return emAnuncio; },
     get jogando() { return jogando; },
@@ -407,10 +415,13 @@ export function criarPoki({
     onAdEnd: null,
     onMudoPlataforma: null,
     onSemAnuncios: null,
+    onPausaPlataforma: null,
     fonteDados: () => Promise.resolve(null),
     idioma: '',
     bloqueador: false,
     intervaloNaNavegacao: true,
+    intervaloNoJogo: () => true,
+    pausaNaAba: false,
     festa() {},
   };
   return poki;

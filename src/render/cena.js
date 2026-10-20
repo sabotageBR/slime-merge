@@ -119,6 +119,7 @@ export function criarCena(el, o = {}) {
     if (chao === Infinity) chao = 0;
     const pes = (vis.potes || []).some((P) => P.cesto.detalhe === 'pes' || P.cesto.detalhe === 'xicara');
     chao -= pes ? 0.85 : 0.08;
+    if (modo.desenho && modo.desenho.cenario) modo.desenho.cenario(ctxFundo, cq, dpr, W, H, t, vis, chao); else // prototipo
     desenharCenario(ctxFundo, cq, dpr, W, H, visual.cenario, t, chao);
     desenharCestos(ctxFundo, cq, dpr, m.paredes, { potes: vis.potes, t, estiloSoltas: acharCesto(visual.cesto).estilo });
     desenharAtras(ctxFundo, m, cq, dpr, visual.objeto);
@@ -137,8 +138,10 @@ export function criarCena(el, o = {}) {
       ctxFundo.stroke();
       ctxFundo.restore();
     }
+    if (modo.desenho && modo.desenho.fundo) modo.desenho.fundo(ctxFundo, cq, dpr, t, vis, m); // prototipo
     // slime
     const q = QUALIDADES[qual];
+    if (comp && !comp.perdeu() && modo.campoMovel) { const cm = modo.campoMovel(garantirCampo(modo.campoJanela)); cm.acumular(m); comp.desenhar(cm, cq, dprSlime, { tempo: t, brilho: q.brilho, limiar, traco: Math.max(1.6, Math.min(2.8, cq.s * 0.055)) }); } else // prototipo
     if (comp && !comp.perdeu()) {
       const c = garantirCampo(modo.campoJanela || modo.janela);
       c.acumular(m);
@@ -152,6 +155,7 @@ export function criarCena(el, o = {}) {
     ctxTopo.setTransform(1, 0, 0, 1, 0, 0);
     ctxTopo.clearRect(0, 0, el.topo.width, el.topo.height);
     desenharRostos(ctxTopo, m, cq, dpr, t, { olhar: vis.olhar || null, estilo: visual.objeto, expr: o.expr || '' });
+    if (modo.desenho && modo.desenho.topo) modo.desenho.topo(ctxTopo, cq, dpr, t, vis, m); // prototipo
     if (vis.potes) desenharReflexos(ctxTopo, cq, dpr, m.paredes, vis.potes);
     vfx.desenhar(ctxTopo, cq, dpr);
     desenharGuias(ctxTopo, cq, dpr, vis, t, m);

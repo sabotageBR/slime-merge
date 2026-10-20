@@ -14,7 +14,6 @@ const args = process.argv.slice(2);
 const opt = Object.fromEntries(args.filter((a) => a.startsWith('--')).map((a) => { const i = a.indexOf('='); return i < 0 ? [a.slice(2), ''] : [a.slice(2, i), a.slice(i + 1)]; }));
 const modelos = args.filter((a) => !a.startsWith('--'));
 const lista = modelos.length ? modelos : ['lab', '1', '2', '3', '4', '5'];
-const [W, H] = (opt.tam || '390x700').split('x').map(Number);
 const QUADROS = Number(opt.quadros) || 120;
 
 /** roteiro de cada modelo: aquecimento, ritmo do bot e semente */
@@ -25,6 +24,12 @@ const ROTEIRO = {
   3: { passos: 300, auto: 450, cada: 4, semente: 4 },
   4: { passos: 60, auto: 300, cada: 5, semente: 4 },
   5: { passos: 900, auto: 800, cada: 4, semente: 4 },
+  // prototipos de gosma (2026-10-19): tam e extra proprios (o volei e largo)
+  volei: { passos: 120, auto: 300, cada: 4, semente: 3, tam: '1280x720' },
+  vitral: { passos: 0, auto: 300, cada: 5, semente: 4, extra: 'vitrine=14' },
+  janela: { passos: 400, auto: 300, cada: 4, semente: 3 },
+  garra: { passos: 0, auto: 400, cada: 5, semente: 5 },
+  aperta: { passos: 0, auto: 400, cada: 5, semente: 3 },
 };
 
 function chrome(argv, ms) {
@@ -45,8 +50,9 @@ for (const m of lista) {
   const r = { ...(ROTEIRO[m] || ROTEIRO[1]) };
   for (const k of ['passos', 'auto', 'cada']) if (opt[k]) r[k] = Number(opt[k]);
   const nome = opt.nome || m;
+  const [W, H] = (opt.tam || r.tam || '390x700').split('x').map(Number);
   const perfil = mkdtempSync(join(tmpdir(), 'slime-gif-'));
-  const extra = opt.extra ? '&' + opt.extra : '';
+  const extra = (opt.extra || r.extra) ? '&' + (opt.extra || r.extra) : '';
   const url = `http://127.0.0.1:${porta}/index.html?modelo=${m}&semente=${r.semente}&passos=${r.passos}&auto=${r.auto}&filme=${QUADROS}&cada=${r.cada}&lang=pt&semanuncio${extra}`;
   const dom = await chrome(['--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--host-resolver-rules=MAP game-cdn.poki.com 127.0.0.1:9',
     `--user-data-dir=${perfil}`, `--window-size=${W},${H}`, '--virtual-time-budget=120000', '--dump-dom', url], 600000);
@@ -61,6 +67,9 @@ for (const m of lista) {
   const gif = join(saida, `${nome}.gif`);
   execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', '15', '-i', join(tmp, 'q%04d.jpg'),
     '-vf', 'scale=300:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4', gif]);
+  // MP4 ao lado (o hub de gosma usa video: a chuva e a camera que anda pesam no GIF)
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', '15', '-i', join(tmp, 'q%04d.jpg'),
+    '-vf', `scale=${W > H ? 640 : 360}:-2:flags=lanczos`, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '27', '-preset', 'slow', '-movflags', '+faststart', '-an', join(saida, `${nome}.mp4`)]);
   const meio = String(Math.floor(quadros.length * 0.7)).padStart(4, '0');
   execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', join(tmp, `q${meio}.jpg`), '-vf', 'scale=360:-1', join(saida, `${nome}.jpg`)]);
   process.stdout.write(`${m}: ${quadros.length} quadros -> ${gif}\n`);
