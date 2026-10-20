@@ -3,6 +3,7 @@
 //   node tools/portais.mjs                    # zips e material de todos
 //   node tools/portais.mjs --so=builds        # so os zips
 //   node tools/portais.mjs --so=arte          # so as imagens e os videos
+//   node tools/portais.mjs --so=videos        # so os videos
 //   node tools/portais.mjs --portal=y8,yandex # so esses portais
 // Zips: tools/empacotar.mjs --alvo=<portal> (dist-portais/slime-merge-<portal>-<versao>.zip; "-sem-id"
 // quando o portal pede id do painel e marketing/portais/ids.json ainda nao tem). No fim o dist/ volta a
@@ -14,12 +15,14 @@
 // - icones: a mesma cena de perto (?caixa=), sem texto;
 // - telas: o jogo de verdade, em ingles, numa partida jogada pelo bot (o sem fim cheio depois de 2 min,
 //   o duelo, outro cesto e cenario), com o HUD, que os portais aceitam;
-// - videos: o de 1920x1080 da CrazyGames; na Y8, a mesma partida continua sem a abertura com a capa
-//   (gameplay desde o 1o s), no MP4 que todo painel le (mp4Compativel);
+// - videos: o de 1920x1080 da CrazyGames (na Y8, a mesma partida continua sem a abertura com a capa:
+//   gameplay desde o 1o s) e, na Yandex, tambem o vertical 9:16 da mesma partida
+//   (marketing/portais/video-1080x1920.mp4, de `node tools/capas-crazy.mjs --so=videos
+//   --video=1080x1920`), todos no MP4 que todo painel le (mp4Compativel);
 // - folha.jpg de cada portal, para conferir (nao vai para o envio).
 // JPG que passa do peso maximo do portal desce de qualidade ate caber. Porta HTTP 5401, depuracao 9401.
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { RAIZ, servir } from './servir.mjs';
 import { abrirChrome, espera } from './cdp.mjs';
@@ -29,6 +32,7 @@ const PORTA = 5401;
 const PORTA_CDP = 9401;
 const PORTAIS = ['y8', 'playgama', 'yandex', 'gamemonetize', 'gamedistribution', 'gamepix'];
 const VIDEO_CRAZY = join(RAIZ, 'marketing/crazygames/video-1920x1080.mp4');
+const VIDEO_VERTICAL = join(RAIZ, 'marketing/portais/video-1080x1920.mp4');
 /** A abertura do video da CrazyGames: a capa parada e a fusao (tools/capas-crazy.mjs). */
 const ABERTURA_VIDEO_S = 1.0 + 0.3;
 /** O icone: a pilha de perto (os slimes vermelho e amarelo sorrindo), em coordenadas do mundo. */
@@ -57,6 +61,7 @@ const PERFIL = `(() => { const d = new Date(); const hoje = d.getFullYear() + '-
  * @property {boolean} [titulo]   capa com o titulo (padrao: sim)
  * @property {string} [cena]      tela: chave de CENAS
  * @property {boolean} [cortaAbertura]
+ * @property {string} [fonte]     video: o MP4 de origem (padrao: o 1920x1080 da CrazyGames)
  */
 
 /** O que cada portal pede (as mesmas medidas do tools/portais.mjs do hexadrop). @type {Record<string, Item[]>} */
@@ -95,7 +100,9 @@ const ITENS = {
     { arq: 'tela-mobile-1080x1920-1', tipo: 'tela', w: 1080, h: 1920, cena: 'cheio', fmt: 'png' },
     { arq: 'tela-mobile-1080x1920-2', tipo: 'tela', w: 1080, h: 1920, cena: 'comeco', fmt: 'png' },
     { arq: 'tela-mobile-1080x1920-3', tipo: 'tela', w: 1080, h: 1920, cena: 'jardim', fmt: 'png' },
+    // os dois ate 28 s e 100 MB; o horizontal e obrigatorio, o vertical aparece no celular
     { arq: 'video-1920x1080', tipo: 'video' },
+    { arq: 'video-1080x1920', tipo: 'video', fonte: VIDEO_VERTICAL },
   ],
   gamemonetize: [
     { arq: 'thumb-512x384', tipo: 'capa', w: 512, h: 384, fmt: 'jpg' },
@@ -125,7 +132,7 @@ for (const p of ESCOLHIDOS) {
   }
 }
 
-if (opt.so !== 'arte') builds();
+if (opt.so !== 'arte' && opt.so !== 'videos') builds();
 if (opt.so !== 'builds') await arte();
 
 // ------------------------------------------------------------------ builds
@@ -216,13 +223,11 @@ async function arte() {
       /** @type {string[]} */
       const naFolha = [];
       for (const it of ITENS[portal]) {
+        if (opt.so === 'videos' && it.tipo !== 'video') continue;
         if (it.tipo === 'video') {
           const mp4 = join(pasta, `${JOGO}-${it.arq}.mp4`);
-          if (it.cortaAbertura) {
-            mp4Compativel(['-ss', String(ABERTURA_VIDEO_S), '-i', VIDEO_CRAZY], mp4);
-          } else {
-            copyFileSync(VIDEO_CRAZY, mp4);
-          }
+          const corte = it.cortaAbertura ? ['-ss', String(ABERTURA_VIDEO_S)] : [];
+          mp4Compativel([...corte, '-i', it.fonte || VIDEO_CRAZY], mp4);
           const dur = spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', mp4], { encoding: 'utf8' }).stdout.trim();
           process.stdout.write(`  ${portal}/${JOGO}-${it.arq}.mp4  ${Number(dur).toFixed(1)} s, ${(statSync(mp4).size / 1048576).toFixed(1)} MB\n`);
           continue;
@@ -238,7 +243,7 @@ async function arte() {
         naFolha.push(arq);
         process.stdout.write(`  ${portal}/${JOGO}-${it.arq}.${it.fmt}  ${w}x${h}, ${kb.toFixed(0)} KB${it.maxKB ? ` (max ${it.maxKB})` : ''}\n`);
       }
-      folha(naFolha, join(pasta, 'folha.jpg'));
+      if (opt.so !== 'videos') folha(naFolha, join(pasta, 'folha.jpg'));
     }
     if (c.erros.length) process.stdout.write(`avisos do jogo: ${c.erros.slice(0, 3).join(' | ')}\n`);
   } finally {

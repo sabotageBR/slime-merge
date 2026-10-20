@@ -20,6 +20,7 @@ Rússia).
 | Screenshots desktop | `yandex/slime-merge-tela-desktop-1920x1080-1.png, -2, -3` | 16:9, mínimo 2, gameplay real |
 | Screenshots mobile | `yandex/slime-merge-tela-mobile-1080x1920-1.png, -2, -3` | 9:16, mínimo 2, gameplay real |
 | Horizontal video | `yandex/slime-merge-video-1920x1080.mp4` | 16:9, ≤ 28 s, ≤ 100 MB, ≥ 70% gameplay |
+| Vertical video | `yandex/slime-merge-video-1080x1920.mp4` | 9:16, MP4, altura ≥ 400 px, ≤ 28 s, ≤ 100 MB; a mesma partida, como aparece no celular |
 
 Cada idioma do rascunho tem o seu conjunto de mídias. Use as mesmas nas duas abas: o nome na capa é
 **Slime Merge**, e ele é o título nas duas. Os arquivos ficam em `marketing/portais/`.

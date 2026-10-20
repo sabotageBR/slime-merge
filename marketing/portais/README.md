@@ -31,6 +31,7 @@ Enquanto faltar o id, o zip sai com `-sem-id` no nome e roda sem anúncios: serv
 node tools/portais.mjs              # os seis zips e todo o material
 node tools/portais.mjs --so=builds  # só os zips
 node tools/portais.mjs --so=arte    # só as imagens e os vídeos
+node tools/portais.mjs --so=videos  # só os vídeos (o vertical da Yandex sai antes, de tools/capas-crazy.mjs --so=videos --video=1080x1920)
 node tools/portaischeck.mjs         # os seis builds com o SDK falso de cada portal
 ```
 

@@ -10,7 +10,9 @@
 //   O print leva ~0,9 s de relogio: o tempo virtual do DevTools anda 1/30 s por quadro (os setTimeout
 //   do HUD, como os 2,6 s do cartao de slime novo) e as animacoes de CSS sao pausadas e postas no
 //   tempo virtual a cada quadro (elas seguem o relogio de verdade mesmo com o tempo virtual);
-// - folha de contato em marketing/crazygames/folha.jpg (as 3 capas e 6 quadros de cada video).
+// - folha de contato em marketing/crazygames/folha.jpg (as 3 capas e 6 quadros de cada video);
+// - so com --video=1080x1920: o vertical 9:16 da Yandex Games (2026-10-20), a mesma partida, em
+//   marketing/portais/video-1080x1920.mp4, que o tools/portais.mjs converte.
 // Uso: node tools/capas-crazy.mjs [--so=capas|videos] [--video=1080x1620] [--semente=34]
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -24,11 +26,16 @@ const opt = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith(
 const SAIDA = join(RAIZ, 'marketing/crazygames');
 const TMP = join(RAIZ, '.tmp/crazygames');
 const CAPAS = ['1920x1080', '800x1200', '800x800'];
-/** Cada video: o tamanho final, a janela (metade: o print sai em 2x) e a capa da abertura. */
+/**
+ * Cada video: o tamanho final, a janela (metade: o print sai em 2x) e a capa da abertura. `saida` e
+ * a pasta de quem nao e da CrazyGames, que so sai quando --video o pede.
+ */
 const VIDEOS = [
   { nome: 'video-1920x1080', janela: [960, 540], capa: '1920x1080' },
   { nome: 'video-1080x1620', janela: [540, 810], capa: '1080x1620' },
+  { nome: 'video-1080x1920', janela: [540, 960], capa: '1080x1920', saida: 'marketing/portais' },
 ];
+const DA_CRAZY = VIDEOS.filter((v) => !v.saida);
 const FPS = 30;
 const SEG_JOGO = 17.5;
 const CAPA_PARADA = 1.0;
@@ -154,7 +161,7 @@ async function quadros(v) {
 /** A capa parada, a fusao para o jogo e a partida, em H.264 sem audio. */
 function montar(v, pasta) {
   const capaArq = join(TMP, `capa-${v.capa}.png`);
-  const mp4 = join(SAIDA, `${v.nome}.mp4`);
+  const mp4 = join(v.saida ? join(RAIZ, v.saida) : SAIDA, `${v.nome}.mp4`);
   const [W, H] = v.nome.replace('video-', '').split('x');
   ff(['-loop', '1', '-framerate', String(FPS), '-t', String(CAPA_PARADA + FUSAO), '-i', capaArq,
     '-framerate', String(FPS), '-i', join(pasta, 'q%04d.jpg'),
@@ -173,7 +180,7 @@ function folha() {
     '-filter_complex', '[0]scale=-1:600[a];[1]scale=-1:600[b];[2]scale=-1:600[c];[a][b][c]hstack=inputs=3,pad=' + L + ':640:(ow-iw)/2:20:white', linha1]);
   const tempos = [0.2, 2.5, 6, 10, 14, 17.8];
   const linhas = [linha1];
-  for (const [k, v] of VIDEOS.entries()) {
+  for (const [k, v] of DA_CRAZY.entries()) {
     const mp4 = join(SAIDA, `${v.nome}.mp4`);
     const altura = k === 0 ? 170 : 300;
     const ents = [];
@@ -196,7 +203,7 @@ try {
     for (const t of CAPAS) await capa(t, join(SAIDA, `capa-${t}.png`));
   }
   // as capas da abertura dos videos no tamanho de cada um (a de 1080x1620 e a 2:3 em mais pixels)
-  const videos = VIDEOS.filter((v) => !opt.video || v.nome.endsWith(opt.video));
+  const videos = opt.video ? VIDEOS.filter((v) => v.nome.endsWith(opt.video)) : DA_CRAZY;
   for (const v of videos) await capa(v.capa, join(TMP, `capa-${v.capa}.png`));
   if (opt.so !== 'capas') {
     for (const v of videos) montar(v, await quadros(v));
