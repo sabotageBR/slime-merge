@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>capa-pilha</title>
+<style>html,body{margin:0;overflow:hidden;background:#000}canvas{display:block}pre{display:none}</style></head>
+<body><canvas id="c"></canvas><pre id="medidas"></pre>
+<script type="module">
+// Capa com o titulo no estilo da imagem que o Grok fez e o usuario gostou (2026-10-21): a pilha de
+// slimes do jogo enchendo o quadro, o par azul se fundindo no alto, o gel bem brilhante com contorno
+// grosso, os raios de sol atras e gotinhas coloridas voando; com o titulo "Slime Merge" (o gel do logo,
+// o mesmo de tools/capas-crazy.html). Duas fontes, para comparar ("os dois"):
+//   ?modo=motor  a recriacao com o jogo: a fisica monta a pilha (slimes do jogo, chao e paredes
+//                invisiveis), o campo da forma, o gel da capa (tools/capa-heroi-gel.js) pinta, o rosto
+//                e o do jogo (src/render/rostos.js);
+//   ?modo=grok   o PNG do Grok (marketing/capa-heroi/grok/grok-original-1408.jpg), a arte escolhida pelo
+//                usuario para todos os portais (2026-10-21). Com o titulo: em pe, a imagem embaixo de uma
+//                faixa de ceu com o titulo; quase quadrado (ate 1,55), a imagem na largura toda cortada
+//                embaixo, o titulo no ceu dela; deitado, a imagem a direita e o ceu com o titulo a
+//                esquerda (o ceu estendido tem as cores da propria imagem). ?semtitulo: so a imagem,
+//                recortada na proporcao (sem area vazia); ?icone: o close do slime vermelho, sem texto.
+//   ?w=1920&h=1080 (16:9), 1600x1600 (1:1), 1200x1800 (2:3)   ?semente=
+import { criarMundo } from '../src/fisica/mundo.js';
+import { linearDeHex } from '../src/cor/km.js';
+import { enquadrar, aplicar, paraTela, paraMundo } from '../src/render/camera.js';
+import { criarCampo } from '../src/render/campo.js';
+import { desenharRostos } from '../src/render/rostos.js';
+import { TINTA } from '../src/render/fundo.js';
+import { LIMIAR, RAIO_CAMPO } from '../src/render/cena.js';
+import { criarGel, volumeDoCampo } from './capa-heroi-gel.js';
+
+const q = new URLSearchParams(location.search);
+const W = Math.max(64, parseInt(q.get('w') || '1920', 10));
+const H = Math.max(64, parseInt(q.get('h') || '1080', 10));
+const AR = W / H;
+const MODO = q.get('modo') === 'grok' ? 'grok' : 'motor';
+const DT = 1 / 60;
+const T = 0.55;
+/** Um nucleo maior que o do jogo: a borda do blob fica lisa, como na imagem do Grok. */
+const RAIO = 0.9;
+const LIM = LIMIAR * (RAIO / RAIO_CAMPO) ** 2;
+const GROK = '../marketing/capa-heroi/grok/grok-original-1408.jpg';
+
+/** As cores da pilha (as da imagem do Grok, que sao as do jogo saturadas): claro, cor, escuro, pe. */
+const PALETA = {
+  azul: ['#8fd0ff', '#1f7cf2', '#0d4fc2', '#5aaaff'],
+  vermelho: ['#ff9a8f', '#ea1f2c', '#b5101c', '#ff5a5f'],
+  amarelo: ['#fff2a0', '#ffc61a', '#e09a00', '#ffd94d'],
+  verde: ['#a6f07a', '#2fae3a', '#1b7a25', '#5fd06a'],
+  roxo: ['#d4a6ff', '#8a3fd8', '#5c1fa6', '#a96cf0'],
+};
+const CORES = Object.keys(PALETA);
+
+// ------------------------------------------------------------ titulo (o gel do logo)
+const CORES_TITULO = [['#a6ef5a', '#4fbf2c', '#2f8f1b'], ['#c9a8ff', '#8a5cf0', '#5b33c4']];
+const escreve = CanvasRenderingContext2D.prototype.fillText;
+const contorna = CanvasRenderingContext2D.prototype.strokeText;
+/** Uma palavra em Fredoka 700: tinta grossa, gel em degrade, o brilho de cima e a sombra de tinta. */
+function palavra(ctx, texto, x, y, tam, cores) {
+  ctx.save();
+  ctx.font = `700 ${tam}px Fredoka`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.lineJoin = 'round';
+  ctx.miterLimit = 2;
+  const sobe = tam * 0.72;
+  ctx.fillStyle = TINTA;
+  ctx.strokeStyle = TINTA;
+  ctx.lineWidth = tam * 0.17;
+  contorna.call(ctx, texto, x, y + tam * 0.075);
+  escreve.call(ctx, texto, x, y + tam * 0.075);
+  contorna.call(ctx, texto, x, y);
+  const g = ctx.createLinearGradient(0, y - sobe, 0, y);
+  g.addColorStop(0, cores[0]);
+  g.addColorStop(0.55, cores[1]);
+  g.addColorStop(1, cores[2]);
+  ctx.fillStyle = g;
+  escreve.call(ctx, texto, x, y);
+  const cv = document.createElement('canvas');
+  const larg = Math.ceil(ctx.measureText(texto).width + tam);
+  cv.width = larg;
+  cv.height = Math.ceil(tam * 1.4);
+  const c2 = cv.getContext('2d');
+  c2.font = ctx.font;
+  c2.textAlign = 'center';
+  c2.textBaseline = 'alphabetic';
+  const bx = larg / 2;
+  const by = tam * 1.05;
+  c2.fillStyle = '#fff';
+  escreve.call(c2, texto, bx, by);
+  c2.globalCompositeOperation = 'source-in';
+  const gb = c2.createLinearGradient(0, by - sobe, 0, by - sobe * 0.45);
+  gb.addColorStop(0, 'rgba(255, 255, 255, 0.75)');
+  gb.addColorStop(0.7, 'rgba(255, 255, 255, 0.25)');
+  gb.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  c2.fillStyle = gb;
+  c2.fillRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(cv, x - bx, y - by);
+  ctx.restore();
+}
+/** O titulo no retangulo r: uma linha ("Slime" verde e "Merge" lilas) ou duas, o maior que cabe. */
+function titulo(ctx, r, linhas) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.font = '700 100px Fredoka';
+  const cx = r.x + r.w / 2;
+  if (linhas === 1) {
+    const espaco = ctx.measureText(' ').width / 100;
+    const l1 = ctx.measureText('Slime').width / 100;
+    const l2 = ctx.measureText('Merge').width / 100;
+    const tam = Math.min(r.w / ((l1 + espaco + l2) * 1.08), r.h / 0.95);
+    const y = r.y + r.h / 2 + tam * 0.32;
+    const x0 = cx - ((l1 + espaco + l2) * tam) / 2;
+    ctx.save();
+    ctx.translate(cx, r.y + r.h / 2);
+    ctx.rotate(-0.03);
+    ctx.translate(-cx, -(r.y + r.h / 2));
+    palavra(ctx, 'Slime', x0 + (l1 * tam) / 2, y, tam, CORES_TITULO[0]);
+    palavra(ctx, 'Merge', x0 + (l1 + espaco) * tam + (l2 * tam) / 2, y, tam, CORES_TITULO[1]);
+    ctx.restore();
+    return;
+  }
+  const larg = Math.max(ctx.measureText('Slime').width, ctx.measureText('Merge').width) / 100;
+  const tam = Math.min(r.w / (larg * 1.12), r.h / 1.8);
+  const y = r.y + (r.h - 1.72 * tam) / 2 + 0.74 * tam;
+  ctx.save();
+  ctx.translate(cx, r.y + r.h / 2);
+  ctx.rotate(-0.04);
+  ctx.translate(-cx, -(r.y + r.h / 2));
+  palavra(ctx, 'Slime', cx - tam * 0.1, y, tam, CORES_TITULO[0]);
+  palavra(ctx, 'Merge', cx + tam * 0.1, y + 0.86 * tam, tam, CORES_TITULO[1]);
+  ctx.restore();
+}
+async function fonte() {
+  const f = new FontFace('Fredoka', 'url(../src/ui/fontes/fredoka-latin-700-normal.woff2)', { weight: '700' });
+  document.fonts.add(await f.load());
+}
+
+// ------------------------------------------------------------ ceu com raios de sol
+/**
+ * O ceu: azul em degrade, os raios de sol saindo de (cx, cy) e o clarao no meio. cores: [alto, baixo,
+ * raio] (a do raio e a da luz).
+ */
+function ceu(ctx, x, y, w, h, cx, cy, cores) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  const g = ctx.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, cores[0]);
+  g.addColorStop(1, cores[1]);
+  ctx.fillStyle = g;
+  ctx.fillRect(x, y, w, h);
+  const R = Math.hypot(w, h) * 1.2;
+  const n = 22;
+  for (let k = 0; k < n; k++) {
+    const a = (k / n) * Math.PI * 2 + 0.05;
+    const abre = (Math.PI / n) * 0.55;
+    const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+    gr.addColorStop(0, 'rgba(255, 252, 200, 0.75)');
+    gr.addColorStop(0.35, 'rgba(255, 250, 210, 0.35)');
+    gr.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = gr;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, R, a - abre, a + abre);
+    ctx.closePath();
+    ctx.fill();
+  }
+  const c = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w, h) * 0.55);
+  c.addColorStop(0, 'rgba(255, 250, 215, 1)');
+  c.addColorStop(0.35, cores[2]);
+  c.addColorStop(1, 'rgba(255, 245, 190, 0)');
+  ctx.fillStyle = c;
+  ctx.fillRect(x, y, w, h);
+  ctx.restore();
+}
+/** Sorteio fixo. */
+function sorteio(semente) {
+  let s = semente >>> 0 || 1;
+  return () => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+/** Gotinhas de gel voando no ceu (elipses brilhantes, algumas com rastro) e brilhos. */
+function gotinhas(ctx, n, area, cx, cy, semente, escala) {
+  const rnd = sorteio(semente);
+  for (let k = 0; k < n; k++) {
+    const x = area.x + rnd() * area.w;
+    const y = area.y + rnd() * area.h;
+    const r = (6 + rnd() * 16) * escala;
+    const cor = PALETA[CORES[Math.floor(rnd() * CORES.length)]];
+    const a = Math.atan2(y - cy, x - cx);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(a);
+    if (rnd() < 0.4) {
+      // o rastro da gota (vindo do centro)
+      const g = ctx.createLinearGradient(-r * 5, 0, 0, 0);
+      g.addColorStop(0, 'rgba(255, 255, 255, 0)');
+      g.addColorStop(1, 'rgba(255, 255, 255, 0.55)');
+      ctx.strokeStyle = g;
+      ctx.lineWidth = r * 0.5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-r * 5, 0);
+      ctx.lineTo(-r * 0.8, 0);
+      ctx.stroke();
+    }
+    const g = ctx.createRadialGradient(-r * 0.3, -r * 0.35, r * 0.1, 0, 0, r * 1.3);
+    g.addColorStop(0, cor[0]);
+    g.addColorStop(0.55, cor[1]);
+    g.addColorStop(1, cor[2]);
+    ctx.fillStyle = g;
+    ctx.globalAlpha = 0.92;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 1.3, r, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.35, -r * 0.35, r * 0.4, r * 0.22, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ------------------------------------------------------------ a recriacao com o motor
+function rodar(m, seg) {
+  for (let f = 0; f < Math.round(seg / DT); f++) {
+    m.avancar(4);
+    m.medir(DT);
+  }
+}
+/**
+ * A pilha: o chao e duas paredes invisiveis da largura do quadro (mais uma folga: os da beira saem
+ * cortados), fileiras em favo de slimes do jogo de tamanhos parecidos, cores vizinhas sempre
+ * diferentes; por cima, o par azul que se abraca no meio (o amasso da fusao).
+ */
+function pilha(larg, alt, semente) {
+  const m = criarMundo({ semente, limites: [-40, -8, 40, 40] });
+  const meia = larg / 2 + 0.2;
+  m.definirParedes([
+    { ax: -50, ay: -0.3, bx: 50, by: -0.3, r: 0.3, oculta: true },
+    { ax: -meia - 0.3, ay: 0, bx: -meia - 0.3, by: 40, r: 0.3, oculta: true },
+    { ax: meia + 0.3, ay: 0, bx: meia + 0.3, by: 40, r: 0.3, oculta: true },
+  ]);
+  const rnd = sorteio(semente * 7 + 3);
+  const passo = 4.3;
+  const lista = [];
+  for (let fila = 0; fila * passo * 0.86 < alt; fila++) {
+    const desloca = fila % 2 ? passo / 2 : 0;
+    for (let x = -meia + passo / 2 - desloca; x < meia; x += passo) {
+      const d = 3.7 + rnd() * 1.1 + (rnd() < 0.15 ? 0.9 : 0);
+      const y = fila * passo * 0.86 + d / 2 + 0.05;
+      const vizinhos = lista.filter((o) => Math.hypot(o.x - x, o.y - y) < passo * 1.25).map((o) => o.cor);
+      const livres = CORES.filter((c) => !vizinhos.includes(c) && c !== 'azul');
+      const cor = livres.length ? livres[Math.floor(rnd() * livres.length)] : CORES[Math.floor(rnd() * CORES.length)];
+      lista.push({ x, y, d, cor });
+    }
+  }
+  const slimes = lista.map((o) => {
+    const s = m.criarSlime({ x: o.x, y: o.y, diametro: o.d, material: 'gelatina' });
+    s.dados.cor = o.cor;
+    s.dados.expr = 'feliz';
+    return s;
+  });
+  rodar(m, 2.2);
+  let topo = 0;
+  for (const s of slimes) if (Math.abs(s.cx) < 4) topo = Math.max(topo, s.topo);
+  // o par azul no alto do meio: os dois caem um puxando o outro e se espremem
+  const d = 4.8;
+  const a = m.criarSlime({ x: -d / 2 - 0.05, y: topo + d / 2 + 0.2, diametro: d, material: 'gelatina' });
+  const b = m.criarSlime({ x: d / 2 + 0.05, y: topo + d / 2 + 0.2, diametro: d, material: 'gelatina' });
+  for (const s of [a, b]) { s.dados.cor = 'azul'; s.dados.expr = 'feliz'; }
+  for (let f = 0; f < 50; f++) {
+    for (let i = 0; i < m.n; i++) {
+      if (m.sl[i] === a.idx) m.vx[i] += 0.3;
+      if (m.sl[i] === b.idx) m.vx[i] -= 0.3;
+    }
+    m.avancar(4);
+    m.medir(DT);
+  }
+  return { m, slimes: [...slimes, a, b], par: [a, b] };
+}
+
+function motor(ctx) {
+  // o quadro do mundo: 13 u de altura; o titulo no alto (ceu), a pilha embaixo
+  const altQ = 13;
+  const largQ = altQ * AR;
+  const semente = Number(q.get('semente')) || 4;
+  const ceuFrac = AR > 1.2 ? 0.36 : AR < 0.8 ? 0.4 : 0.34;
+  const C = pilha(largQ, altQ * (1 - ceuFrac) + 2.6, semente);
+  const [a, b] = C.par;
+  const topoPar = Math.max(a.topo, b.topo);
+  // o alto da pilha (o par) fica logo abaixo da faixa do ceu
+  const y1 = topoPar + altQ * ceuFrac - 0.4;
+  const janela = [-largQ / 2, y1 - altQ, largQ / 2, y1];
+  const cam = enquadrar(janela, { x: 0, y: 0, w: W, h: H });
+  // ceu e raios saindo de tras do par
+  const [sx, sy] = paraTela(cam, (a.cx + b.cx) / 2, topoPar + 0.6);
+  ceu(ctx, 0, 0, W, H, sx, sy, ['#1d86ea', '#9fdcff', 'rgba(255, 238, 150, 0.85)']);
+  gotinhas(ctx, Math.round(26 * Math.sqrt(AR)), { x: 0, y: H * 0.03, w: W, h: H * (ceuFrac + 0.2) }, sx, sy, semente, H / 1080);
+  // o gel
+  const [x0, yy1] = paraMundo(cam, 0, 0);
+  const [x1, yy0] = paraMundo(cam, W, H);
+  const celula = (yy1 - yy0) / 600;
+  const campo = criarCampo({ janela: [x0 - 1.5, yy0 - 1.5, x1 + 1.5, yy1 + 1.5], celula, raio: RAIO });
+  // a aparencia de cada slime e a cor dele (1 a 5)
+  for (const s of C.slimes) s.dados.ap = CORES.indexOf(s.dados.cor) + 1;
+  campo.acumular(C.m);
+  const vol = volumeDoCampo(campo, { limiar: LIM, kDomo: 1, alisarU: 0.3 });
+  // atras da pilha, a tinta: um vao entre slimes vira costura grossa, nunca um buraco de ceu
+  ctx.save();
+  ctx.fillStyle = '#1b1238';
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  for (let px = 0; px <= W; px += 4) {
+    const [wx] = paraMundo(cam, px, 0);
+    let alto = -1e9;
+    const i = Math.round((wx - campo.janela[0]) / campo.celula);
+    for (let j = campo.ny - 1; j >= 0 && i >= 0 && i < campo.nx; j--) {
+      if (campo.t0[(j * campo.nx + i) * 4] > LIM * 1.3) { alto = campo.janela[1] + j * campo.celula; break; }
+    }
+    const [, py] = paraTela(cam, wx, alto - 0.35);
+    ctx.lineTo(px, alto < -1e8 ? H : Math.max(py, 0));
+  }
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+  const glcv = document.createElement('canvas');
+  glcv.width = W;
+  glcv.height = H;
+  const gel = criarGel(glcv);
+  if (!gel) throw new Error('sem WebGL2');
+  const lin = (hex) => linearDeHex(hex);
+  const aparencias = CORES.map((c) => ({ claro: lin(PALETA[c][0]), cor: lin(PALETA[c][1]), escuro: lin(PALETA[c][2]), brilhoPe: lin(PALETA[c][3]), esp: 1.8 }));
+  gel.desenhar(campo, cam, vol, {
+    limiar: LIM, traco: cam.s * 0.11, aparencias, tons: [0.9, 0.55, 0.55, 0.3], rim: [1, 1, 1, 0.5],
+    tinta: true, borda: 3, rosto: null, estouros: [],
+  });
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(glcv, 0, 0);
+  // o brilho em camadas de cada slime (o gel da imagem do Grok): o reflexo grande no alto a esquerda,
+  // o ponto de luz, a linha de luz da borda de baixo e cintilas; recortado pelos corpos
+  const camada = document.createElement('canvas');
+  camada.width = W;
+  camada.height = H;
+  const t = camada.getContext('2d');
+  const rb = sorteio(semente * 13 + 5);
+  for (const sl of C.slimes) {
+    const [cx, cy] = paraTela(cam, sl.cx, sl.cy);
+    const R = sl.raio0 * cam.s * 0.92;
+    t.save();
+    t.translate(cx - R * 0.36, cy - R * 0.46);
+    t.rotate(-0.6);
+    const g = t.createRadialGradient(0, 0, 0, 0, 0, R * 0.34);
+    g.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+    g.addColorStop(0.6, 'rgba(255, 255, 255, 0.45)');
+    g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    t.scale(1, 0.45);
+    t.fillStyle = g;
+    t.beginPath();
+    t.arc(0, 0, R * 0.34, 0, Math.PI * 2);
+    t.fill();
+    t.restore();
+    t.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    t.beginPath();
+    t.arc(cx - R * 0.08, cy - R * 0.66, R * 0.045, 0, Math.PI * 2);
+    t.fill();
+    t.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    t.lineWidth = R * 0.05;
+    t.lineCap = 'round';
+    t.beginPath();
+    t.arc(cx, cy, R * 0.8, 0.25, 1.15);
+    t.stroke();
+    for (let k = 0; k < 3; k++) {
+      const a = rb() * Math.PI * 2;
+      const d = R * (0.3 + rb() * 0.45);
+      const x = cx + Math.cos(a) * d;
+      const y = cy + Math.sin(a) * d;
+      const r = R * (0.03 + rb() * 0.04);
+      t.fillStyle = `rgba(255, 255, 255, ${0.5 + rb() * 0.4})`;
+      t.beginPath();
+      t.moveTo(x, y - r * 2);
+      t.quadraticCurveTo(x, y, x + r * 2, y);
+      t.quadraticCurveTo(x, y, x, y + r * 2);
+      t.quadraticCurveTo(x, y, x - r * 2, y);
+      t.quadraticCurveTo(x, y, x, y - r * 2);
+      t.fill();
+    }
+  }
+  t.globalCompositeOperation = 'destination-in';
+  t.drawImage(glcv, 0, 0);
+  ctx.drawImage(camada, 0, 0);
+  // o brilho da fusao do par, por cima da costura
+  const [px, py] = paraTela(cam, (a.cx + b.cx) / 2, (a.cy + b.cy) / 2 + 0.6);
+  const gl = ctx.createRadialGradient(px, py, 0, px, py, cam.s * 1.4);
+  gl.addColorStop(0, 'rgba(255, 255, 240, 0.7)');
+  gl.addColorStop(1, 'rgba(255, 255, 240, 0)');
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.fillStyle = gl;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+  // os rostos do jogo, olhando o sol
+  desenharRostos(ctx, C.m, cam, 1, T, { olhar: paraMundo(cam, sx, sy * 0.4), estilo: 'classico' });
+  // o titulo na faixa do ceu
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const r = AR < 0.8 ? { x: W * 0.06, y: H * 0.03, w: W * 0.88, h: H * 0.3 } : { x: W * 0.08, y: H * 0.03, w: W * 0.84, h: H * (ceuFrac - 0.07) };
+  titulo(ctx, r, AR < 0.8 ? 2 : 1);
+}
+
+// ------------------------------------------------------------ a imagem do Grok
+function carregar(src) {
+  return new Promise((ok, falha) => {
+    const im = new Image();
+    im.onload = () => ok(im);
+    im.onerror = () => falha(new Error('nao carregou ' + src));
+    im.src = src;
+  });
+}
+/** A cor media de um retangulo da imagem (para o ceu que estende a do Grok). */
+function corMedia(im, x, y, w, h) {
+  const c = document.createElement('canvas');
+  c.width = 8;
+  c.height = 8;
+  const g = c.getContext('2d');
+  g.drawImage(im, x, y, w, h, 0, 0, 8, 8);
+  const d = g.getImageData(0, 0, 8, 8).data;
+  let r = 0;
+  let gg = 0;
+  let b = 0;
+  for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; }
+  const n = d.length / 4;
+  return `rgb(${Math.round(r / n)}, ${Math.round(gg / n)}, ${Math.round(b / n)})`;
+}
+async function grok(ctx) {
+  const im = await carregar(GROK);
+  const S = im.width;
+  ctx.imageSmoothingQuality = 'high';
+  if (q.has('icone')) {
+    // o close do slime vermelho (o rosto no meio), sem texto: os icones dos portais
+    const lado = S * 0.52;
+    ctx.drawImage(im, S * 0.41 - lado / 2, S * 0.635 - lado / 2, lado, lado, 0, 0, W, H);
+    return;
+  }
+  if (q.has('semtitulo')) {
+    // so a arte, recortada na proporcao pedida (o par azul no alto, a pilha enchendo o quadro)
+    if (AR >= 1) {
+      const h = S / AR;
+      const y = Math.min(S - h, S * 0.17);
+      ctx.drawImage(im, 0, y, S, h, 0, 0, W, H);
+    } else {
+      const w = S * AR;
+      ctx.drawImage(im, (S - w) / 2, 0, w, S, 0, 0, W, H);
+    }
+    return;
+  }
+  // o ceu da propria imagem: o alto (azul) e o baixo do ceu, perto da luz (claro)
+  const alto = corMedia(im, 0, 0, S, S * 0.04);
+  const baixo = corMedia(im, S * 0.02, S * 0.36, S * 0.08, S * 0.04);
+  if (AR > 1.55) {
+    // deitado: o quadrado inteiro a direita, o ceu estendido a esquerda com o titulo
+    const lado = H;
+    const x = W - lado;
+    ceu(ctx, 0, 0, W, H, x + lado * 0.5, H * 0.27, [alto, baixo, 'rgba(255, 238, 150, 0.6)']);
+    ctx.save();
+    // a beira esquerda do quadrado some no ceu (sem costura)
+    const tmp = document.createElement('canvas');
+    tmp.width = lado;
+    tmp.height = lado;
+    const t = tmp.getContext('2d');
+    t.imageSmoothingQuality = 'high';
+    t.drawImage(im, 0, 0, lado, lado);
+    t.globalCompositeOperation = 'destination-in';
+    const g = t.createLinearGradient(0, 0, lado * 0.09, 0);
+    g.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    g.addColorStop(1, 'rgba(0, 0, 0, 1)');
+    t.fillStyle = g;
+    t.fillRect(0, 0, lado, lado);
+    ctx.drawImage(tmp, x, 0);
+    ctx.restore();
+    titulo(ctx, { x: W * 0.03, y: H * 0.16, w: x + lado * 0.12 - W * 0.03, h: H * 0.68 }, 2);
+  } else if (AR < 0.8) {
+    // em pe: o quadrado embaixo, o ceu estendido em cima com o titulo
+    const lado = W;
+    const y = H - lado;
+    ceu(ctx, 0, 0, W, H, W * 0.5, y + lado * 0.27, [alto, baixo, 'rgba(255, 238, 150, 0.6)']);
+    const tmp = document.createElement('canvas');
+    tmp.width = lado;
+    tmp.height = lado;
+    const t = tmp.getContext('2d');
+    t.imageSmoothingQuality = 'high';
+    t.drawImage(im, 0, 0, lado, lado);
+    t.globalCompositeOperation = 'destination-in';
+    const g = t.createLinearGradient(0, 0, 0, lado * 0.2);
+    g.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    g.addColorStop(1, 'rgba(0, 0, 0, 1)');
+    t.fillStyle = g;
+    t.fillRect(0, 0, lado, lado);
+    ctx.drawImage(tmp, 0, y);
+    titulo(ctx, { x: W * 0.06, y: H * 0.03, w: W * 0.88, h: y + lado * 0.1 - H * 0.03 }, 2);
+  } else {
+    // quadrado ou quase: a imagem na largura toda (cortada embaixo) e o titulo no alto, por cima do ceu
+    ctx.drawImage(im, 0, 0, W, W);
+    titulo(ctx, { x: W * 0.07, y: W * 0.02, w: W * 0.86, h: W * 0.2 }, 1);
+  }
+}
+
+async function principal() {
+  await fonte();
+  const cv = document.getElementById('c');
+  cv.width = W;
+  cv.height = H;
+  const ctx = cv.getContext('2d');
+  if (MODO === 'grok') await grok(ctx);
+  else motor(ctx);
+}
+principal().then(() => { document.title = 'PRONTO'; }).catch((e) => {
+  document.getElementById('medidas').textContent = String(e && e.stack ? e.stack : e);
+  document.title = 'ERRO: ' + (e && e.message ? e.message : String(e));
+});
+</script></body></html>

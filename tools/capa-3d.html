@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>capa-3d</title>
+<style>html,body{margin:0;overflow:hidden;background:#000}canvas{display:block}pre{display:none}</style></head>
+<body><canvas id="c"></canvas><pre id="medidas"></pre>
+<script type="module">
+// Capa em 3D (2026-10-21): o padrao de qualidade dos destaques da CrazyGames (print do usuario: "Quero
+// nesse padrao de qualidade"). Os slimes do jogo (o blob com o rosto classico: olhos grandes, pupila
+// preta, sorriso) em 3D de verdade, por raymarching num shader proprio: gelatina saturada e
+// translucida, olhos de esfera brilhante, boca escavada, reflexo de softbox, luz de recorte, sombra
+// macia no chao, os menores se fundindo no heroi por uma ponte de gosma (a cor passa de um para o
+// outro) e a luz da fusao. Depois, em 2D: o bloom, as estrelas e a vinheta. Nenhum texto.
+//   ?versao=1..5   ?w=1920&h=1080   ?ss=2 (supersampling por eixo)
+const q = new URLSearchParams(location.search);
+const W = Math.max(64, parseInt(q.get('w') || '1920', 10));
+const H = Math.max(64, parseInt(q.get('h') || '1080', 10));
+
+const VERT = `#version 300 es
+in vec2 aPos;
+void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
+
+const FRAG = `#version 300 es
+precision highp float;
+uniform vec2 uRes;
+uniform vec3 uCorH;
+uniform vec3 uCor1;
+uniform vec3 uCor2;
+uniform vec3 uFundo0;
+uniform vec3 uFundo1;
+uniform vec3 uFundo2;
+uniform vec3 uCam;
+uniform vec3 uAlvo;
+uniform float uLente;
+out vec4 frag;
+
+const vec3 C1 = vec3(-1.62, 0.0, 0.62);
+const vec3 C2 = vec3(1.62, 0.0, 0.62);
+const vec3 LUZ = normalize(vec3(-0.55, 0.9, 0.65));
+// o heroi: o corpo em domo (centro e raios) e a base larga; os menores
+const vec3 HC = vec3(0.0, 1.0, 0.0);
+const vec3 HR = vec3(1.14, 1.02, 1.0);
+const vec3 MC = vec3(0.0, 0.5, 0.0);
+const vec3 MR = vec3(0.56, 0.5, 0.52);
+
+float sdElip(vec3 p, vec3 r) {
+  float k0 = length(p / r);
+  float k1 = length(p / (r * r));
+  return k0 * (k0 - 1.0) / k1;
+}
+float sdCap(vec3 p, vec3 a, vec3 b, float r) {
+  vec3 pa = p - a;
+  vec3 ba = b - a;
+  float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+  return length(pa - ba * h) - r;
+}
+float smin(float a, float b, float k) {
+  float h = max(k - abs(a - b), 0.0) / k;
+  return min(a, b) - h * h * k * 0.25;
+}
+/** z da superficie da frente de um elipsoide (centro c, raios r) em (x, y). */
+float zSup(vec3 c, vec3 r, float x, float y) {
+  float t = 1.0 - ((x - c.x) / r.x) * ((x - c.x) / r.x) - ((y - c.y) / r.y) * ((y - c.y) / r.y);
+  return c.z + r.z * sqrt(max(t, 0.0));
+}
+
+// ---- corpos: o heroi sentado (base larga) e os dois menores; a ondulacao leve dos slimes do jogo
+float corpoH(vec3 p) {
+  float d = sdElip(p - HC, HR);
+  d = smin(d, sdElip(p - vec3(0.0, 0.12, 0.0), vec3(1.3, 0.16, 1.15)), 0.42);
+  d += 0.004 * sin(4.1 * p.x + 1.3) * sin(3.3 * p.y + 0.4) * sin(3.7 * p.z + 2.1);
+  return d;
+}
+float corpoM(vec3 p, vec3 c) {
+  vec3 l = p - c;
+  float d = sdElip(l - MC, MR);
+  d = smin(d, sdElip(l - vec3(0.0, 0.07, 0.0), vec3(0.64, 0.09, 0.58)), 0.2);
+  d += 0.003 * sin(6.0 * l.x + 0.5) * sin(5.0 * l.y + 1.1) * sin(6.0 * l.z);
+  return d;
+}
+// ---- rosto (o classico do jogo em 3D: olhos grandes, pupila preta, sorriso aberto)
+float bocaH(vec3 p) {
+  float zb = zSup(HC, HR, 0.0, 0.74);
+  float d = sdElip(p - vec3(0.0, 0.74, zb - 0.06), vec3(0.27, 0.2, 0.26));
+  return max(d, p.y - 0.8);
+}
+float bocaM(vec3 p, vec3 c) {
+  vec3 l = p - c;
+  float zb = zSup(MC, MR, 0.0, 0.36) - 0.02;
+  float d = sdElip(l - vec3(0.0, 0.36, zb), vec3(0.095, 0.07, 0.09));
+  return max(d, l.y - 0.39);
+}
+const vec3 OLHO_R = vec3(0.245, 0.28, 0.15);
+vec3 olhoH(float lado) { return vec3(lado * 0.35, 1.2, zSup(HC, HR, lado * 0.35, 1.2) - 0.07); }
+const vec3 OLHO_M = vec3(0.12, 0.135, 0.075);
+vec3 olhoM(vec3 c, float lado) { return c + vec3(lado * 0.17, 0.6, zSup(MC, MR, lado * 0.17, 0.6) - 0.035); }
+float sobrancelhas(vec3 p) {
+  float d = 1e9;
+  for (int k = 0; k < 2; k++) {
+    float lado = k == 0 ? -1.0 : 1.0;
+    // o arco alto e redondo da surpresa, colado no corpo
+    vec3 ant = vec3(0.0);
+    for (int i = 0; i <= 6; i++) {
+      float t = float(i) / 6.0;
+      float x = lado * (0.18 + 0.38 * t);
+      float y = 1.57 + 0.1 * sin(3.14159 * t);
+      vec3 q = vec3(x, y, zSup(HC, HR, x, y) + 0.01);
+      if (i > 0) d = min(d, sdCap(p, ant, q, 0.034));
+      ant = q;
+    }
+  }
+  return d;
+}
+// gotinhas voando acima das fusoes
+const vec4 GOTAS[6] = vec4[6](vec4(-1.3, 1.5, 0.95, 0.075), vec4(-1.62, 1.82, 0.8, 0.055), vec4(-1.05, 1.88, 0.9, 0.045),
+  vec4(1.32, 1.55, 0.92, 0.07), vec4(1.64, 1.86, 0.8, 0.055), vec4(1.08, 1.92, 0.9, 0.04));
+
+// material: 1 corpo, 2 olho, 3 boca, 4 lingua, 5 sobrancelha, 6 gota esquerda, 7 gota direita.
+// gotas = false: sem as gotinhas (elas nao fazem sombra: no corpo virariam manchas escuras)
+vec2 cenaX(vec3 p, bool gotas) {
+  float dh = corpoH(p);
+  float d1 = corpoM(p, C1);
+  float d2 = corpoM(p, C2);
+  // a fusao: os menores se fundem no heroi por uma ponte curta de gosma
+  float corpo = smin(smin(dh, d1, 0.3), d2, 0.3);
+  float boca = max(max(-bocaH(p), -bocaM(p, C1)), -bocaM(p, C2));
+  vec2 r = vec2(max(corpo, boca), boca > corpo ? 3.0 : 1.0);
+  float li = sdElip(p - vec3(0.0, 0.64, zSup(HC, HR, 0.0, 0.64) - 0.12), vec3(0.15, 0.08, 0.12));
+  if (li < r.x) r = vec2(li, 4.0);
+  for (int k = 0; k < 2; k++) {
+    float lado = k == 0 ? -1.0 : 1.0;
+    float o = sdElip(p - olhoH(lado), OLHO_R);
+    o = min(o, sdElip(p - olhoM(C1, lado), OLHO_M));
+    o = min(o, sdElip(p - olhoM(C2, lado), OLHO_M));
+    if (o < r.x) r = vec2(o, 2.0);
+  }
+  float s = sobrancelhas(p);
+  if (s < r.x) r = vec2(s, 5.0);
+  if (gotas) {
+    for (int k = 0; k < 6; k++) {
+      float g = length(p - GOTAS[k].xyz) - GOTAS[k].w;
+      if (g < r.x) r = vec2(g, k < 3 ? 6.0 : 7.0);
+    }
+  }
+  return r;
+}
+vec2 cena(vec3 p) { return cenaX(p, true); }
+vec3 normal(vec3 p) {
+  vec2 e = vec2(0.0015, 0.0);
+  return normalize(vec3(cena(p + e.xyy).x - cena(p - e.xyy).x, cena(p + e.yxy).x - cena(p - e.yxy).x, cena(p + e.yyx).x - cena(p - e.yyx).x));
+}
+float sombra(vec3 ro, vec3 rd) {
+  float res = 1.0;
+  float t = 0.02;
+  for (int i = 0; i < 40; i++) {
+    float h = cenaX(ro + rd * t, false).x;
+    res = min(res, 9.0 * h / t);
+    t += clamp(h, 0.02, 0.25);
+    if (res < 0.002 || t > 6.0) break;
+  }
+  return clamp(res, 0.0, 1.0);
+}
+float oclusao(vec3 p, vec3 n) {
+  float o = 0.0;
+  float s = 1.0;
+  for (int i = 1; i <= 5; i++) {
+    float h = 0.05 * float(i);
+    o += (h - cena(p + n * h).x) * s;
+    s *= 0.7;
+  }
+  return clamp(1.0 - 2.2 * o, 0.0, 1.0);
+}
+/** O fundo: o degrade radial na tela, centro claro atras do heroi. */
+vec3 fundo(vec2 uv) {
+  vec2 d = (uv - vec2(0.5, 0.62)) * vec2(uRes.x / uRes.y, 1.0);
+  float r = length(d);
+  vec3 c = mix(uFundo0, uFundo1, smoothstep(0.0, 0.6, r));
+  c = mix(c, uFundo2, smoothstep(0.55, 1.2, r));
+  // raios largos e macios saindo de tras do heroi
+  float a = atan(d.y, d.x);
+  float raio = pow(0.5 + 0.5 * cos(a * 12.0), 6.0) * smoothstep(1.3, 0.15, r) * smoothstep(0.05, 0.3, r);
+  return c + uFundo0 * 0.22 * raio;
+}
+/** O que o gel reflete: o estudio (fundo) e duas softboxes (a grande em cima a esquerda). */
+vec3 ambiente(vec3 r) {
+  vec3 c = mix(uFundo2 * 0.5, uFundo1 * 1.2, smoothstep(-0.3, 0.9, r.y));
+  c += vec3(3.4) * smoothstep(0.88, 0.94, dot(r, normalize(vec3(-0.55, 0.75, 0.55))));
+  c += vec3(1.6) * smoothstep(0.97, 0.985, dot(r, normalize(vec3(0.75, 0.45, 0.55))));
+  return c;
+}
+/** Cor do corpo no ponto: a de cada slime pela distancia (na ponte da fusao uma passa para a outra). */
+vec3 corDoCorpo(vec3 p) {
+  float wh = exp(-18.0 * max(corpoH(p), 0.0));
+  float w1 = exp(-18.0 * max(corpoM(p, C1), 0.0));
+  float w2 = exp(-18.0 * max(corpoM(p, C2), 0.0));
+  return (uCorH * wh + uCor1 * w1 + uCor2 * w2) / (wh + w1 + w2);
+}
+/** Tom: comprime o brilho sem desbotar a cor (por canal, suave). */
+vec3 tom(vec3 x) { return 1.0 - exp(-1.15 * x); }
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / uRes;
+  vec2 pt = (2.0 * gl_FragCoord.xy - uRes) / uRes.y;
+  vec3 ww = normalize(uAlvo - uCam);
+  vec3 uu = normalize(cross(ww, vec3(0.0, 1.0, 0.0)));
+  vec3 vv = cross(uu, ww);
+  vec3 rd = normalize(pt.x * uu * uLente + pt.y * vv * uLente + ww);
+  vec3 ro = uCam;
+  float t = 0.0;
+  vec2 h = vec2(0.0);
+  bool bateu = false;
+  for (int i = 0; i < 160; i++) {
+    h = cena(ro + rd * t);
+    if (h.x < 0.0008 * t) { bateu = true; break; }
+    t += h.x * 0.9;
+    if (t > 20.0) break;
+  }
+  // o chao (y = 0): o fundo com a sombra macia e o contato
+  float tc = rd.y < 0.0 ? -ro.y / rd.y : 1e9;
+  vec3 col;
+  if (!bateu || tc < t) {
+    col = fundo(uv);
+    if (tc < 1e8 && (!bateu || tc < t)) {
+      vec3 pc = ro + rd * tc;
+      float sh = sombra(pc + vec3(0.0, 0.01, 0.0), LUZ);
+      float ao = oclusao(pc, vec3(0.0, 1.0, 0.0));
+      col *= mix(0.42, 1.0, sh) * mix(0.5, 1.0, ao);
+    }
+  } else {
+    vec3 p = ro + rd * t;
+    vec3 n = normal(p);
+    vec3 v = -rd;
+    float m = h.y;
+    float sh = sombra(p + n * 0.01, LUZ);
+    float ao = oclusao(p, n);
+    float ndv = max(dot(n, v), 0.0);
+    float fres = pow(1.0 - ndv, 4.0);
+    vec3 r = reflect(rd, n);
+    float dif = clamp((dot(n, LUZ) + 0.35) / 1.35, 0.0, 1.0) * mix(0.35, 1.0, sh);
+    if (m < 1.5 || m > 5.5) {
+      // gelatina: cor saturada, a luz que atravessa (clareia o miolo), reflexo do estudio e recorte
+      vec3 base = m > 6.5 ? uCor2 : m > 5.5 ? uCor1 : corDoCorpo(p);
+      // bochechas do heroi: um rubor claro (misturar o rosa no verde daria marrom)
+      float rubor = 0.0;
+      for (int k = 0; k < 2; k++) {
+        float bx = (k == 0 ? -1.0 : 1.0) * 0.66;
+        vec3 b = vec3(bx, 0.94, zSup(HC, HR, bx, 0.94));
+        rubor += exp(-dot(p - b, p - b) / 0.012);
+      }
+      // a sombra fica na propria cor, mais saturada (base ao quadrado), sem cinza
+      float a0 = mix(0.5, 1.0, ao);
+      vec3 c = (base * 0.95 * dif + base * base * 0.42) * a0;
+      c += base * 0.32 * pow(ndv, 2.0);
+      c += mix(base, vec3(1.0), 0.35) * 0.35 * fres;
+      c += vec3(1.0, 0.45, 0.62) * 0.35 * rubor;
+      // a ponte da fusao brilha (a mistura direta das cores passaria por marrom)
+      if (m < 1.5) {
+        float wh = exp(-18.0 * max(corpoH(p), 0.0));
+        float w1 = exp(-18.0 * max(corpoM(p, C1), 0.0));
+        float w2 = exp(-18.0 * max(corpoM(p, C2), 0.0));
+        float mist = 1.0 - max(wh, max(w1, w2)) / (wh + w1 + w2);
+        c += vec3(1.0, 0.93, 0.75) * smoothstep(0.08, 0.45, mist) * 0.9;
+      }
+      // luz de recorte por tras, do alto a direita
+      float rim = pow(1.0 - ndv, 2.2) * smoothstep(-0.1, 0.7, dot(n, normalize(vec3(0.75, 0.45, -0.5))));
+      c += mix(base, vec3(1.0), 0.6) * 1.1 * rim;
+      c += ambiente(r) * mix(0.03, 0.75, fres) * 0.5;
+      c += vec3(1.0) * pow(max(dot(r, LUZ), 0.0), 140.0) * 2.4 * sh;
+      // a luz da fusao: um brilho quente perto de cada encosto
+      for (int k = 0; k < 2; k++) {
+        vec3 j = vec3((k == 0 ? -1.0 : 1.0) * 1.2, 0.85, 0.75);
+        c += vec3(1.0, 0.85, 0.55) * 0.55 * exp(-6.0 * length(p - j));
+      }
+      col = c;
+    } else if (m < 2.5) {
+      // olho: branco brilhante e a pupila preta grande (pela direcao na esfera do olho)
+      vec3 centro;
+      vec3 raios;
+      vec3 olha;
+      float lado = p.x < 0.0 ? -1.0 : 1.0;
+      if (abs(p.x) < 0.9) {
+        centro = olhoH(lado);
+        raios = OLHO_R;
+        olha = normalize(uCam + vec3(0.0, 2.2, 0.0) - centro);
+      } else {
+        vec3 cm = p.x < 0.0 ? C1 : C2;
+        centro = olhoM(cm, (p.x - cm.x) < 0.0 ? -1.0 : 1.0);
+        raios = OLHO_M;
+        olha = normalize(normalize(uCam - centro) * 0.75 + normalize(olhoH(0.0) - centro) * 0.25);
+      }
+      float cosp = dot(normalize((p - centro) / raios), olha);
+      float pu = smoothstep(abs(p.x) < 0.9 ? 0.74 : 0.7, abs(p.x) < 0.9 ? 0.77 : 0.73, cosp);
+      vec3 c = mix(vec3(0.97), vec3(0.012), pu) * (0.4 + 0.6 * dif) * mix(0.65, 1.0, ao);
+      c += ambiente(r) * mix(0.04, 0.8, fres) * (pu > 0.5 ? 0.25 : 0.4);
+      c += vec3(1.0) * pow(max(dot(r, LUZ), 0.0), 260.0) * 4.0;
+      col = c;
+    } else if (m < 3.5) {
+      col = vec3(0.13, 0.01, 0.03) * (0.3 + 0.7 * ao);
+    } else if (m < 4.5) {
+      col = vec3(1.0, 0.3, 0.42) * (0.35 + 0.65 * dif) + ambiente(r) * 0.06 * fres;
+    } else {
+      col = vec3(0.015) + ambiente(r) * 0.1 * fres;
+    }
+  }
+  col = tom(col);
+  frag = vec4(pow(col, vec3(1.0 / 2.2)), 1.0);
+}`;
+
+/** As versoes: cores do heroi e dos menores e o fundo (lineares no shader). */
+const VERSOES = {
+  1: { heroi: '#8be23c', m1: '#ff3fa0', m2: '#2e8cff', fundo: ['#b195ff', '#5b33c4', '#24106a'] },
+};
+/** A camera (a mesma conta do shader, para projetar as estrelas na tela). */
+const CAM = [0, 1.55, 5.75];
+const ALVO = [0, 1.0, 0];
+const LENTE = 0.29;
+/** Supersampling por eixo (renderiza maior e reduz: borda lisa). */
+const SS = Math.max(1, Math.min(3, parseInt(q.get('ss') || '2', 10)));
+const lin = (hex) => [0, 2, 4].map((k) => {
+  const v = parseInt(hex.slice(1 + k, 3 + k), 16) / 255;
+  return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+});
+
+function renderizar(V) {
+  const cv = document.createElement('canvas');
+  cv.width = W * SS;
+  cv.height = H * SS;
+  const gl = cv.getContext('webgl2', { preserveDrawingBuffer: true, antialias: false });
+  if (!gl) throw new Error('sem WebGL2');
+  const sh = (t, f) => {
+    const s = gl.createShader(t);
+    gl.shaderSource(s, f);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error('shader 3d: ' + gl.getShaderInfoLog(s));
+    return s;
+  };
+  const prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, VERT));
+  gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
+  gl.bindAttribLocation(prog, 0, 'aPos');
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error('link 3d: ' + gl.getProgramInfoLog(prog));
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  const u = (n) => gl.getUniformLocation(prog, n);
+  gl.uniform2f(u('uRes'), cv.width, cv.height);
+  gl.uniform3fv(u('uCorH'), lin(V.heroi));
+  gl.uniform3fv(u('uCor1'), lin(V.m1));
+  gl.uniform3fv(u('uCor2'), lin(V.m2));
+  gl.uniform3fv(u('uFundo0'), lin(V.fundo[0]));
+  gl.uniform3fv(u('uFundo1'), lin(V.fundo[1]));
+  gl.uniform3fv(u('uFundo2'), lin(V.fundo[2]));
+  gl.uniform3f(u('uCam'), CAM[0], CAM[1], CAM[2]);
+  gl.uniform3f(u('uAlvo'), ALVO[0], ALVO[1], ALVO[2]);
+  gl.uniform1f(u('uLente'), LENTE);
+  gl.viewport(0, 0, cv.width, cv.height);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  gl.finish();
+  return cv;
+}
+
+/** Ponto do mundo -> px na tela (a camera do shader). */
+function projetar([x, y, z]) {
+  const sub = (a, b) => a.map((v, i) => v - b[i]);
+  const norm = (a) => { const l = Math.hypot(...a); return a.map((v) => v / l); };
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const ww = norm(sub(ALVO, CAM));
+  const uu = norm(cross(ww, [0, 1, 0]));
+  const vv = cross(uu, ww);
+  const d = sub([x, y, z], CAM);
+  const zz = dot(d, ww);
+  const px = dot(d, uu) / (zz * LENTE);
+  const py = dot(d, vv) / (zz * LENTE);
+  return [(px * H + W) / 2, H - (py * H + H) / 2];
+}
+/** Estrela cheia de 4 pontas com o brilho em volta (px). */
+function estrela(ctx, x, y, r, cor) {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r * 2.6);
+  g.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
+  g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, r * 2.6, 0, Math.PI * 2);
+  ctx.fill();
+  const c = r * 0.18;
+  ctx.beginPath();
+  ctx.moveTo(x, y - r);
+  ctx.quadraticCurveTo(x + c, y - c, x + r, y);
+  ctx.quadraticCurveTo(x + c, y + c, x, y + r);
+  ctx.quadraticCurveTo(x - c, y + c, x - r, y);
+  ctx.quadraticCurveTo(x - c, y - c, x, y - r);
+  ctx.closePath();
+  ctx.fillStyle = cor;
+  ctx.fill();
+}
+function vinheta(ctx) {
+  const g = ctx.createRadialGradient(W / 2, H * 0.45, H * 0.45, W / 2, H * 0.45, W * 0.72);
+  g.addColorStop(0, 'rgba(10, 0, 30, 0)');
+  g.addColorStop(1, 'rgba(10, 0, 30, 0.38)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+}
+/** Bloom: o que passa do limiar, borrado e somado em tela. */
+function bloom(ctx) {
+  const img = ctx.getImageData(0, 0, W, H);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+    const k = Math.max(0, (l - 225) / 30);
+    d[i] *= k;
+    d[i + 1] *= k;
+    d[i + 2] *= k;
+  }
+  const tmp = document.createElement('canvas');
+  tmp.width = W;
+  tmp.height = H;
+  tmp.getContext('2d').putImageData(img, 0, 0);
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  for (const [r, a] of [[W * 0.006, 0.8], [W * 0.02, 0.6], [W * 0.05, 0.45]]) {
+    ctx.filter = `blur(${r}px)`;
+    ctx.globalAlpha = a;
+    ctx.drawImage(tmp, 0, 0);
+  }
+  ctx.restore();
+}
+
+function principal() {
+  const V = VERSOES[q.get('versao') || '1'];
+  if (!V) throw new Error('versao desconhecida');
+  const t0 = performance.now();
+  const gcv = renderizar(V);
+  const t1 = performance.now();
+  const cv = document.getElementById('c');
+  cv.width = W;
+  cv.height = H;
+  const ctx = cv.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(gcv, 0, 0, W, H);
+  vinheta(ctx);
+  bloom(ctx);
+  // as estrelas: em volta das fusoes e acima da cabeca (mundo)
+  const s = H / 1080;
+  for (const [p, r] of [[[-1.25, 1.95, 0.9], 30], [[-1.85, 1.3, 0.9], 20], [[1.3, 2.0, 0.9], 34], [[1.92, 1.32, 0.9], 22], [[-0.75, 2.45, 0.5], 18], [[0.85, 2.5, 0.5], 16]]) {
+    const [x, y] = projetar(p);
+    estrela(ctx, x, y, r * s, '#ffffff');
+  }
+  window.__medidas = { ms3d: Math.round(t1 - t0), ms: Math.round(performance.now() - t0) };
+}
+try {
+  principal();
+  document.title = 'PRONTO';
+} catch (e) {
+  document.getElementById('medidas').textContent = String(e && e.stack ? e.stack : e);
+  document.title = 'ERRO: ' + (e && e.message ? e.message : String(e));
+}
+</script></body></html>

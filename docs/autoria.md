@@ -385,3 +385,81 @@ Pedidos com prints anotados do Merge Lab (plano em
   "Agora não", do mesmo tamanho e cor. Cumpre duas regras da CrazyGames: o pedido do vídeo fora da tela de
   gameplay ativa e uma alternativa ao anúncio. Vale também na build da Poki.
 - **Capas e vídeos de prévia:** feitos junto com a build, como proposta para aprovar (`marketing/crazygames/`).
+
+## 2026-10-21: capa 16:9 sem texto com o slime herói
+- Pedido do usuário (um prompt em inglês): *"Vibrant game thumbnail for a casual merge game called 'Slime Merge'.
+  Center: a large, cute, glossy slime character with big expressive eyes and a happy surprised face, taking up most
+  of the frame. Two smaller colorful slimes merging into it with a bright glowing burst effect. Highly saturated
+  colors (lime green, hot pink, electric blue), strong contrast, soft 3D cartoon style, clean simple background with
+  radial gradient. No text. Readable at small size. Landscape 16:9."* Depois: **"gere umas 5 versoes para eu escolher"**.
+- **Primeira rodada (descartada):** o herói verde-limão em todas e montado em gravidade zero. O usuário perguntou
+  **"Por que utilizou a cor verde no personagem? E por que fez o personagem uma bola, sendo que ele é uma slime"**.
+  O verde foi interpretação minha (a primeira cor do prompt, a do "Slime" no logo); a bola veio da gravidade zero
+  (sem peso, a física devolve o slime ao disco de repouso). Escolha do usuário: **a cor do herói varia entre as 5**
+  (a recomendada). E o personagem passa a ter peso: senta num chão invisível e assenta como gelatina.
+- **Terceira rodada:** **"Quero a logo em formato de gosma e não bola"** (entendido como o personagem principal). Com
+  peso, o herói ainda era um domo redondo. Agora a silhueta de gosma é desenhada (distância com sinal: corpo, ponta
+  mole, pingos e poça, unidos de forma macia) e vira as partículas do slime, a forma de repouso dele (`criarSlime`
+  com `pontos`; um buraco fechado dentro da forma é preenchido). Duas formas de herói: **gota** (a ponta mole caída
+  para um lado e a poça espalhada na base) nas versões 1, 3 e 5, e **derretendo** (o topo torto e pingos escorrendo
+  pelos lados, que param no ar acima da poça) nas 2 e 4. Os menores viram gotinhas com ponta; os que voam (4) e a que
+  cai (5) são gotas com cauda. O encosto (o brilho da fusão) é o meio do par de partículas mais perto. Núcleo do
+  campo 1,0 (com as partículas em grade, a borda fica lisa e a ponta e os pingos não somem).
+- **Quarta rodada (a atual):** **"Faça o desenho da slime herói idêntica a slime do jogo, mesmo formato"**. O herói
+  e os menores voltam a ser os slimes do jogo: o corpo nasce disco e assenta com o próprio peso no chão (gelatina do
+  jogo), o campo e o limiar são os do jogo (a mesma borda levemente ondulada), a luz, a tinta e a costura são as de
+  `src/render/composicao.js` (o modo jogo do shader da capa, com a cor exata de cada versão no lugar da mistura KM) e
+  o rosto é o clássico do jogo: o herói com o "contente" (sorriso aberto e bochecha) ou o "feliz" na 1 (a bochecha do
+  jogo fica marrom no verde-limão), olhando para cima; os menores com o "feliz", olhando o herói. A gosma desenhada
+  e o rosto próprio da capa saíram; o gel 3D fica por `?estilo=gel`. O estouro sai da abertura acima de cada
+  encosto (no encosto ele aparecia por uma fresta como mancha branca). A versão 2 virou "Petróleo" (com tinta, como
+  todas: o jogo sempre tem contorno).
+- **Quinta rodada: o padrão dos destaques da CrazyGames.** Com um print da home da CrazyGames: **"Quero nesse padrão
+  de qualidade"**. Protótipo em 3D de verdade por raymarching (`tools/capa-3d.html`: gelatina saturada, olhos de esfera,
+  boca escavada, reflexo de softbox, recorte, sombra no chão, ponte de gosma, bloom). Resposta: **"Ta melhorando em 3D,
+  agora faça a bola no formato da slime do jogo"** e **título: "Com o título"**. Logo depois, com uma imagem feita no
+  Grok (a pilha de slimes do jogo, gel brilhante, raios de sol, gotinhas): **"Eu gostei desse que o grok fez"**;
+  escolha: **"Os dois, para comparar"**.
+  - `tools/capa-pilha.html` (`npm run capa-heroi -- --pilha`), com o título "Slime Merge" no gel do logo:
+    `?modo=motor` recria a imagem com o jogo (a física monta a pilha com chão e paredes invisíveis, o par azul se
+    abraça no alto, o gel da capa com contorno grosso e brilho em camadas, o rosto do jogo, raios de sol e gotinhas;
+    os vãos da pilha viram costura escura); `?modo=grok` usa o PNG do Grok (`marketing/capa-heroi/grok/`): inteiro no
+    quadrado, ao lado (16:9) ou embaixo (2:3) de uma faixa de céu com os raios nas cores da própria imagem, onde fica
+    o título. Saídas em `marketing/capa-heroi/pilha/` nos tamanhos da CrazyGames (1920x1080, 800x800, 800x1200) e a
+    folha `comparar.png`.
+  - Limite do PNG do Grok: ele é quadrado; no 16:9 sobra uma emenda onde o quadrado começa (um 16:9 gerado no próprio
+    Grok resolve). A imagem do Grok tem um slime de um olho só (o amarelo), o que o jogo não tem.
+  - **Escolha do usuário: a do Grok** ("Eu gostei da versão do grok, crie o material de todos os portais com essa
+    arte"). A arte vai para todos os portais: `tools/portais.mjs` (capas e ícones por `tools/capa-pilha.html?modo=grok`;
+    `--so=capas` refaz só as imagens) e as capas da CrazyGames e a abertura dos vídeos (`tools/capas-crazy.mjs`).
+    Composição por tamanho: em pé, a arte embaixo do céu com o título; quase quadrado (até 1,55), a arte na
+    largura toda cortada embaixo, o título no céu dela; deitado, a arte à direita e o céu com o título à
+    esquerda; sem título, só a arte recortada; ícone, o close do slime vermelho. A capa da GamePix (1360x850)
+    passava de 1,5 MB em PNG: o `gravar()` do `portais.mjs` agora tenta a paleta de 256 cores com dithering
+    (333 KB, sem perda visível).
+  - **Aprovado em 2026-10-21:** com as folhas da CrazyGames, da Yandex e da GameDistribution na frente, **"Essa
+    ultima versão ficou perfeita"**. É o material oficial de todos os portais.
+- **Como é feita:** com o próprio motor (`npm run capa-heroi`, `tools/capa-heroi.html`). A física do jogo monta a
+  cena: o herói assenta com o próprio peso (base larga, topo em domo; a plasticidade guarda o achatado) e os menores
+  chegam e amassam nele (sem `m.fundir`). O campo do jogo dá a forma (núcleo 1,4: borda lisa e o pescoço de gosma do
+  encosto). O gel 3D é um shader da ferramenta (`tools/capa-heroi-gel.js`): a cor exata de cada slime (a mistura KM
+  chega a só ~56% do croma do verde-limão), o volume por distância até a borda (EDT, normais suavizadas), 3 tons,
+  luz de recorte, translucidez e a luz do encosto por baixo da tinta da costura. O rosto feliz-surpreso do herói é da
+  ferramenta: olhos grandes e abertos, sobrancelha alta e grossa (legível no tile), boca aberta e funda com língua,
+  bochecha na cor que aparece no corpo; o brilho fica acima do olho esquerdo. Os menores usam o rosto do jogo.
+  O `src` e as builds não mudam.
+- **As 5 versões** (`marketing/capa-heroi/opcoes/`; lado a lado com a capa de hoje em `comparar.png`; tiles de
+  320x180, 200x113 e 160x90 em `comparar-tiles.png`). Sem texto e só com as estrelas cheias da capa:
+  1. **Vitrine:** herói verde-limão, rosa e azul amassando nos lados, fundo violeta;
+  2. **Petróleo:** herói rosa-choque, verde e azul nos lados, fundo petróleo;
+  3. **Close:** herói azul elétrico enchendo o quadro, verde e rosa na base, fundo ameixa;
+  4. **Impacto:** herói amarelo (a cor do nível 6), o rosa e o azul chegando voando pela direita, raios, fundo índigo;
+  5. **Caderno fiel:** herói tangerina (nível 5), a regra do jogo (só iguais se fundem): dois azuis se abraçam com o
+     halo dourado e uma gota rosa cai, no caderno.
+- **Licenças de capa:** cores diferentes se fundindo (1 a 4) não acontecem no jogo; as cores são as do pedido
+  (amarelo e tangerina vêm dos níveis), mais saturadas que as do jogo; o herói (d 10) é maior que o nível 14 (d 8).
+- **Revisão independente** (2 críticos de imagem e 1 de código) antes da entrega: estouro fraco, surpresa ilegível no
+  tile, brilho vazando no olho, riscos do voo por cima do azul, estrelas finas na aura, um bug na suavização das
+  normais, o temporizador que segurava o runner e as medidas: tudo corrigido. As 5 saem iguais em duas rodadas.
+- **Nenhuma das 5 foi escolhida:** o usuário ficou com a arte do Grok (acima). A `ESCOLHIDA` do `capa-heroi.mjs`
+  continua vazia.

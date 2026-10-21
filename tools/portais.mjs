@@ -4,15 +4,17 @@
 //   node tools/portais.mjs --so=builds        # so os zips
 //   node tools/portais.mjs --so=arte          # so as imagens e os videos
 //   node tools/portais.mjs --so=videos        # so os videos
+//   node tools/portais.mjs --so=capas         # so as capas e os icones (a arte)
 //   node tools/portais.mjs --portal=y8,yandex # so esses portais
 // Zips: tools/empacotar.mjs --alvo=<portal> (dist-portais/slime-merge-<portal>-<versao>.zip; "-sem-id"
 // quando o portal pede id do painel e marketing/portais/ids.json ainda nao tem). No fim o dist/ volta a
 // ser a build da Poki (--ensaio), para nao ficar a de um portal ali.
 // Material em marketing/portais/<portal>/, no tamanho e no formato exatos que cada painel pede (ITENS;
 // a fonte de cada regra esta no ficha.md do portal):
-// - capas: tools/capas-crazy.html (a fisica e o render do jogo no caderno, com o titulo; sem titulo,
-//   deitada, a pilha de perto), renderizadas em pelo menos 1600 px no lado maior e reduzidas;
-// - icones: a mesma cena de perto (?caixa=), sem texto;
+// - capas: a arte do Grok que o usuario escolheu em 2026-10-21 (tools/capa-pilha.html?modo=grok: a pilha
+//   de slimes do jogo com o titulo; sem titulo, so a arte recortada na proporcao), renderizadas em pelo
+//   menos 1600 px no lado maior e reduzidas;
+// - icones: o close do slime vermelho da mesma arte (&icone), sem texto;
 // - telas: o jogo de verdade, em ingles, numa partida jogada pelo bot (o sem fim cheio depois de 2 min,
 //   o duelo, outro cesto e cenario), com o HUD, que os portais aceitam;
 // - videos: o de 1920x1080 da CrazyGames (na Y8, a mesma partida continua sem a abertura com a capa:
@@ -22,7 +24,7 @@
 // - folha.jpg de cada portal, para conferir (nao vai para o envio).
 // JPG que passa do peso maximo do portal desce de qualidade ate caber. Porta HTTP 5401, depuracao 9401.
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { RAIZ, servir } from './servir.mjs';
 import { abrirChrome, espera } from './cdp.mjs';
@@ -35,8 +37,8 @@ const VIDEO_CRAZY = join(RAIZ, 'marketing/crazygames/video-1920x1080.mp4');
 const VIDEO_VERTICAL = join(RAIZ, 'marketing/portais/video-1080x1920.mp4');
 /** A abertura do video da CrazyGames: a capa parada e a fusao (tools/capas-crazy.mjs). */
 const ABERTURA_VIDEO_S = 1.0 + 0.3;
-/** O icone: a pilha de perto (os slimes vermelho e amarelo sorrindo), em coordenadas do mundo. */
-const CAIXA_ICONE = '-3,4,3,10';
+/** A pagina da arte das capas e dos icones (a imagem do Grok, escolhida pelo usuario em 2026-10-21). */
+const ARTE = 'tools/capa-pilha.html?modo=grok';
 /**
  * As cenas das telas: a partida jogada pelo bot (`auto`, uma gota por segundo) depois de `passos` de
  * fisica, como os videos. `perfil` grava o check-in de hoje (sem o aviso da sequencia diaria por cima).
@@ -132,7 +134,7 @@ for (const p of ESCOLHIDOS) {
   }
 }
 
-if (opt.so !== 'arte' && opt.so !== 'videos') builds();
+if (opt.so !== 'arte' && opt.so !== 'videos' && opt.so !== 'capas') builds();
 if (opt.so !== 'builds') await arte();
 
 // ------------------------------------------------------------------ builds
@@ -165,14 +167,14 @@ async function arte() {
     await c.cmd('Emulation.setTouchEmulationEnabled', { enabled: toque, maxTouchPoints: toque ? 2 : 0 });
   };
 
-  /** Capa ou icone pelo tools/capas-crazy.html, em >= 1600 px no lado maior, reduzida para w x h. */
+  /** Capa ou icone pela arte (ARTE), em >= 1600 px no lado maior, reduzida para w x h. */
   async function cena(/** @type {string} */ chave, /** @type {number} */ w, /** @type {number} */ h, /** @type {string} */ extra) {
     if (feitos.has(chave)) return feitos.get(chave);
     const f = Math.max(1, Math.ceil(1600 / Math.max(w, h)));
     const W = w * f;
     const H = h * f;
     await vista(W, H, 1);
-    await c.ir(`http://127.0.0.1:${PORTA}/tools/capas-crazy.html?w=${W}&h=${H}${extra}`, 300);
+    await c.ir(`http://127.0.0.1:${PORTA}/${ARTE}&w=${W}&h=${H}${extra}`, 300);
     let pronto = false;
     for (let k = 0; k < 120 && !pronto; k++) {
       await espera(150);
@@ -224,6 +226,12 @@ async function arte() {
       const naFolha = [];
       for (const it of ITENS[portal]) {
         if (opt.so === 'videos' && it.tipo !== 'video') continue;
+        if (opt.so === 'capas' && it.tipo !== 'capa' && it.tipo !== 'icone') {
+          // a folha continua com as telas que ja estao na pasta
+          const ja = join(pasta, `${JOGO}-${it.arq}.${it.fmt}`);
+          if (it.tipo === 'tela' && existsSync(ja)) naFolha.push(ja);
+          continue;
+        }
         if (it.tipo === 'video') {
           const mp4 = join(pasta, `${JOGO}-${it.arq}.mp4`);
           const corte = it.cortaAbertura ? ['-ss', String(ABERTURA_VIDEO_S)] : [];
@@ -236,7 +244,7 @@ async function arte() {
         const h = /** @type {number} */ (it.h);
         let fonte;
         if (it.tipo === 'capa') fonte = await cena(`capa-${w}x${h}-${it.titulo === false ? 'sem' : 'com'}`, w, h, it.titulo === false ? '&semtitulo' : '');
-        else if (it.tipo === 'icone') fonte = await cena(`icone-${w}`, w, h, `&caixa=${CAIXA_ICONE}`);
+        else if (it.tipo === 'icone') fonte = await cena(`icone-${w}`, w, h, '&icone');
         else fonte = await tela(it);
         const arq = join(pasta, `${JOGO}-${it.arq}.${it.fmt}`);
         const kb = gravar(fonte, arq, it);
@@ -263,6 +271,12 @@ function gravar(fonte, arq, it) {
   rmSync(arq, { force: true });
   if (it.fmt === 'png') {
     ff(['-i', fonte, '-pix_fmt', 'rgb24', '-compression_level', '9', arq]);
+    // PNG acima do peso: paleta de 256 cores com dithering (a arte do Grok, cheia de detalhe, passava
+    // do 1,5 MB da GamePix em 1360x850)
+    if (it.maxKB && statSync(arq).size / 1024 > it.maxKB) {
+      rmSync(arq, { force: true });
+      ff(['-i', fonte, '-filter_complex', 'split[a][b];[a]palettegen=max_colors=256:stats_mode=full[p];[b][p]paletteuse=dither=sierra2_4a', '-compression_level', '9', arq]);
+    }
   } else {
     for (let q = 2; q <= 12; q++) {
       ff(['-i', fonte, '-q:v', String(q), '-pix_fmt', 'yuvj444p', arq]);

@@ -5,6 +5,14 @@ Builds e material gráfico para Y8, Playgama, Yandex Games, GameMonetize, GameDi
 painel pede, a `ficha.md` com as opções do envio e os textos para colar, e uma `folha.jpg` para conferir
 tudo de uma vez.
 
+**Arte das capas e dos ícones (desde 2026-10-21):** a imagem que o usuário escolheu, feita no Grok
+(`marketing/capa-heroi/grok/grok-original-1408.jpg`: a pilha de slimes do jogo, o par azul se fundindo, raios
+de sol), composta por `tools/capa-pilha.html?modo=grok` em cada tamanho: com o título "Slime Merge" onde o
+portal aceita; sem o título (GameDistribution 512x384, 512x512 e 200x120; Yandex sem texto), só a arte
+recortada na proporção; os ícones (Yandex 512, GamePix 256), o close do slime vermelho. As capas da
+CrazyGames (`marketing/crazygames/capa-*.png`) e a abertura dos vídeos usam a mesma arte. As telas continuam
+o jogo de verdade.
+
 | portal | zip | material e ficha | estado |
 |---|---|---|---|
 | Y8 | `dist-portais/slime-merge-y8-2.1.0-sem-id.zip` | [`y8/`](y8/ficha.md) | **falta o id do painel** |
@@ -31,6 +39,7 @@ Enquanto faltar o id, o zip sai com `-sem-id` no nome e roda sem anúncios: serv
 node tools/portais.mjs              # os seis zips e todo o material
 node tools/portais.mjs --so=builds  # só os zips
 node tools/portais.mjs --so=arte    # só as imagens e os vídeos
+node tools/portais.mjs --so=capas   # só as capas e os ícones (a arte)
 node tools/portais.mjs --so=videos  # só os vídeos (o vertical da Yandex sai antes, de tools/capas-crazy.mjs --so=videos --video=1080x1920)
 node tools/portaischeck.mjs         # os seis builds com o SDK falso de cada portal
 ```

@@ -1,6 +1,7 @@
 // Capas e videos de previa da CrazyGames (2026-10-19; docs.crazygames.com/requirements/game-covers):
-// - capas 1920x1080, 800x1200 e 800x800 pelo tools/capas-crazy.html (a fisica e o render do jogo no
-//   caderno, com o titulo) em marketing/crazygames/capa-<LxA>.png;
+// - capas 1920x1080, 800x1200 e 800x800 em marketing/crazygames/capa-<LxA>.png: desde 2026-10-21 a arte
+//   do Grok que o usuario escolheu (tools/capa-pilha.html?modo=grok, com o titulo); a cena do jogo no
+//   caderno (tools/capas-crazy.html) era a capa ate entao. A abertura dos videos usa a mesma arte;
 // - videos 1920x1080 (16:9) e 1080x1620 (2:3), sem som, 18,2 s: a capa parada 1 s, 0,3 s de fusao da
 //   capa para o jogo e 17,5 s de partida de verdade (o sem fim com o bot, 1 s por gota, semente 34,
 //   depois de 2 min de partida: o pote cheio e colorido como na capa, ~17 fusoes, um "Triple!" e o
@@ -13,7 +14,7 @@
 // - folha de contato em marketing/crazygames/folha.jpg (as 3 capas e 6 quadros de cada video);
 // - so com --video=1080x1920: o vertical 9:16 da Yandex Games (2026-10-20), a mesma partida, em
 //   marketing/portais/video-1080x1920.mp4, que o tools/portais.mjs converte.
-// Uso: node tools/capas-crazy.mjs [--so=capas|videos] [--video=1080x1620] [--semente=34]
+// Uso: node tools/capas-crazy.mjs [--so=capas|videos|folha] [--video=1080x1620] [--semente=34]
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -61,7 +62,7 @@ async function capa(tam, arq) {
   const perfil = mkdtempSync(join(tmpdir(), 'slime-capa-'));
   await chrome(['--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
     `--user-data-dir=${perfil}`, `--window-size=${w},${h}`, '--virtual-time-budget=6000', `--screenshot=${arq}`,
-    `http://127.0.0.1:${porta}/tools/capas-crazy.html?w=${w}&h=${h}`], 180000);
+    `http://127.0.0.1:${porta}/tools/capa-pilha.html?modo=grok&w=${w}&h=${h}`], 180000);
   rmSync(perfil, { recursive: true, force: true });
   process.stdout.write(`capa -> ${relative(RAIZ, arq)}\n`);
 }
@@ -177,7 +178,7 @@ function folha() {
   const L = 1920;
   const linha1 = join(TMP, 'folha-capas.png');
   ff(['-i', join(SAIDA, 'capa-1920x1080.png'), '-i', join(SAIDA, 'capa-800x1200.png'), '-i', join(SAIDA, 'capa-800x800.png'),
-    '-filter_complex', '[0]scale=-1:600[a];[1]scale=-1:600[b];[2]scale=-1:600[c];[a][b][c]hstack=inputs=3,pad=' + L + ':640:(ow-iw)/2:20:white', linha1]);
+    '-filter_complex', '[0]scale=-1:540[a];[1]scale=-1:540[b];[2]scale=-1:540[c];[a][b][c]hstack=inputs=3,pad=' + L + ':580:(ow-iw)/2:20:white', linha1]);
   const tempos = [0.2, 2.5, 6, 10, 14, 17.8];
   const linhas = [linha1];
   for (const [k, v] of DA_CRAZY.entries()) {
@@ -199,6 +200,9 @@ function folha() {
 }
 
 try {
+  if (opt.so === 'folha') {
+    folha();
+  } else {
   if (opt.so !== 'videos') {
     for (const t of CAPAS) await capa(t, join(SAIDA, `capa-${t}.png`));
   }
@@ -209,6 +213,7 @@ try {
     for (const v of videos) montar(v, await quadros(v));
   }
   if (!opt.so && !opt.video) folha();
+  }
 } finally {
   await fechar();
 }

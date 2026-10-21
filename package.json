@@ -14,6 +14,7 @@
     "jogar": "node tools/jogar.mjs",
     "menu": "node tools/menu.mjs",
     "thumb": "node tools/thumb.mjs",
+    "capa-heroi": "node tools/capa-heroi.mjs",
     "gifs": "node tools/gif-modelos.mjs",
     "visuais": "node tools/prints-visuais.mjs",
     "artifact": "node tools/artifact-modelos.mjs",

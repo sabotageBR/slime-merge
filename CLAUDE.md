@@ -188,9 +188,16 @@ cenários, personagens e **skins** por gotas) e **Missões** (3 do dia + sequên
   - pausa do portal (`onPausaPlataforma(pausado)`): o menu de pausa, e a volta fecha e segue sozinha; aba
     escondida (`pausaNaAba`): o menu, que fica 0,8 s na volta e retoma sozinho (`J.pausaDaAba`). O Testing
     Toolkit da GamePix cobrou as duas. GamePix: ganchos em `GamePix.on.*` e `GamePix.*` antes do `loaded()`.
-  `npm run portais` faz os 6 zips e o material de `marketing/portais/<portal>/` (capas pelo
-  `tools/capas-crazy.html` em qualquer proporção, com `?semtitulo` e `?caixa=`; telas do jogo em inglês;
-  vídeos); `npm run portais:check` roda os 6 com o SDK falso de cada um (porta 5399, depuração 9398).
+  `npm run portais` faz os 6 zips e o material de `marketing/portais/<portal>/` (capas e ícones: desde
+  2026-10-21 a arte do Grok escolhida pelo usuário, por `tools/capa-pilha.html?modo=grok` em qualquer proporção,
+  com `&semtitulo` e `&icone`; antes, a cena do jogo do `tools/capas-crazy.html`; telas do jogo em inglês;
+  vídeos, que abrem com a mesma arte); `npm run portais:check` roda os 6 com o SDK falso de cada um (porta 5399,
+  depuração 9398).
+- **Thumbs dos próximos jogos (2026-10-21):** o mecanismo das capas foi transposto para
+  `~/git/em_tech/thumb_generator`, junto com o aprendizado (as regras de cada portal e o gosto do usuário). São a
+  composição da arte do Grok em qualquer proporção, o título de gel, as telas, os vídeos e a conferência. O
+  `jogos/slime-merge/` de lá reproduz as capas e os ícones daqui pixel a pixel. As ferramentas daqui ficam como
+  estão.
 - Protótipos (Croma, Loja, Molde, lab) só por `?modelo=` ou pelo hub; o `tools/empacotar.mjs`
   apaga os arquivos deles e as linhas `// prototipo` do `main.js`.
 
@@ -318,8 +325,9 @@ Depois da recusa da Poki, o usuário escolheu 5 ideias da página "Vinte Ideias 
 | `node --test test/fisica.test.js` | Um arquivo só (`node:test`, sem dependências); `--test-name-pattern="Croma"` filtra pelo nome do teste |
 | `npm run menu` | Fluxo da build no Chrome headless: sequência, gotas no fim, dobrar, loja, missões, troca de modo, Loja › Skins e o editor (pintar, salvar, Esc). Prints em `.tmp/menu/`. `-- --tam=640x360` |
 | `npm run empacotar` | Build da Poki em `dist/` e zip em `dist-poki/` (sem protótipos; só os sons do `PADRAO`; recusa import quebrado, URL externa, `console.log`, `.map`, > 500 KB gzip e áudio > 150 KB); `-- --thumb` confere e anexa `marketing/thumb/slime-merge-1256.png` (sem ele é ensaio); `-- --alvo=crazygames` gera a build da CrazyGames em `dist-crazygames/` (sem anúncios, `-basic`; `--anuncios` para o Full Launch); `-- --alvo=<portal>` a de um portal de distribuição em `dist-portais/`; `-- --ensaio` monta e confere `dist/` sem zip |
-| `npm run portais` | Os 6 zips dos portais e o material em `marketing/portais/<portal>/` (`-- --so=builds\|arte`, `-- --portal=y8,yandex`); `npm run portais:check`: os 6 builds com o SDK falso de cada portal |
+| `npm run portais` | Os 6 zips dos portais e o material em `marketing/portais/<portal>/` (`-- --so=builds\|arte\|capas`, `-- --portal=y8,yandex`); as capas e os ícones são a arte do Grok escolhida em 2026-10-21 (`tools/capa-pilha.html?modo=grok`); `npm run portais:check`: os 6 builds com o SDK falso de cada portal |
 | `npm run thumb` | Opções de thumb da Poki (`tools/thumb.html`: física e render do jogo) em `marketing/thumb/`, com tiles e a régua (#83FFE7, tarja, opaca); `-- --final` grava a escolhida (`ESCOLHIDA` em `tools/thumb.mjs`) em `slime-merge-{1256,628}` |
+| `npm run capa-heroi` | Capa 16:9 sem texto em 5 versões (`tools/capa-heroi.html`: a física e o campo do jogo; o slime herói desenhado como os do jogo (corpo, campo, luz, tinta e rosto do jogo, a cor exata de cada versão no modo jogo do shader da ferramenta, `tools/capa-heroi-gel.js`; `?estilo=gel` o gel 3D), uma cor por versão, com dois menores se fundindo nele; o `src` não muda) em `marketing/capa-heroi/` (`opcoes/`, `comparar.png` com a capa de hoje, `comparar-tiles.png` em 320x180, 200x113 e 160x90); `-- 1 3` só essas; `-- --final` grava a `ESCOLHIDA` (3840 reduzida para 1920x1080, PNG e JPG); `-- --pilha`: a capa com título no estilo da imagem do Grok (`tools/capa-pilha.html`: o motor e o PNG do Grok) em 1920x1080, 800x800 e 800x1200, em `marketing/capa-heroi/pilha/`. Protótipo 3D por raymarching em `tools/capa-3d.html`. Porta 5410, depuração 9410 |
 | `npm run servir` | `http://127.0.0.1:5370/` (jogo) e `/modelos/` (hub de avaliação); `-- --lan` mostra o endereço para o celular |
 | `npm run jogar` | Joga os modelos em tempo real (Chrome headless pelo DevTools Protocol, `tools/cdp.mjs`): gestos, pausa, mudo, reforço, fim, revive, jogar de novo. `-- 1 4 --tam=1031x580`; os de gosma: `-- volei vitral janela garra aperta` |
 | `npm run sdkcheck` | Banco do SDK da Poki em 5 cenários (`tools/sdkcheck.html`, ganchos `window.__slimeTeste`) |

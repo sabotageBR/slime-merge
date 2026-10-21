@@ -1,0 +1,1054 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>capa-heroi</title>
+<style>html,body{margin:0;overflow:hidden;background:#000}canvas{display:block}pre{display:none}</style></head>
+<body><canvas id="c"></canvas><pre id="medidas"></pre>
+<script type="module">
+// Capa 16:9 sem texto (2026-10-21): um slime heroi grande no centro e dois slimes menores se fundindo
+// nele com um estouro de luz. Pedido do usuario (um prompt em ingles), "gere umas 5 versoes para eu
+// escolher" e, vendo as rodadas, a cor do heroi variando entre as 5 e, por fim, "Faca o desenho da
+// slime heroi identica a slime do jogo, mesmo formato"; registro em docs/autoria.md. Os slimes sao os
+// do jogo: o corpo nasce disco e assenta com o proprio peso num chao invisivel (a fisica do jogo; nunca
+// o m.fundir, que mistura o pigmento), o campo e o limiar sao os do jogo (a mesma borda), a luz, a
+// tinta e a costura sao as de src/render/composicao.js (o modo jogo do shader da capa,
+// tools/capa-heroi-gel.js, so com a cor exata de cada versao no lugar da mistura KM) e o rosto e o
+// classico do jogo (src/render/rostos.js). O src nao muda.
+//   ?versao=1..5     a versao (VERSOES); chave desconhecida = ERRO
+//   ?w=1920&h=1080   tamanho em px (a vista do Chrome deve ter w x h)
+//   ?medir           as medidas em window.__medidas (e no <pre id="medidas">)
+//   ?folha           a folha de comparacao (a capa de hoje e as 5), das PNG de marketing/capa-heroi/opcoes/
+//   ?grade           os tiles pequenos (320x180, 200x113 e 160x90) sobre fundo escuro e claro
+//   ?semente= ?raio= ?limiar= ?mole= ?assenta=                  ajustes (mole: rigidez do heroi)
+//   ?estilo=gel      o gel 3D da capa (3 tons, translucidez, recorte) no lugar da luz do jogo
+//   ?fundo=<chave> ?menores=rosa,azul ?heroi=<cor>              recombinar sem mexer no codigo
+import { criarMundo } from '../src/fisica/mundo.js';
+import { material } from '../src/fisica/materiais.js';
+import { linearDeHex, oklch } from '../src/cor/km.js';
+import { enquadrar, aplicar, paraTela, paraMundo } from '../src/render/camera.js';
+import { criarCampo } from '../src/render/campo.js';
+import { desenharRostos } from '../src/render/rostos.js';
+import { desenharPapel, TINTA } from '../src/render/fundo.js';
+import { LIMIAR, RAIO_CAMPO } from '../src/render/cena.js';
+import { criarGel, volumeDoCampo } from './capa-heroi-gel.js';
+
+const q = new URLSearchParams(location.search);
+const W = Math.max(64, parseInt(q.get('w') || '1920', 10));
+const H = Math.max(64, parseInt(q.get('h') || '1080', 10));
+/** As medidas em px foram pensadas para 1920x1080. */
+const ESC = H / 1080;
+const DT = 1 / 60;
+const T = 0.55;
+/** O campo do jogo (src/render/cena.js): o mesmo nucleo e o mesmo limiar, a mesma borda. */
+const RAIO = Number(q.get('raio')) || RAIO_CAMPO;
+const LIM = Number(q.get('limiar')) || LIMIAR * (RAIO / RAIO_CAMPO) ** 2;
+/** jogo: a luz e a costura do jogo; gel: o gel 3D da capa. */
+const ESTILO = q.get('estilo') === 'gel' ? 'gel' : 'jogo';
+const LUZ_GEL = { kDomo: 1, tons: [0.72, 0.7, 0.35, 0.32], rim: ['#ffffff', 0.22], esp: 0.9 };
+const marcas = { inicio: performance.now() };
+
+// ------------------------------------------------------------ paleta, fundos e versoes
+/**
+ * Cada slime em gel: claro (cima-esquerda), cor, escuro (baixo), o brilho da translucidez no pe e a
+ * cor da bochecha (no heroi rosa, a bochecha rosa sumiria).
+ */
+const PALETA = {
+  limao: { claro: '#c8ff5a', cor: '#8be23c', escuro: '#43b02a', pe: '#b8ff4d', bochecha: '255, 143, 184' },
+  rosa: { claro: '#ffc4e3', cor: '#ff3fa0', escuro: '#d8187f', pe: '#ff86c6', bochecha: '196, 10, 98' },
+  azul: { claro: '#bfe3ff', cor: '#2e8cff', escuro: '#1a5fe0', pe: '#6cb4ff', bochecha: '255, 143, 184' },
+  // cores de nivel do jogo (src/jogo/niveis.js), mais saturadas: o 6 (amarelo) e o 5 (tangerina)
+  amarelo: { claro: '#fff3a6', cor: '#ffd21f', escuro: '#e9a400', pe: '#ffe45c', bochecha: '255, 120, 140' },
+  laranja: { claro: '#ffb89a', cor: '#ff6b3d', escuro: '#d9431c', pe: '#ff9a73', bochecha: '230, 40, 80' },
+};
+/** Fundos radiais limpos (o centro claro fica atras do heroi; a borda nao fica escura demais). */
+const FUNDOS = {
+  violeta: { paradas: [[0, '#b195ff'], [0.25, '#7d52f2'], [0.55, '#4c27b8'], [1, '#2e157a']], centro: 'alto', raio: 0.62, sombra: 'rgba(16, 4, 48, 0.55)' },
+  petroleo: { paradas: [[0, '#1b8ea3'], [0.35, '#0d6680'], [0.7, '#094a63'], [1, '#063a50']], centro: 'heroi', raio: 0.62, sombra: 'rgba(2, 24, 36, 0.6)' },
+  ameixa: { paradas: [[0, '#c2187a'], [0.35, '#8e1268'], [0.7, '#6e0b52'], [1, '#4f083c']], centro: 'heroi', raio: 0.62, sombra: 'rgba(30, 2, 22, 0.6)' },
+  indigo: { paradas: [[0, '#8a76ff'], [0.3, '#5a3ee6'], [0.62, '#3a1d96'], [1, '#2b1478']], centro: 'heroi', raio: 0.7, sombra: 'rgba(14, 4, 46, 0.55)' },
+  caderno: { caderno: true, sombra: 'rgba(23, 22, 28, 0.2)' },
+};
+/**
+ * As 5 versoes, cada uma com o heroi de uma cor (escolha do usuario: variar entre as 5). cena: a pose
+ * (CENAS); foco: x do centro do heroi e y do chao no quadro (0..1, de cima); ocupa: a altura do heroi
+ * (do chao ao topo) sobre a do quadro; mole e assenta: a rigidez do heroi (a gelatina do jogo e 0,02) e
+ * quanto tempo ele assenta com o proprio peso; estouro: ESTOUROS.
+ */
+const VERSOES = {
+  1: {
+    nome: 'vitrine', rotulo: '1 · Vitrine', eixos: 'herói verde-limão · violeta · rosa e azul nos lados',
+    heroi: 'limao', menores: ['rosa', 'azul'], cena: 'flancos', fundo: 'violeta', estouro: 'medio', expr: 'feliz',
+    semente: 7, ocupa: 0.8, foco: [0.5, 0.93], mole: 0.02, assenta: 1.4, sombras: 'todos',
+  },
+  2: {
+    nome: 'petroleo', rotulo: '2 · Petróleo', eixos: 'herói rosa-choque · petróleo · verde e azul nos lados',
+    heroi: 'rosa', menores: ['limao', 'azul'], cena: 'flancos', fundo: 'petroleo', estouro: 'medio',
+    semente: 9, ocupa: 0.78, foco: [0.5, 0.92], mole: 0.02, assenta: 1.4, sombras: 'todos',
+  },
+  3: {
+    nome: 'close', rotulo: '3 · Close', eixos: 'herói azul elétrico · ameixa · de perto',
+    heroi: 'azul', menores: ['limao', 'rosa'], cena: 'queixo', fundo: 'ameixa', estouro: 'medio',
+    semente: 11, ocupa: 0.92, foco: [0.5, 1.05], mole: 0.02, assenta: 1.4, sombras: 'nenhuma',
+  },
+  4: {
+    nome: 'impacto', rotulo: '4 · Impacto', eixos: 'herói amarelo (nível 6) · índigo · voo e raios',
+    heroi: 'amarelo', menores: ['rosa', 'azul'], cena: 'voo', fundo: 'indigo', estouro: 'forte', olhar: 'estouro',
+    semente: 5, ocupa: 0.74, foco: [0.46, 0.93], mole: 0.02, assenta: 1.4, sombras: 'heroi',
+  },
+  5: {
+    nome: 'caderno', rotulo: '5 · Caderno fiel', eixos: 'herói tangerina (nível 5) · regra do jogo · caderno',
+    heroi: 'laranja', menores: ['azul', 'rosa'], cena: 'fiel', fundo: 'caderno', estouro: 'aura',
+    semente: 3, ocupa: 0.68, foco: [0.66, 0.84], mole: 0.02, assenta: 1.4, sombras: 'papel',
+  },
+};
+/**
+ * O estouro de cada versao (mundo). clarao: o brilho de tras, em volta do encosto (os corpos cobrem o
+ * miolo); juncao: raios curtos em cunha atras de cada encosto; raios: os longos do Impacto, so no fundo;
+ * a luz do encosto nos corpos vem do shader (a tinta da costura fica por cima, inteira); estrelas e
+ * gotas por encosto, so sobre o fundo; aura: o halo dourado e as estrelas em volta do par do caderno.
+ */
+const ESTOUROS = {
+  medio: { clarao: 3.0, juncao: true, estrelas: [2, 2], gotas: [4, 4], rEstrela: [32, 46] },
+  forte: { clarao: 3.4, raios: true, estrelas: [3, 2], gotas: [6, 5], rEstrela: [18, 42] },
+  aura: { clarao: 0, aura: true, estrelas: [0], gotas: [0], rEstrela: [0, 0] },
+};
+/** A capa de hoje (CrazyGames e portais), para comparar. */
+const HOJE = '../marketing/crazygames/capa-1920x1080.png';
+
+// ------------------------------------------------------------ cena (fisica de verdade)
+function novoMundo(semente) {
+  const m = criarMundo({ semente });
+  // o chao invisivel em y = 0: o slime senta e assenta com o proprio peso (a forma de slime)
+  m.definirParedes([{ ax: -40, ay: -0.3, bx: 40, by: -0.3, r: 0.3, oculta: true }]);
+  return m;
+}
+/** Um slime da capa (o disco do jogo): cor da paleta e aparencia (1 = heroi, 2 e 3 = menores: o id que o gel le). */
+function criar(m, o) {
+  const s = m.criarSlime({ x: o.x, y: o.y, diametro: o.d, material: o.mat || 'gelatina', vy: o.vy || 0 });
+  s.dados.ap = o.ap;
+  s.dados.cor = o.cor;
+  s.dados.hex = PALETA[o.cor].cor;
+  if (o.expr) s.dados.expr = o.expr;
+  return s;
+}
+function rodar(m, seg) {
+  for (let f = 0; f < Math.round(seg / DT); f++) {
+    m.avancar(4);
+    m.medir(DT);
+  }
+}
+/**
+ * Os menores puxados para o seu alvo ate amassar no encosto; o heroi fica no lugar. A foto e tirada
+ * ainda puxando: o amasso do abraco. semPeso: quem chega voando (nao cai).
+ */
+function apertar(m, heroi, menores, alvos, o) {
+  const hx = heroi.cx;
+  const hy = heroi.cy;
+  const voam = new Set((o.semPeso || []).map((s) => s.idx));
+  for (let f = 0; f < o.quadros; f++) {
+    m.atrair(heroi, hx, hy, 30, 0.2, DT);
+    menores.forEach((s, k) => {
+      const a = alvos[k];
+      const [ax, ay] = Array.isArray(a) ? a : [a.cx, a.cy];
+      m.atrair(s, ax, ay, o.acel, o.vmax, DT);
+    });
+    // quem chega voando nao cai: devolve a gravidade do quadro (so o heroi pesa no chao)
+    if (voam.size) for (let i = 0; i < m.n; i++) if (voam.has(m.sl[i])) m.vy[i] -= m.gy * DT;
+    m.avancar(4);
+    m.medir(DT);
+  }
+}
+/** O ponto do encosto entre dois slimes: o meio do par de particulas mais perto. */
+function contato(m, a, b) {
+  let melhor = Infinity;
+  let p = [(a.cx + b.cx) / 2, (a.cy + b.cy) / 2];
+  for (let i = 0; i < m.n; i++) {
+    if (m.sl[i] !== a.idx) continue;
+    for (let j = 0; j < m.n; j++) {
+      if (m.sl[j] !== b.idx) continue;
+      const d = (m.x[i] - m.x[j]) ** 2 + (m.y[i] - m.y[j]) ** 2;
+      if (d < melhor) {
+        melhor = d;
+        p = [(m.x[i] + m.x[j]) / 2, (m.y[i] + m.y[j]) / 2];
+      }
+    }
+  }
+  return p;
+}
+const HEROI = { d: 10 };
+/** O heroi: o slime do jogo solto no chao, assentando com o proprio peso (como no fundo do pote). */
+function heroiSentado(m, V) {
+  // a expressao do jogo: contente (sorriso aberto e bochecha); feliz onde a bochecha do jogo suja a cor (o limao)
+  const heroi = criar(m, { x: 0, y: HEROI.d / 2 + 0.05, d: HEROI.d, cor: V.heroi, ap: 1, expr: V.expr || 'contente', mat: material('gelatina', { k: V.mole }) });
+  rodar(m, V.assenta);
+  return heroi;
+}
+/** Dois menores no chao, um de cada lado, empurrados rente ao chao contra o heroi. */
+function nosFlancos(m, V, heroi, d) {
+  const meia = (heroi.dir - heroi.esq) / 2;
+  const menores = [-1, 1].map((lado, k) => criar(m, { x: heroi.cx + lado * (meia + d / 2 + 0.3), y: d / 2 + 0.05, d, cor: V.menores[k], ap: 2 + k, expr: 'feliz' }));
+  menores.forEach((s) => m.amolecer(s, 0.45, 0));
+  rodar(m, 0.4);
+  apertar(m, heroi, menores, menores.map((s) => [heroi.cx, s.cy]), { quadros: 32, acel: 26, vmax: 2.6 });
+  return menores;
+}
+
+const CENAS = {
+  /** Vitrine e Petroleo: o heroi sentado inteiro; os menores chegam pelos lados e amassam nele. */
+  flancos(V) {
+    const m = novoMundo(V.semente);
+    const heroi = heroiSentado(m, V);
+    const menores = nosFlancos(m, V, heroi, 4);
+    return { m, heroi, menores, contatos: menores.map((s) => contato(m, heroi, s)) };
+  },
+  /** Close: o mesmo, de perto; os menores espremidos na base, um de cada lado. */
+  queixo(V) {
+    const m = novoMundo(V.semente);
+    const heroi = heroiSentado(m, V);
+    const menores = nosFlancos(m, V, heroi, 3.4);
+    return { m, heroi, menores, contatos: menores.map((s) => contato(m, heroi, s)) };
+  },
+  /**
+   * Impacto: o heroi ja sentado; o rosa e o azul chegam voando pela direita e amassam nele (o rosa no
+   * ombro, o azul no flanco). Quem voa nao cai (semPeso); o heroi continua pesando no chao.
+   */
+  voo(V) {
+    const m = novoMundo(V.semente);
+    const heroi = heroiSentado(m, V);
+    const ex = heroi.cx;
+    const ey = (heroi.topo + heroi.base) / 2;
+    const rx = (heroi.dir - heroi.esq) / 2;
+    const ry = (heroi.topo - heroi.base) / 2;
+    const voadores = [[40, 3.8, V.menores[0], 0.3], [-2, 3.2, V.menores[1], 0.4]].map(([ang, d, cor, rampa], k) => {
+      const a = (ang * Math.PI) / 180;
+      const x = ex + (rx + d / 2 + 0.3) * Math.cos(a);
+      const y = ey + (ry + d / 2 + 0.3) * Math.sin(a);
+      const s = criar(m, { x, y, d, cor, ap: 2 + k, expr: 'feliz' });
+      m.amolecer(s, rampa, 0);
+      s.dados.de = [Math.cos(a), Math.sin(a)];
+      return s;
+    });
+    rodar(m, DT);
+    apertar(m, heroi, voadores, [[ex, ey], [ex, ey]], { quadros: 30, acel: 40, vmax: 3.6, semPeso: voadores });
+    return { m, heroi, menores: voadores, contatos: voadores.map((s) => contato(m, heroi, s)), voo: true };
+  },
+  /** Caderno fiel: dois azuis iguais se abracam no chao, ao lado do heroi; uma gota rosa cai. */
+  fiel(V) {
+    const m = novoMundo(V.semente);
+    const heroi = heroiSentado(m, V);
+    const d = 3.3;
+    // o par igual fica ao lado do heroi, sem encostar nele (no jogo so iguais se fundem)
+    const x1 = heroi.esq - d / 2 - 1.0;
+    const a = criar(m, { x: x1, y: d / 2 + 0.05, d, cor: V.menores[0], ap: 3, expr: 'feliz' });
+    const b = criar(m, { x: x1 - d - 0.2, y: d / 2 + 0.05, d, cor: V.menores[0], ap: 3, expr: 'feliz' });
+    m.amolecer(a, 0.5, 0);
+    m.amolecer(b, 0.5, 0);
+    rodar(m, 0.4);
+    // o par se abraca: um puxa o outro, rente ao chao
+    for (let f = 0; f < 26; f++) {
+      const mx = (a.cx + b.cx) / 2;
+      m.atrair(a, mx, a.cy, 14, 1.3, DT);
+      m.atrair(b, mx, b.cy, 14, 1.3, DT);
+      m.avancar(4);
+      m.medir(DT);
+    }
+    // a gota da vez (rosa) caindo, longe de todos
+    const gota = criar(m, { x: heroi.cx - 10.6, y: heroi.topo - 1.6, d: 2.5, cor: V.menores[1], ap: 2, expr: 'feliz', vy: -6 });
+    rodar(m, DT);
+    return { m, heroi, menores: [a, b, gota], contatos: [contato(m, a, b)], par: [a, b], gota };
+  },
+};
+
+// ------------------------------------------------------------ enquadramento
+/**
+ * Janela do mundo na proporcao da tela: o heroi (do chao ao topo) na fracao `ocupa` da altura, o
+ * centro dele em foco[0] da largura e o chao (y = 0) em foco[1] da altura, contando de cima.
+ */
+function janelaPara(heroi, V) {
+  const alt = heroi.topo / V.ocupa;
+  const larg = (alt * W) / H;
+  const x0 = heroi.cx - V.foco[0] * larg;
+  const y1 = V.foco[1] * alt;
+  return [x0, y1 - alt, x0 + larg, y1];
+}
+
+// ------------------------------------------------------------ fundo
+/** Um ruido fixo de +-1 nivel (sem faixas no degrade, nem no JPG). */
+function dither(ctx) {
+  const img = ctx.getImageData(0, 0, W, H);
+  const d = img.data;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      let h = Math.imul(x * 374761393 + y * 668265263, 1274126177);
+      h ^= h >>> 13;
+      const n = ((h >>> 0) % 3) - 1;
+      const i = (y * W + x) * 4;
+      d[i] += n;
+      d[i + 1] += n;
+      d[i + 2] += n;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+function fundo(ctx, cam, V, C) {
+  const F = FUNDOS[V.fundo];
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (F.caderno) {
+    // o papel do jogo com uma luz atras do heroi e os cantos mais fundos (como as capas de hoje)
+    desenharPapel(ctx, cam, 1, W, H);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const [fx, fy] = paraTela(cam, C.heroi.cx - 1.5, C.heroi.cy + 1);
+    const R = Math.max(W, H);
+    const luz = ctx.createRadialGradient(fx, fy, 0, fx, fy, R * 0.6);
+    luz.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+    luz.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = luz;
+    ctx.fillRect(0, 0, W, H);
+    const v = ctx.createRadialGradient(W / 2, H / 2, R * 0.38, W / 2, H / 2, R * 0.85);
+    v.addColorStop(0, 'rgba(70, 80, 110, 0)');
+    v.addColorStop(1, 'rgba(70, 80, 110, 0.28)');
+    ctx.fillStyle = v;
+    ctx.fillRect(0, 0, W, H);
+    return;
+  }
+  const alto = F.centro === 'alto';
+  const [cx, cy] = paraTela(cam, C.heroi.cx, alto ? C.heroi.topo - C.heroi.raio0 * 0.25 : C.heroi.cy + C.heroi.raio0 * 0.15);
+  const R = Math.hypot(W, H) * F.raio;
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+  for (const [p, c] of F.paradas) g.addColorStop(p, c);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  dither(ctx);
+}
+/** Sombra de contato macia (achatada) embaixo de um slime. */
+function sombra(ctx, cam, s, cor, k = 1) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const larg = (s.dir - s.esq) * cam.s;
+  const [sx, sy] = paraTela(cam, s.cx, s.base - 0.06 * s.raio0);
+  const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, larg * 0.5 * k);
+  g.addColorStop(0, cor);
+  g.addColorStop(1, cor.replace(/[\d.]+\)$/, '0)'));
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.scale(1, 0.13);
+  ctx.translate(-sx, -sy);
+  ctx.fillStyle = g;
+  ctx.fillRect(sx - larg, sy - larg, larg * 2, larg * 2);
+  ctx.restore();
+}
+
+// ------------------------------------------------------------ estouro
+/** Brilho radial (px) com as paradas dadas. */
+function clarao(ctx, x, y, r, paradas, modo = 'lighter') {
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = modo;
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  for (const [p, c] of paradas) g.addColorStop(p, c);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+/** Raios em cunha largos (nunca linhas), so no fundo (antes dos slimes). */
+function raios(ctx, x, y, n, abre, alcance, alfa, giro = 0, modo = 'source-over') {
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = modo;
+  const g = ctx.createRadialGradient(x, y, 0, x, y, alcance);
+  g.addColorStop(0, `rgba(255, 255, 255, ${alfa})`);
+  g.addColorStop(0.55, `rgba(255, 255, 255, ${alfa * 0.45})`);
+  g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  for (let k = 0; k < n; k++) {
+    const a = giro + (k * 2 * Math.PI) / n;
+    ctx.moveTo(x, y);
+    ctx.arc(x, y, alcance, a - abre / 2, a + abre / 2);
+    ctx.closePath();
+  }
+  ctx.fill();
+  ctx.restore();
+}
+/** Estrela cheia de 4 pontas (a de src/render/guias.js, mais gordinha: nada de cruz fina). */
+function estrela(ctx, x, y, r, cor, tinta) {
+  const c = r * 0.2;
+  ctx.beginPath();
+  ctx.moveTo(x, y - r);
+  ctx.quadraticCurveTo(x + c, y - c, x + r, y);
+  ctx.quadraticCurveTo(x + c, y + c, x, y + r);
+  ctx.quadraticCurveTo(x - c, y + c, x - r, y);
+  ctx.quadraticCurveTo(x - c, y - c, x, y - r);
+  ctx.closePath();
+  if (tinta) {
+    ctx.strokeStyle = TINTA;
+    ctx.lineWidth = Math.max(1.5, r * 0.2);
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  }
+  ctx.fillStyle = cor;
+  ctx.fill();
+}
+/** Gota de gel (mundo): degrade da paleta, brilho e a tinta se a versao tem. */
+function gota(ctx, cam, x, y, r, P, tinta) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const [sx, sy] = paraTela(cam, x, y);
+  const R = r * cam.s;
+  const g = ctx.createRadialGradient(sx - R * 0.35, sy - R * 0.4, R * 0.1, sx, sy, R);
+  g.addColorStop(0, P.claro);
+  g.addColorStop(0.55, P.cor);
+  g.addColorStop(1, P.escuro);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(sx, sy, R, 0, Math.PI * 2);
+  ctx.fill();
+  if (tinta) {
+    ctx.strokeStyle = TINTA;
+    ctx.lineWidth = Math.max(1.5, cam.s * 0.045);
+    ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.beginPath();
+  ctx.ellipse(sx - R * 0.35, sy - R * 0.38, R * 0.24, R * 0.16, -0.6, 0, Math.PI * 2);
+  ctx.fill();
+}
+/** rho do campo num ponto do mundo (0 fora da janela). */
+function rhoEm(campo, x, y) {
+  const i = Math.round((x - campo.janela[0]) / campo.celula);
+  const j = Math.round((y - campo.janela[1]) / campo.celula);
+  if (i < 0 || j < 0 || i >= campo.nx || j >= campo.ny) return 0;
+  return campo.t0[(j * campo.nx + i) * 4];
+}
+/**
+ * O ponto de fora dos corpos mais perto do encosto, puxando para cima (a abertura da fusao): as voltas
+ * crescem ate achar o fundo e, nelas, fica o ponto mais alto.
+ */
+function abertura(campo, [px, py]) {
+  for (let r = 0.15; r < 4; r += 0.1) {
+    let melhor = null;
+    for (let a = 0; a < 360; a += 6) {
+      const x = px + Math.cos((a * Math.PI) / 180) * r;
+      const y = py + Math.sin((a * Math.PI) / 180) * r;
+      if (y > 0.3 && rhoEm(campo, x, y) < LIM * 0.35 && (!melhor || y > melhor[1])) melhor = [x, y];
+    }
+    if (melhor) return melhor;
+  }
+  return [px, py];
+}
+/** O circulo (mundo, raio r) esta todo no fundo, sem encostar em slime? */
+function noFundo(campo, x, y, r) {
+  // a silhueta fica em rho = LIM; com o nucleo largo da capa, a densidade cai devagar do lado de fora
+  if (rhoEm(campo, x, y) > LIM * 0.5) return false;
+  for (let k = 0; k < 12; k++) {
+    const a = (k * Math.PI) / 6;
+    if (rhoEm(campo, x + Math.cos(a) * r, y + Math.sin(a) * r) > LIM * 0.5) return false;
+  }
+  return true;
+}
+/** Sorteio fixo (LCG) para a posicao das estrelas e das gotas. */
+function criarSorteio(semente) {
+  let s = semente >>> 0 || 1;
+  return () => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+/**
+ * Dentro do quadro (com a margem de 40 px) e acima do chao (y = 0): nada boiando embaixo da linha do
+ * chao nem cortado pela borda. @returns {(x: number, y: number, r: number) => boolean}
+ */
+function noQuadro(cam) {
+  const [qx0, qy1] = paraMundo(cam, 0, 0);
+  const [qx1, qy0] = paraMundo(cam, W, H);
+  const mg = (40 * ESC) / cam.s;
+  return (x, y, r) => x - r > qx0 + mg && x + r < qx1 - mg && y - r > Math.max(qy0 + mg, 0.2) && y + r < qy1 - mg;
+}
+/**
+ * Estrelas e gotas em volta de cada encosto, so sobre o fundo: a costura corta a linha dos centros e o
+ * espaco livre fica dos dois lados dela (acima e abaixo do encosto), nao na direcao dos corpos.
+ * @returns {{ estrelas: number[][], gotas: number[][] }} (mundo)
+ */
+function enfeites(campo, C, cam, o) {
+  const rnd = criarSorteio(o.semente);
+  const cabe = noQuadro(cam);
+  const estrelas = [];
+  const gotas = [];
+  const longe = (x, y, r, lista, fator) => lista.every(([a, b, c]) => Math.hypot(a - x, b - y) > (r + c) * fator);
+  C.contatos.forEach(([px, py], k) => {
+    const sai = Math.atan2(py - C.heroi.cy, px - C.heroi.cx);
+    const lados = [sai + Math.PI / 2, sai - Math.PI / 2];
+    for (let t = 0, n = 0; t < 500 && n < (o.estrelas[k] || 0); t++) {
+      const a = lados[t % 2] + (rnd() - 0.5) * 1.3;
+      const d = o.dist[0] + rnd() * (o.dist[1] - o.dist[0]);
+      const r = (o.rEstrela[0] + rnd() * (o.rEstrela[1] - o.rEstrela[0])) / o.escala;
+      const x = px + Math.cos(a) * d;
+      const y = py + Math.sin(a) * d;
+      if (!cabe(x, y, r) || !noFundo(campo, x, y, r * 1.25) || !longe(x, y, r, estrelas, 2.2) || !longe(x, y, r, gotas, 1.6)) continue;
+      estrelas.push([x, y, r]);
+      n++;
+    }
+    for (let t = 0, n = 0; t < 500 && n < (o.gotas[k] || 0); t++) {
+      const a = lados[t % 2] + (rnd() - 0.5) * 1.1;
+      const d = o.distGota[0] + rnd() * (o.distGota[1] - o.distGota[0]);
+      const r = 0.1 + rnd() * 0.17;
+      const x = px + Math.cos(a) * d;
+      const y = py + Math.sin(a) * d;
+      if (!cabe(x, y, r) || !noFundo(campo, x, y, r * 1.4) || !longe(x, y, r, gotas, 1.8) || !longe(x, y, r, estrelas, 1.4)) continue;
+      gotas.push([x, y, r, k]);
+      n++;
+    }
+  });
+  return { estrelas, gotas };
+}
+
+// ------------------------------------------------------------ rostos (os do jogo)
+/** O centro do rosto classico do jogo (src/render/rostos.js: olhos em 0,16 R acima do centro). */
+function centroRosto(s) { return [s.cx, s.cy + 0.16 * 0.9 * s.raio0]; }
+/**
+ * Os rostos do jogo (estilo classico): o do heroi olhando para o alto (alegria, ou o estouro no
+ * Impacto) e os dos menores olhando o rosto dele. So `quem` desenha (os outros ficam sem rosto).
+ */
+function rostosDoJogo(ctx, C, cam, V, quem = 'todos') {
+  const { m, heroi } = C;
+  const [rx, ry] = centroRosto(heroi);
+  const vivos = m.slimes.filter((s) => s.ativo);
+  const desenhar = (lista, olhar) => {
+    for (const s of vivos) s.dados.semRosto = !lista.includes(s);
+    desenharRostos(ctx, m, cam, 1, T, { olhar, estilo: 'classico' });
+  };
+  if (quem !== 'menores') desenhar([heroi], V.olhar === 'estouro' && C.contatos.length ? C.contatos[0] : [rx, ry + 3 * heroi.raio0]);
+  if (quem !== 'heroi') desenhar(C.menores, [rx, ry]);
+  for (const s of vivos) s.dados.semRosto = false;
+}
+
+// ------------------------------------------------------------ desenho da capa
+function rgbDe(hex) { return linearDeHex(hex); }
+function hexA(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
+function rendererDe(gl) {
+  const ext = gl.getExtension('WEBGL_debug_renderer_info');
+  return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+}
+
+/** A capa inteira no canvas. Devolve o que a medida precisa. */
+function capa(cv, V) {
+  const C = CENAS[V.cena](V);
+  marcas.fisica = performance.now();
+  const { m, heroi } = C;
+  const janela = janelaPara(heroi, V);
+  const cam = enquadrar(janela, { x: 0, y: 0, w: W, h: H });
+  cv.width = W;
+  cv.height = H;
+  const ctx = /** @type {CanvasRenderingContext2D} */ (cv.getContext('2d'));
+  const F = FUNDOS[V.fundo];
+  const P = PALETA;
+  const escuro = !F.caderno;
+  const tinta = true;
+
+  // campo e volume (a grade vem do mundo: a mesma silhueta em qualquer resolucao)
+  const [x0, y1] = paraMundo(cam, 0, 0);
+  const [x1, y0] = paraMundo(cam, W, H);
+  const celula = (y1 - y0) / 500;
+  const campo = criarCampo({ janela: [x0 - 1.5, y0 - 1.5, x1 + 1.5, y1 + 1.5], celula, raio: RAIO });
+  campo.acumular(m);
+  marcas.campo = performance.now();
+  const vol = volumeDoCampo(campo, { limiar: LIM, kDomo: LUZ_GEL.kDomo, alisarU: 0.35 });
+  marcas.volume = performance.now();
+
+  // o estouro sai da abertura logo acima de cada encosto (no ponto do encosto ele so apareceria por
+  // uma fresta entre os corpos, como uma mancha branca)
+  C.contatos = C.contatos.map((p) => abertura(campo, p));
+  const E = ESTOUROS[V.estouro];
+  const enf = enfeites(campo, C, cam, {
+    semente: V.semente * 31 + 7, estrelas: E.estrelas, gotas: E.gotas, rEstrela: E.rEstrela, escala: cam.s / ESC,
+    dist: V.estouro === 'forte' ? [1.8, 4.6] : [1.6, 3.6], distGota: V.estouro === 'forte' ? [1.0, 3.8] : [0.9, 2.8],
+  });
+
+  // 1. fundo e os raios longos do Impacto (so no fundo)
+  fundo(ctx, cam, V, C);
+  if (E.raios && C.contatos.length) {
+    const [sx, sy] = paraTela(cam, ...C.contatos[0]);
+    raios(ctx, sx, sy, 14, (10 * Math.PI) / 180, 1500 * ESC, 0.26, 0.12);
+  }
+  // 2. sombras de contato (depois dos raios: a sombra nao fica listrada de luz)
+  if (V.sombras !== 'nenhuma') {
+    sombra(ctx, cam, heroi, F.sombra, 1);
+    if (V.sombras === 'todos' || V.sombras === 'papel') for (const s of C.menores) if (s !== C.gota) sombra(ctx, cam, s, F.sombra, 0.9);
+  }
+  // 3. estouro de tras: o clarao e os raios curtos de cada encosto (os corpos cobrem o miolo); os
+  // riscos de quem chega voando ficam atras dos corpos
+  const modo = escuro ? 'lighter' : 'source-over';
+  C.contatos.forEach(([px, py], k) => {
+    const [sx, sy] = paraTela(cam, px, py);
+    if (E.juncao) {
+      const [hx, hy] = paraTela(cam, heroi.cx, heroi.cy);
+      const chao = paraTela(cam, 0, 0)[1];
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, W, chao);
+      ctx.clip();
+      raios(ctx, sx, sy, 9, (14 * Math.PI) / 180, 4.0 * cam.s, 0.3, Math.atan2(sy - hy, sx - hx), modo);
+      ctx.restore();
+    }
+    if (E.clarao) {
+      const cor = C.menores[k] ? P[C.menores[k].dados.cor] : P.rosa;
+      clarao(ctx, sx, sy, E.clarao * cam.s, [[0, 'rgba(255, 255, 255, 0.95)'], [0.25, 'rgba(255, 246, 200, 0.85)'], [0.55, hexA(cor.claro, 0.4)], [1, hexA(cor.claro, 0)]], modo);
+    }
+  });
+  if (C.voo) riscosVoo(ctx, cam, C);
+  let auraEstrelas = [];
+  if (E.aura) auraEstrelas = auraHalo(ctx, cam, campo, C);
+
+  // 4. o gel (WebGL): desenhado e copiado no mesmo bloco
+  const glcv = document.createElement('canvas');
+  glcv.width = W;
+  glcv.height = H;
+  const gel = criarGel(glcv);
+  if (!gel) throw new Error('sem WebGL2');
+  const ap = [heroi, ...C.menores].reduce((lista, s) => {
+    const p = P[s.dados.cor];
+    // no gel, so o heroi tem especular no shader: nos menores, o brilho e o arco do rosto do jogo
+    lista[s.dados.ap - 1] = { claro: rgbDe(p.claro), cor: rgbDe(p.cor), escuro: rgbDe(p.escuro), brilhoPe: rgbDe(p.pe), esp: s === heroi ? LUZ_GEL.esp : 0 };
+    return lista;
+  }, []);
+  for (let k = 0; k < 3; k++) if (!ap[k]) ap[k] = ap[0];
+  const traco = cam.s * 0.05;
+  // a luz de cada encosto nos dois corpos (o brilho da fusao por baixo da tinta da costura)
+  // (no jogo nao tem essa luz: no estilo do jogo o brilho da fusao fica so no fundo)
+  const jogo = ESTILO === 'jogo';
+  const forca = jogo ? 0 : 1;
+  const estouros = C.contatos.map(([px, py]) => ({ x: px, y: py, z: 1.0, r: 3.2, cor: (escuro ? [0.45, 0.41, 0.31] : [0.26, 0.23, 0.17]).map((v) => v * forca) }));
+  const [rx, ry] = centroRosto(heroi);
+  gel.desenhar(campo, cam, vol, {
+    limiar: LIM, traco, aparencias: ap, tons: LUZ_GEL.tons, rim: [...rgbDe(LUZ_GEL.rim[0]), LUZ_GEL.rim[1]],
+    tinta, borda: traco * 0.9, rosto: [rx, ry, 0.8 * heroi.raio0, 0.7 * heroi.raio0], estouros, jogo,
+  });
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(glcv, 0, 0);
+  const renderer = rendererDe(gel.gl);
+  const buffer = [gel.gl.drawingBufferWidth, gel.gl.drawingBufferHeight];
+  marcas.gel = performance.now();
+
+  // 5. os rostos do jogo: o do heroi e os dos menores olhando para ele
+  rostosDoJogo(ctx, C, cam, V);
+  // 6. estouro da frente: estrelas e gotas (so sobre o fundo) e os riscos da gota que cai
+  for (const [x, y, r, k] of enf.gotas) gota(ctx, cam, x, y, r, P[C.menores[k] ? C.menores[k].dados.cor : 'rosa'], tinta);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  for (const [x, y, r] of enf.estrelas) {
+    const [sx, sy] = paraTela(cam, x, y);
+    estrela(ctx, sx, sy, r * cam.s, '#ffffff', tinta);
+  }
+  if (C.gota) riscosQueda(ctx, cam, C.gota);
+  marcas.fim = performance.now();
+  return { C, cam, campo, vol, ctx, renderer, buffer, auraEstrelas, estrelas: enf.estrelas };
+}
+/**
+ * Riscos brancos macios atras de quem chega voando (Impacto), na direcao de onde veio; desenhados
+ * antes do gel, os corpos cobrem o que passa por cima deles.
+ */
+function riscosVoo(ctx, cam, C) {
+  aplicar(ctx, cam, 1);
+  ctx.lineCap = 'round';
+  for (const s of C.menores) {
+    const [ux, uy] = s.dados.de;
+    const R = s.raio0;
+    const nx = -uy;
+    const ny = ux;
+    for (const [lado, ini, comp] of [[-0.55, 0.25, 1.5], [0, 0.55, 2.2], [0.55, 0.25, 1.5]]) {
+      const bx = s.cx + ux * (R + ini) + nx * lado * R;
+      const by = s.cy + uy * (R + ini) + ny * lado * R;
+      const g = ctx.createLinearGradient(bx, by, bx + ux * comp, by + uy * comp);
+      g.addColorStop(0, 'rgba(255, 255, 255, 0.75)');
+      g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.strokeStyle = g;
+      ctx.lineWidth = 0.16;
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(bx + ux * comp, by + uy * comp);
+      ctx.stroke();
+    }
+  }
+}
+/** Riscos de tinta acima da gota que cai (como nas capas de hoje). */
+function riscosQueda(ctx, cam, g) {
+  aplicar(ctx, cam, 1);
+  ctx.strokeStyle = 'rgba(23, 22, 28, 0.55)';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 0.12;
+  for (const [dx, a0, b0] of [[-0.75, 0.4, 1.2], [0, 0.6, 1.5], [0.75, 0.4, 1.15]]) {
+    ctx.beginPath();
+    ctx.moveTo(g.cx + dx * g.raio0, g.topo + a0);
+    ctx.lineTo(g.cx + dx * g.raio0, g.topo + b0);
+    ctx.stroke();
+  }
+}
+/**
+ * Caderno: o halo dourado da fusao em volta do par igual (o gradiente da aura de src/render/guias.js,
+ * mais quente e forte no papel) e 6 estrelas cheias da capa (as do jogo sao finas: a cruz que o usuario
+ * vetou), so no papel, dentro do quadro e acima do chao.
+ * @returns {boolean[]} cada estrela coube
+ */
+function auraHalo(ctx, cam, campo, C) {
+  const [a, b] = C.par;
+  const x = (a.cx + b.cx) / 2;
+  const y = (a.cy + b.cy) / 2;
+  const raio = (Math.max(a.dir, b.dir) - Math.min(a.esq, b.esq)) * 0.5;
+  const [sx, sy] = paraTela(cam, x, y);
+  const r = raio * cam.s;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const g = ctx.createRadialGradient(sx, sy, r * 0.7, sx, sy, r * 1.45);
+  g.addColorStop(0, 'rgba(255, 178, 26, 0)');
+  g.addColorStop(0.3, 'rgba(255, 178, 26, 0.8)');
+  g.addColorStop(0.55, 'rgba(255, 140, 20, 0.35)');
+  g.addColorStop(1, 'rgba(255, 140, 20, 0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(sx, sy, r * 1.45, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // as estrelas: a volta que deixa mais delas no papel
+  const cabe = noQuadro(cam);
+  const rEst = (30 * ESC) / cam.s;
+  const pos = (t) => Array.from({ length: 6 }, (_, k) => {
+    const ang = t + (k * 2 * Math.PI) / 6;
+    return [x + Math.cos(ang) * raio * 1.12, y + Math.sin(ang) * raio * 1.12];
+  });
+  const boa = ([px, py]) => cabe(px, py, rEst) && noFundo(campo, px, py, rEst * 1.2);
+  let melhor = 0;
+  let nota = -1;
+  for (let t = 0; t < Math.PI / 3; t += 0.02) {
+    const n = pos(t).filter(boa).length;
+    if (n > nota) { nota = n; melhor = t; }
+  }
+  const lista = pos(melhor);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  for (const p of lista) {
+    if (!boa(p)) continue;
+    const [px, py] = paraTela(cam, p[0], p[1]);
+    estrela(ctx, px, py, rEst * cam.s, '#ffd23a', true);
+  }
+  return lista.map(boa);
+}
+
+// ------------------------------------------------------------ medidas
+function linSrgb(v) { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }
+function lumLin(r, g, b) { return 0.2126 * linSrgb(r) + 0.7152 * linSrgb(g) + 0.0722 * linSrgb(b); }
+function wcag(a, b) { return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); }
+function mediana(v) { const s = [...v].sort((x, y) => x - y); return s.length ? s[s.length >> 1] : 0; }
+/**
+ * Recortes que os portais fazem do 16:9 (px pensados em 1920x1080): o 1:1 do meio (x 420-1500) para
+ * o rosto do heroi; o 4:3 do meio (x 240-1680) para os rostos dos menores. A altura inteira fica (o
+ * 9:16 e os banners baixos pedem outro mestre).
+ */
+const RECORTE_1x1 = [420, 1500];
+const RECORTE_4x3 = [240, 1680];
+function medir(R, V) {
+  const { C, cam, campo, ctx } = R;
+  const img = ctx.getImageData(0, 0, W, H).data;
+  let opaca = true;
+  for (let i = 3; i < img.length; i += 4) if (img[i] < 255) { opaca = false; break; }
+  /** O pixel (r, g, b) de um ponto do mundo, ou null fora da tela. */
+  const px = (x, y) => {
+    const [sx, sy] = paraTela(cam, x, y);
+    const ix = Math.round(sx);
+    const iy = Math.round(sy);
+    if (ix < 0 || iy < 0 || ix >= W || iy >= H) return null;
+    const i = (iy * W + ix) * 4;
+    return [img[i], img[i + 1], img[i + 2]];
+  };
+  const { heroi } = C;
+  // as mascaras dos rostos do jogo (o do heroi e os dos menores)
+  const novaMascara = () => {
+    const c = document.createElement('canvas');
+    c.width = W;
+    c.height = H;
+    return /** @type {CanvasRenderingContext2D} */ (c.getContext('2d'));
+  };
+  const mRosto = novaMascara();
+  rostosDoJogo(mRosto, C, cam, V, 'heroi');
+  const mMenores = novaMascara();
+  rostosDoJogo(mMenores, C, cam, V, 'menores');
+  const dRosto = mRosto.getImageData(0, 0, W, H).data;
+  const dMenores = mMenores.getImageData(0, 0, W, H).data;
+  const fora = (sx, sy) => {
+    const i = (Math.round(sy) * W + Math.round(sx)) * 4 + 3;
+    return dRosto[i] === 0 && dMenores[i] === 0;
+  };
+  // o corpo de cada slime (na caixa dele, fora dos rostos e da borda): croma OKLCH e luminancia
+  const corpo = (s) => {
+    const cs = [];
+    let somaL = 0;
+    let n = 0;
+    for (let j = 0; j < campo.ny; j += 2) {
+      const y = campo.janela[1] + j * campo.celula;
+      if (y < s.base || y > s.topo) continue;
+      for (let i = 0; i < campo.nx; i += 2) {
+        const x = campo.janela[0] + i * campo.celula;
+        if (x < s.esq || x > s.dir) continue;
+        const k = j * campo.nx + i;
+        if (Math.round(campo.t2[k * 4 + 2]) !== s.dados.ap) continue;
+        const sd = R.vol[k * 4 + 3];
+        if (sd < 0.08) continue;
+        const [sx, sy] = paraTela(cam, x, y);
+        if (!fora(sx, sy)) continue;
+        const c = px(x, y);
+        if (!c) continue;
+        cs.push(oklch(c.map(linSrgb))[1]);
+        somaL += lumLin(...c);
+        n++;
+      }
+    }
+    return { croma: n ? +mediana(cs).toFixed(3) : null, lum: n ? somaL / n : null, amostras: n };
+  };
+  // o fundo logo fora da silhueta (anda para fora ate o fundo e soma 12 a 30 px): contraste WCAG
+  const anelFundo = (s) => {
+    let soma = 0;
+    let n = 0;
+    const cy = (s.topo + s.base) / 2;
+    for (let a = 0; a < 360; a += 5) {
+      const ux = Math.cos((a * Math.PI) / 180);
+      const uy = Math.sin((a * Math.PI) / 180);
+      let d = 0;
+      while (d < 30 && rhoEm(campo, s.cx + ux * d, cy + uy * d) > LIM * 0.1) d += campo.celula * 2;
+      for (const extra of [12, 20, 30]) {
+        const dd = d + (extra * ESC) / cam.s;
+        const x = s.cx + ux * dd;
+        const y = cy + uy * dd;
+        if (y < 0 || rhoEm(campo, x, y) > LIM * 0.1) continue;
+        if (C.contatos.some(([qx, qy]) => Math.hypot(qx - x, qy - y) < 3.2)) continue;
+        const c = px(x, y);
+        if (!c) continue;
+        soma += lumLin(...c);
+        n++;
+      }
+    }
+    return n ? soma / n : null;
+  };
+  const minimo = (cor) => +(0.85 * oklch(linearDeHex(PALETA[cor].cor))[1]).toFixed(3);
+  const avisos = [];
+  const slimes = [heroi, ...C.menores].map((s) => {
+    const c = corpo(s);
+    const f = anelFundo(s);
+    const contraste = f === null || c.lum === null ? null : +wcag(c.lum, f).toFixed(2);
+    if (c.amostras < 150) avisos.push(`poucas amostras do corpo: ${s.dados.cor} (${c.amostras})`);
+    if (c.croma !== null && c.croma < minimo(s.dados.cor)) avisos.push(`croma baixo: ${s.dados.cor} ${c.croma} (minimo ${minimo(s.dados.cor)})`);
+    if (contraste === null) avisos.push(`contraste sem amostra: ${s.dados.cor}`);
+    else if (contraste < 3) avisos.push(`contraste baixo: ${s.dados.cor} ${contraste}`);
+    return { cor: s.dados.cor, croma: c.croma, amostras: c.amostras, contraste };
+  });
+  // o rosto do heroi pela mascara (tudo o que foi desenhado) e os dos menores pelo centro
+  let rx0 = W;
+  let ry0 = H;
+  let rx1 = -1;
+  let ry1 = -1;
+  for (let y = 0; y < H; y += 2) {
+    for (let x = 0; x < W; x += 2) {
+      if (dRosto[(y * W + x) * 4 + 3] === 0) continue;
+      if (x < rx0) rx0 = x;
+      if (x > rx1) rx1 = x;
+      if (y < ry0) ry0 = y;
+      if (y > ry1) ry1 = y;
+    }
+  }
+  const rosto = [rx0, ry0, rx1, ry1];
+  const sx = W / 1920;
+  if (rx0 < RECORTE_1x1[0] * sx || rx1 > RECORTE_1x1[1] * sx) avisos.push('rosto do heroi sai do recorte 1:1');
+  if (ry0 < 40 * ESC || ry1 > H - 40 * ESC) avisos.push('rosto do heroi encosta no alto ou no pe do quadro');
+  for (const s of C.menores) {
+    const [cx] = paraTela(cam, s.cx, s.cy);
+    if (cx < RECORTE_4x3[0] * sx || cx > RECORTE_4x3[1] * sx) avisos.push(`rosto do ${s.dados.cor} sai do recorte 4:3`);
+  }
+  if (!opaca) avisos.push('nao opaca');
+  if (R.buffer[0] !== W || R.buffer[1] !== H) avisos.push('drawingBuffer menor que o canvas');
+  if (R.auraEstrelas.some((b) => !b)) avisos.push('estrela da aura sem lugar no papel');
+  // a altura do heroi pela silhueta (celulas com o heroi dominante e rho acima do limiar)
+  let topo = H;
+  let pe = -1;
+  for (let j = 0; j < campo.ny; j++) {
+    for (let i = 0; i < campo.nx; i += 3) {
+      const k = j * campo.nx + i;
+      if (campo.t0[k * 4] < LIM || Math.round(campo.t2[k * 4 + 2]) !== 1) continue;
+      const [, py] = paraTela(cam, 0, campo.janela[1] + j * campo.celula);
+      if (py < topo) topo = py;
+      if (py > pe) pe = py;
+    }
+  }
+  const altura = +((Math.min(pe, H) - Math.max(topo, 0)) / H).toFixed(3);
+  if (topo <= 0 || pe >= H) avisos.push('heroi cortado pela borda do quadro');
+  return {
+    versao: V.nome, estilo: ESTILO, w: W, h: H, renderer: R.renderer, buffer: R.buffer, opaca, altura, rosto, slimes,
+    estrelas: R.estrelas.length,
+    heroi: { a11: +heroi.a11.toFixed(3), a22: +heroi.a22.toFixed(3), giro: +((Math.atan2(heroi.sin, heroi.cos) * 180) / Math.PI).toFixed(1) },
+    celulas: [campo.nx, campo.ny], limiar: +LIM.toFixed(3), raio: RAIO,
+    ms: {
+      fisica: Math.round(marcas.fisica - marcas.inicio), campo: Math.round(marcas.campo - marcas.fisica), volume: Math.round(marcas.volume - marcas.campo),
+      gel: Math.round(marcas.gel - marcas.volume), total: Math.round(marcas.fim - marcas.inicio),
+    },
+    avisos,
+  };
+}
+
+// ------------------------------------------------------------ folhas (comparacao e tiles)
+async function fonte() {
+  const f = new FontFace('Fredoka', 'url(../src/ui/fontes/fredoka-latin-700-normal.woff2)', { weight: '700' });
+  document.fonts.add(await f.load());
+}
+function carregar(src) {
+  return new Promise((ok, falha) => {
+    const im = new Image();
+    im.onload = () => ok(im);
+    im.onerror = () => falha(new Error('nao carregou ' + src));
+    im.src = src;
+  });
+}
+/** Reduz em passos de metade (sem serrilhar) ate w x h. */
+function reduzir(im, w, h) {
+  let cv = document.createElement('canvas');
+  cv.width = im.width;
+  cv.height = im.height;
+  cv.getContext('2d').drawImage(im, 0, 0);
+  while (cv.width / 2 >= w) {
+    const n = document.createElement('canvas');
+    n.width = Math.round(cv.width / 2);
+    n.height = Math.round(cv.height / 2);
+    const c = n.getContext('2d');
+    c.imageSmoothingQuality = 'high';
+    c.drawImage(cv, 0, 0, n.width, n.height);
+    cv = n;
+  }
+  const n = document.createElement('canvas');
+  n.width = w;
+  n.height = h;
+  const c = n.getContext('2d');
+  c.imageSmoothingQuality = 'high';
+  c.drawImage(cv, 0, 0, w, h);
+  return n;
+}
+function cantos(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+const ARQ = (n) => `../marketing/capa-heroi/opcoes/${n}-${VERSOES[n].nome}-1920x1080.png`;
+async function imagens() {
+  const lista = [{ rotulo: 'Hoje (com título)', eixos: 'a capa atual da CrazyGames e dos portais', src: HOJE }];
+  for (const n of Object.keys(VERSOES)) lista.push({ rotulo: VERSOES[n].rotulo, eixos: VERSOES[n].eixos, src: ARQ(n) });
+  for (const it of lista) it.im = await carregar(it.src);
+  return lista;
+}
+/** Folha 3x2: a capa de hoje e as 5, com rotulo (fora da arte). */
+async function folha(cv) {
+  await fonte();
+  const lista = await imagens();
+  const cw = 624;
+  const ch = 351;
+  const m = 24;
+  const rot = 54;
+  cv.width = W;
+  cv.height = H;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#f3f2ee';
+  ctx.fillRect(0, 0, W, H);
+  lista.forEach((it, k) => {
+    const x = m + (k % 3) * (cw + m);
+    const y = m + Math.floor(k / 3) * (ch + rot + m);
+    ctx.fillStyle = '#17161c';
+    ctx.font = '700 25px Fredoka';
+    ctx.fillText(it.rotulo, x + 2, y + 24);
+    ctx.fillStyle = '#5a5866';
+    ctx.font = '700 15px Fredoka';
+    ctx.fillText(it.eixos, x + 2, y + 45);
+    ctx.save();
+    ctx.shadowColor = 'rgba(23, 22, 28, 0.25)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 3;
+    cantos(ctx, x, y + rot, cw, ch, 10);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    cantos(ctx, x, y + rot, cw, ch, 10);
+    ctx.clip();
+    ctx.drawImage(reduzir(it.im, cw, ch), x, y + rot);
+    ctx.restore();
+  });
+}
+/** Tiles pequenos (320x180, 200x113 e 160x90), numa faixa escura e numa clara, como numa grade de portal. */
+async function grade(cv) {
+  await fonte();
+  const lista = await imagens();
+  cv.width = W;
+  cv.height = H;
+  const ctx = cv.getContext('2d');
+  const faixas = [['#101018', '#e8e8f0'], ['#ffffff', '#17161c']];
+  const m = 16;
+  const alt = H / 2;
+  faixas.forEach(([fundoF, letra], f) => {
+    const y0 = f * alt;
+    ctx.fillStyle = fundoF;
+    ctx.fillRect(0, y0, W, alt);
+    let y = y0 + m;
+    for (const [tw, th, r] of [[320, 180, 10], [200, 113, 8], [160, 90, 6]]) {
+      lista.forEach((it, k) => {
+        const x = m + k * (320 + m) + (320 - tw) / 2;
+        ctx.save();
+        cantos(ctx, x, y, tw, th, r);
+        ctx.clip();
+        ctx.drawImage(reduzir(it.im, tw, th), x, y);
+        ctx.restore();
+        ctx.fillStyle = letra;
+        ctx.font = '700 15px Fredoka';
+        ctx.textAlign = 'center';
+        ctx.fillText(k ? String(k) : 'Hoje', x + tw / 2, y + th + 18);
+        ctx.textAlign = 'left';
+      });
+      y += th + 30;
+    }
+  });
+}
+
+// ------------------------------------------------------------ entrada
+function versaoPedida() {
+  const n = q.get('versao') || '1';
+  const base = VERSOES[n];
+  if (!base) throw new Error(`versao desconhecida: ${n}`);
+  const V = { ...base, heroi: q.get('heroi') || base.heroi, menores: q.get('menores') ? q.get('menores').split(',') : base.menores };
+  if (q.get('fundo')) {
+    if (!FUNDOS[q.get('fundo')]) throw new Error(`fundo desconhecido: ${q.get('fundo')}`);
+    V.fundo = q.get('fundo');
+  }
+  if (q.get('semente')) V.semente = Number(q.get('semente'));
+  if (q.get('mole')) V.mole = Number(q.get('mole'));
+  if (q.get('assenta')) V.assenta = Number(q.get('assenta'));
+  for (const c of [V.heroi, ...V.menores]) if (!PALETA[c]) throw new Error(`cor desconhecida: ${c}`);
+  return V;
+}
+
+async function principal() {
+  const cv = /** @type {HTMLCanvasElement} */ (document.getElementById('c'));
+  if (q.has('folha')) { await folha(cv); return; }
+  if (q.has('grade')) { await grade(cv); return; }
+  // na arte, nenhum texto: o portal pede capa sem texto
+  const proibido = () => { throw new Error('texto na arte da capa'); };
+  CanvasRenderingContext2D.prototype.fillText = proibido;
+  CanvasRenderingContext2D.prototype.strokeText = proibido;
+  const V = versaoPedida();
+  const R = capa(cv, V);
+  if (q.has('medir')) {
+    const med = medir(R, V);
+    window.__medidas = med;
+    document.getElementById('medidas').textContent = JSON.stringify(med);
+  }
+}
+window.addEventListener('error', (e) => { document.title = 'ERRO: ' + (e.message || 'erro'); });
+principal().then(() => { document.title = 'PRONTO'; }).catch((e) => {
+  document.getElementById('medidas').textContent = String(e && e.stack ? e.stack : e);
+  document.title = 'ERRO: ' + (e && e.message ? e.message : String(e));
+});
+</script></body></html>
